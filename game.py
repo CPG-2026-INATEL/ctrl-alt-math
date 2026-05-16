@@ -131,10 +131,12 @@ class Game:
         self.floating_text = FloatingTextSystem()
         self.math_bg = MathBackground()
         self.world_map = WorldMap()
+        self.world_map._game = self
 
         self.entropy = 0
         self.rewind_cooldown = 0
         self.rewind_fx_timer = 0
+        self.gold = 0
         self.mp_is_multiplayer = False
         self.mp_player_index = 1
         self.mp_host = None
@@ -168,10 +170,12 @@ class Game:
         self.floating_text = FloatingTextSystem()
         self.math_bg = MathBackground()
         self.world_map = WorldMap()
+        self.world_map._game = self
 
         self.entropy = 0
         self.rewind_cooldown = 0
         self.rewind_fx_timer = 0
+        self.gold = 0
 
         self.screen_shake = 0.0
         self.shake_intensity = 0

@@ -220,9 +220,8 @@ class GameplayScene(Scene):
             
             # Randomize map size based on difficulty
             scaling = settings.DIFFICULTY_SCALING.get(settings.DIFFICULTY, settings.DIFFICULTY_SCALING[settings.DIFFICULTY_HARD])
-            size_factor = random.uniform(scaling["arena_size_min"], scaling["arena_size_max"])
-            new_cols = int(settings.GRID_COLS * size_factor)
-            new_rows = int(settings.GRID_ROWS * size_factor)
+            new_cols = getattr(room, 'arena_cols', settings.GRID_COLS)
+            new_rows = getattr(room, 'arena_rows', settings.GRID_ROWS)
             self.grid = Grid(new_cols, new_rows)
             
             self.obstacles_data = room.obstacles
@@ -443,7 +442,7 @@ class GameplayScene(Scene):
     def _leave_no_combat_room(self):
         if self.game.current_room:
             self.game.world_map.complete_room(
-                (self.game.current_room.col, self.game.current_room.row)
+                self.game.current_room.id
             )
             if self.game.current_room.type == "victory" and self.game.world_map.all_required_rooms_completed():
                 self._broadcast_scene_switch("victory")
@@ -1058,7 +1057,13 @@ class GameplayScene(Scene):
             self.game.floating_text.add_info(pos[0], pos[1] - 40, 
                                             t("earned_skill_point"), settings.GOLD)
             self.game.tts.speak(t("earned_skill_point"), lang=settings.LANGUAGE)
-            self.game.skill_tree.add_points(1)
+
+            if self.game.current_room:
+                gold_reward = getattr(self.game.current_room, 'gold_reward', 20)
+                self.game.gold += gold_reward
+                self.game.floating_text.add_info(
+                    self.game.player.x, self.game.player.y - 60,
+                    f"+{gold_reward} gold", settings.GOLD)
 
             from achievement_manager import AchievementManager
             mgr = AchievementManager()
@@ -1281,11 +1286,11 @@ class GameplayScene(Scene):
             if self.victory_timer >= settings.VICTORY_TRANSITION_DURATION:
                 if self.game.current_room:
                     self.game.world_map.complete_room(
-                        (self.game.current_room.col, self.game.current_room.row)
+                        self.game.current_room.id
                     )
-                    # If victory room (and all requirements met) OR final boss gate completed, go to victory screen
-                    if (self.game.current_room.type == "victory" and self.game.world_map.all_required_rooms_completed()) or \
-                       getattr(self.game.current_room, "is_final_gate", False):
+                    if (self.game.current_room.type == "victory" or
+                        self.game.current_room.is_final or
+                        getattr(self.game.current_room, 'is_final_gate', False)):
                         self._broadcast_scene_switch("victory")
                         self._restore_primary_player()
                         self.game.scene_manager.switch("victory")

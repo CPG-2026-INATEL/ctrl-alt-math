@@ -43,8 +43,8 @@ class MapScene(Scene):
             self._remote_player = None
 
     def _speak_room(self):
-        room_pos = self.game.world_map.player_room
-        room = self.game.world_map.rooms.get(room_pos)
+        room_id = self.game.world_map.player_room
+        room = self.game.world_map.rooms.get(room_id)
         if room:
             text = f"{t(room.name)}. {t(room.narrative)}" if room.state != "locked" else t("unknown")
             self.game.tts.speak(text, lang=settings.LANGUAGE)
@@ -92,22 +92,22 @@ class MapScene(Scene):
                 self.game.sfx.play("menu_confirm")
                 self.game.scene_manager.switch("gameplay")
 
-    def _cast_vote(self, room_pos):
+    def _cast_vote(self, room_id):
         if not self.game.mp_is_multiplayer:
-            room = self.game.world_map.rooms.get(room_pos)
+            room = self.game.world_map.rooms.get(room_id)
             if room:
                 self.room = room
                 self.game.sfx.play("menu_confirm")
                 self.game.scene_manager.switch("gameplay")
             return
 
-        if self._local_voted_room == room_pos:
+        if self._local_voted_room == room_id:
             self._local_voted_room = None
             self._vote_status = ""
             self._net_send({"type": "map_vote_cancel"})
         else:
-            self._local_voted_room = room_pos
-            self._broadcast_vote(room_pos)
+            self._local_voted_room = room_id
+            self._broadcast_vote(room_id)
             self._update_vote_status()
             self._check_votes()
 
@@ -131,10 +131,10 @@ class MapScene(Scene):
     def handle_event(self, event):
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             room = self.game.world_map.get_room_at_pos(event.pos)
-            if room and self.game.world_map.set_player_room((room.col, room.row)):
+            if room and self.game.world_map.set_player_room(room.id):
                 self._broadcast_position()
                 if room.state in ("available", "completed"):
-                    self._cast_vote((room.col, room.row))
+                    self._cast_vote(room.id)
                 else:
                     self.game.sfx.play("menu_select")
             return
@@ -174,10 +174,10 @@ class MapScene(Scene):
                 self._vote_status = ""
                 self._net_send({"type": "map_vote_cancel"})
         elif event.key == pygame.K_RETURN:
-            room_pos = self.game.world_map.player_room
-            room = self.game.world_map.rooms.get(room_pos)
+            room_id = self.game.world_map.player_room
+            room = self.game.world_map.rooms.get(room_id)
             if room and room.state in ("available", "completed"):
-                self._cast_vote(room_pos)
+                self._cast_vote(room_id)
         elif event.key == pygame.K_ESCAPE:
             self.game.sfx.play("menu_select")
             self.game.scene_manager.switch("menu")

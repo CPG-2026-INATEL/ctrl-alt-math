@@ -210,12 +210,8 @@ class Player:
 
     def level_up(self):
         self.level += 1
-        self.max_hp += settings.PLAYER_HP_PER_LEVEL
-        self.hp = self.max_hp  # Heal on level up
-        self.base_damage += settings.PLAYER_DMG_PER_LEVEL
+        self.hp = self.max_hp
         self.next_level_exp = int(self.next_level_exp * settings.PLAYER_EXP_GROWTH)
-        
-        # Increase move range every 2 levels
         if self.level % 2 == 0:
             self.move_range += 1
 
