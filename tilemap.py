@@ -10,13 +10,13 @@ import random
 ROW_SIZE = 16
 
 TILE_HOLE = -1       # buraco (sem tile)
-TILE_LOW = ROW_SIZE * 1         # terreno baixo
-TILE_HIGH = 1        # terreno alto
-TILE_HIGH_EDGE = 6   # borda inferior do terreno alto (profundidade)
+TILE_LOW = 0       # terreno baixo
+TILE_HIGH = 16        # terreno alto
+TILE_HIGH_EDGE = 45+16   # borda inferior do terreno alto (profundidade)
 TILE_STAIRS_UP = 11+ROW_SIZE  # escada subindo (norte)
 TILE_STAIRS_DOWN = 11 # escada descendo (sul)
-TILE_STAIRS_LEFT = 9 # escada esquerda (oeste)
-TILE_STAIRS_RIGHT = 8 # escada direita (leste)
+TILE_STAIRS_LEFT = 9+16 # escada esquerda (oeste)
+TILE_STAIRS_RIGHT = 8 +16# escada direita (leste)
 
 
 
@@ -104,7 +104,9 @@ class MapGenerator:
         self._enforce_low_connectivity(grid)
         self._prune_small_high_areas(grid)
         self._place_stairs(grid)
+        self._enforce_full_connectivity(grid)
         self._apply_high_edge(grid)
+        self._fix_stair_edges(grid)
 
         return grid
 
@@ -118,6 +120,35 @@ class MapGenerator:
                     changes.append((r, c))
         for r, c in changes:
             grid[r][c] = TILE_HIGH_EDGE
+
+    def _fix_stair_edges(self, grid):
+        ALL_STAIRS = {TILE_STAIRS_UP, TILE_STAIRS_DOWN, TILE_STAIRS_LEFT, TILE_STAIRS_RIGHT}
+        STAIR_DIR = {
+            TILE_STAIRS_UP: (-1, 0),
+            TILE_STAIRS_DOWN: (1, 0),
+            TILE_STAIRS_LEFT: (0, -1),
+            TILE_STAIRS_RIGHT: (0, 1),
+        }
+        changes = set()
+        for r in range(self.height):
+            for c in range(self.width):
+                if grid[r][c] in STAIR_DIR:
+                    dr, dc = STAIR_DIR[grid[r][c]]
+                    nr, nc = r + dr, c + dc
+                    if 0 <= nr < self.height and 0 <= nc < self.width:
+                        if grid[nr][nc] == TILE_HIGH_EDGE:
+                            changes.add((nr, nc))
+        for r in range(self.height):
+            for c in range(self.width):
+                if grid[r][c] == TILE_HIGH_EDGE:
+                    for dr, dc in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+                        nr, nc = r + dr, c + dc
+                        if 0 <= nr < self.height and 0 <= nc < self.width:
+                            if grid[nr][nc] in ALL_STAIRS:
+                                changes.add((r, c))
+                                break
+        for r, c in changes:
+            grid[r][c] = TILE_HIGH
 
     def _scatter_holes(self, grid):
         total = self.width * self.height
@@ -216,6 +247,34 @@ class MapGenerator:
         for r in range(self.height):
             for c in range(self.width):
                 if grid[r][c] == TILE_LOW and (r, c) not in visited:
+                    grid[r][c] = TILE_HOLE
+
+    def _enforce_full_connectivity(self, grid):
+        WALKABLE = {TILE_LOW, TILE_HIGH, TILE_STAIRS_UP, TILE_STAIRS_DOWN, TILE_STAIRS_LEFT, TILE_STAIRS_RIGHT}
+        start = None
+        for r in range(self.height):
+            for c in range(self.width):
+                if grid[r][c] in WALKABLE:
+                    start = (r, c)
+                    break
+            if start:
+                break
+        if not start:
+            return
+        visited = set()
+        queue = [start]
+        visited.add(start)
+        while queue:
+            r, c = queue.pop(0)
+            for dr, dc in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+                nr, nc = r + dr, c + dc
+                if 0 <= nr < self.height and 0 <= nc < self.width:
+                    if (nr, nc) not in visited and grid[nr][nc] in WALKABLE:
+                        visited.add((nr, nc))
+                        queue.append((nr, nc))
+        for r in range(self.height):
+            for c in range(self.width):
+                if grid[r][c] in WALKABLE and (r, c) not in visited:
                     grid[r][c] = TILE_HOLE
 
     def _prune_small_high_areas(self, grid):
