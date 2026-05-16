@@ -1,0 +1,107 @@
+{
+    "inventory_items": [
+        {
+            "id": "pocao_pequena_vida",
+            "nome": "Poção Pequena de Vida",
+            "tipo": "consumivel",
+            "descricao": "Recupera uma pequena quantidade de vida.",
+            "ouro": 15,
+            "efeito": {
+                "hp": 20
+            }
+        },
+        {
+            "id": "pocao_media_vida",
+            "nome": "Poção Média de Vida",
+            "tipo": "consumivel",
+            "descricao": "Recupera uma quantidade moderada de vida.",
+            "ouro": 30,
+            "efeito": {
+                "hp": 40
+            }
+        },
+        {
+            "id": "pocao_grande_vida",
+            "nome": "Poção Grande de Vida",
+            "tipo": "consumivel",
+            "descricao": "Recupera uma grande quantidade de vida.",
+            "ouro": 55,
+            "efeito": {
+                "hp": 75
+            }
+        },
+        {
+            "id": "elixir_vitalidade",
+            "nome": "Elixir de Vitalidade",
+            "tipo": "consumivel",
+            "descricao": "Aumenta a vida maxima durante a partida.",
+            "ouro": 45,
+            "efeito": {
+                "max_hp": 15
+            }
+        },
+        {
+            "id": "tonico_defensivo",
+            "nome": "Tônico Defensivo",
+            "tipo": "consumivel",
+            "descricao": "Concede defesa temporaria.",
+            "ouro": 35,
+            "efeito": {
+                "defesa": 5,
+                "duracao_turnos": 3
+            }
+        }
+    ],
+    "equipments": [
+        {
+            "id": "espada_curta",
+            "nome": "Espada Curta",
+            "tipo": "weapon",
+            "descricao": "Arma basica que aumenta o ataque.",
+            "ouro": 40,
+            "bonus": {
+                "ataque": 5
+            }
+        },
+        {
+            "id": "machado_pesado",
+            "nome": "Machado Pesado",
+            "tipo": "weapon",
+            "descricao": "Arma forte com grande bonus de ataque.",
+            "ouro": 75,
+            "bonus": {
+                "ataque": 9
+            }
+        },
+        {
+            "id": "cajado_arcano",
+            "nome": "Cajado Arcano",
+            "tipo": "weapon",
+            "descricao": "Canaliza energia e melhora o dano magico.",
+            "ouro": 60,
+            "bonus": {
+                "ataque": 7
+            }
+        },
+        {
+            "id": "escudo_madeira",
+            "nome": "Escudo de Madeira",
+            "tipo": "shield",
+            "descricao": "Escudo simples que aumenta a defesa.",
+            "ouro": 35,
+            "bonus": {
+                "defesa": 4
+            }
+        },
+        {
+            "id": "escudo_aco",
+            "nome": "Escudo de Aço",
+            "tipo": "shield",
+            "descricao": "Escudo resistente com bonus maior de defesa.",
+            "ouro": 65,
+            "bonus": {
+                "defesa": 8
+            }
+        }
+    ]
+}
