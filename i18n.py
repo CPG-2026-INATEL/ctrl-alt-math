@@ -61,7 +61,7 @@ STRINGS = {
     "fell_at": {LANG_EN: "You fell at: {room}", LANG_PT: "Você caiu em: {room}"},
     "fell_battle": {LANG_EN: "You fell in battle", LANG_PT: "Você caiu em batalha"},
     "regime_silenced": {LANG_EN: "The regime has silenced another mind.", LANG_PT: "O regime silenciou outra mente."},
-    "upgrades_lost": {LANG_EN: "All upgrades lost. Progress saved.", LANG_PT: "Melhorias perdidas. Progresso salvo."},
+    "upgrades_lost": {LANG_EN: "All upgrades lost.", LANG_PT: "Melhorias perdidas."},
     "press_enter_return": {LANG_EN: "Press ENTER to return to map", LANG_PT: "Pressione ENTER para voltar ao mapa"},
 
     # Victory
@@ -170,7 +170,7 @@ STRINGS = {
         LANG_EN: "Reveal enemy targets.\nNash equilibrium:\nno regrets strategy.",
         LANG_PT: "Revele os alvos inimigos.\nEquilíbrio de Nash:\nestratégia sem arrependimento."
     },
-    
+
     # Skill Flavor Lore
     "skill_axioma_flavor": {LANG_EN: "The first thing they tried to erase was the equal sign.", LANG_PT: "A primeira coisa que tentaram apagar foi o sinal de igual."},
     "skill_derivada_flavor": {LANG_EN: "Change is the only constant the Regime fears.", LANG_PT: "A mudança é a única constante que o Regime teme."},
