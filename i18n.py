@@ -1,7 +1,5 @@
 import settings
-
-LANG_EN = "en"
-LANG_PT = "pt"
+from lore_data import LORE_STRINGS, LANG_EN, LANG_PT
 
 STRINGS = {
     # Menu
@@ -216,6 +214,9 @@ STRINGS = {
     "room_lab_name": {LANG_EN: "Chaos Theory Lab", LANG_PT: "Laboratório de Teoria do Caos"},
     "room_lab_narr": {LANG_EN: "Small changes have massive consequences.", LANG_PT: "Pequenas mudanças têm consequências massivas."},
 }
+
+# Merge Lore Strings
+STRINGS.update(LORE_STRINGS)
 
 def t(key, **kwargs):
     lang = getattr(settings, "LANGUAGE", LANG_EN)

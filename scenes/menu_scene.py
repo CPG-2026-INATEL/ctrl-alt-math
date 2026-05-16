@@ -18,6 +18,7 @@ class MenuScene(Scene):
         self.menu_items = [
             (t("menu_start"), ""),
             (t("menu_how_to"), ""),
+            (t("menu_lore"), ""),
             (f"{t('menu_language')}: {lang_str}", ""),
             (f"TTS: {tts_str}", ""),
             (t("menu_quit"), "")
@@ -59,6 +60,8 @@ class MenuScene(Scene):
             elif self.selected == 1:
                 self.showing_how_to_play = True
             elif self.selected == 2:
+                self.game.scene_manager.switch("lore")
+            elif self.selected == 3:
                 # Toggle Language
                 if settings.LANGUAGE == LANG_EN:
                     settings.LANGUAGE = LANG_PT
@@ -66,13 +69,13 @@ class MenuScene(Scene):
                     settings.LANGUAGE = LANG_EN
                 self._update_menu_items()
                 self._speak_selection()
-            elif self.selected == 3:
+            elif self.selected == 4:
                 # Toggle TTS
                 settings.TTS_ENABLED = not settings.TTS_ENABLED
                 self.game.tts.enabled = settings.TTS_ENABLED
                 self._update_menu_items()
                 self._speak_selection()
-            elif self.selected == 4:
+            elif self.selected == 5:
                 self.game.running = False
 
     def update(self, dt):

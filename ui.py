@@ -454,18 +454,7 @@ class UI:
         hp_surf = hp_font.render(hp_text, True, settings.WHITE)
 
         # Wrap lore text
-        words = t(enemy.lore).split(' ')
-        lines = []
-        current_line = ""
-        for word in words:
-            test_line = current_line + word + " "
-            if lore_font.size(test_line)[0] < max_width - padding * 2:
-                current_line = test_line
-            else:
-                lines.append(current_line)
-                current_line = word + " "
-        lines.append(current_line)
-
+        lines = self._wrap_text(t(enemy.lore), lore_font, max_width - padding * 2)
         lore_surfs = [lore_font.render(line, True, settings.LIGHT_GRAY) for line in lines]
 
         # Calculate box size
@@ -510,3 +499,82 @@ class UI:
 
         curr_y += 5
         screen.blit(hp_surf, (x + padding, curr_y))
+
+    def _wrap_text(self, text, font, max_width):
+        paragraphs = text.split('\n')
+        lines = []
+        for p in paragraphs:
+            if not p:
+                lines.append("")
+                continue
+            words = p.split(' ')
+            current_line = ""
+            for word in words:
+                test_line = current_line + word + " "
+                if font.size(test_line)[0] < max_width:
+                    current_line = test_line
+                else:
+                    lines.append(current_line)
+                    current_line = word + " "
+            lines.append(current_line)
+        return lines
+
+    def draw_lore(self, screen, cat_key, content_key, scroll_y, index, total):
+        screen.fill(settings.DARK_BLUE)
+        
+        # Background effect
+        time_val = pygame.time.get_ticks() / 1000.0
+        for i in range(20):
+            x = int(400 + math.sin(time_val * 0.2 + i) * 380)
+            y = int(300 + math.cos(time_val * 0.15 + i) * 280)
+            pygame.draw.circle(screen, (20, 40, 80), (x, y), 2)
+
+        # Title
+        draw_text(screen, t("lore_title"), (settings.WINDOW_WIDTH // 2, 40), settings.CYAN, 32)
+        
+        # Category Selector
+        selector_y = 90
+        pygame.draw.line(screen, settings.GRAY, (50, selector_y - 15), (settings.WINDOW_WIDTH - 50, selector_y - 15), 1)
+        
+        cat_name = t(cat_key).upper()
+        draw_text(screen, f"< {cat_name} >", (settings.WINDOW_WIDTH // 2, selector_y), settings.GOLD, 24)
+        draw_text(screen, f"{index + 1} / {total}", (settings.WINDOW_WIDTH - 80, selector_y), settings.GRAY, 16)
+        
+        pygame.draw.line(screen, settings.GRAY, (50, selector_y + 15), (settings.WINDOW_WIDTH - 50, selector_y + 15), 1)
+
+        # Content Area
+        content_rect = pygame.Rect(60, 120, settings.WINDOW_WIDTH - 120, settings.WINDOW_HEIGHT - 200)
+        # pygame.draw.rect(screen, (10, 10, 30), content_rect) # Debug
+        
+        font = pygame.font.Font(None, 22)
+        wrapped_lines = self._wrap_text(t(content_key), font, content_rect.width)
+        
+        line_height = 24
+        total_height = len(wrapped_lines) * line_height
+        max_scroll = max(0, total_height - content_rect.height)
+        
+        # Clip area for scrolling
+        temp_surf = pygame.Surface((content_rect.width, content_rect.height), pygame.SRCALPHA)
+        
+        for i, line in enumerate(wrapped_lines):
+            y_pos = i * line_height - scroll_y
+            if -line_height < y_pos < content_rect.height:
+                color = settings.WHITE if line.strip() else settings.GRAY
+                if line.startswith("-") or line.startswith("'") or line.startswith("“"):
+                    color = settings.CYAN
+                txt_surf = font.render(line, True, color)
+                temp_surf.blit(txt_surf, (0, y_pos))
+        
+        screen.blit(temp_surf, (content_rect.x, content_rect.y))
+        
+        # Scrollbar
+        if max_scroll > 0:
+            bar_h = content_rect.height * (content_rect.height / total_height)
+            bar_y = content_rect.y + (scroll_y / max_scroll) * (content_rect.height - bar_h)
+            pygame.draw.rect(screen, settings.DARK_GRAY, (content_rect.right + 10, content_rect.y, 6, content_rect.height))
+            pygame.draw.rect(screen, settings.CYAN, (content_rect.right + 10, bar_y, 6, bar_h))
+
+        # Footer
+        draw_text(screen, t("lore_footer"), (settings.WINDOW_WIDTH // 2, settings.WINDOW_HEIGHT - 40), settings.GRAY, 14)
+        
+        return max_scroll
