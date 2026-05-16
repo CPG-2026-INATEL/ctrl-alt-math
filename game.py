@@ -20,6 +20,7 @@ from scenes.pause_scene import PauseScene
 from scenes.game_over_scene import GameOverScene
 from scenes.victory_scene import VictoryScene
 from scenes.map_scene import MapScene
+from scenes.tilemap_scene import TilemapScene
 
 
 class Game:
@@ -46,6 +47,7 @@ class Game:
         self.scene_manager.add("game_over", GameOverScene)
         self.scene_manager.add("victory", VictoryScene)
         self.scene_manager.add("map", MapScene)
+        self.scene_manager.add("tilemap", TilemapScene)
         self.scene_manager.switch("menu")
 
     def _init_shared_state(self):
