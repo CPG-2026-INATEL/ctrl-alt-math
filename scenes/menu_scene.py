@@ -1,7 +1,7 @@
 import pygame
 
 import settings
-from scene import Scene
+from scenes.scene import Scene
 
 
 class MenuScene(Scene):

@@ -10,13 +10,13 @@ from ui import UI
 from sfx import SFX
 from floating_text import FloatingTextSystem
 
-from scene_manager import SceneManager
-from menu_scene import MenuScene
-from gameplay_scene import GameplayScene
-from skill_tree_scene import SkillTreeScene
-from pause_scene import PauseScene
-from game_over_scene import GameOverScene
-from victory_scene import VictoryScene
+from scenes.scene_manager import SceneManager
+from scenes.menu_scene import MenuScene
+from scenes.gameplay_scene import GameplayScene
+from scenes.skill_tree_scene import SkillTreeScene
+from scenes.pause_scene import PauseScene
+from scenes.game_over_scene import GameOverScene
+from scenes.victory_scene import VictoryScene
 
 
 class Game:

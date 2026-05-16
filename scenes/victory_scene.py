@@ -1,9 +1,10 @@
 import pygame
 
-from scene import Scene
+import settings
+from scenes.scene import Scene
 
 
-class GameOverScene(Scene):
+class VictoryScene(Scene):
     overlay = True
 
     def __init__(self, game):
@@ -24,8 +25,12 @@ class GameOverScene(Scene):
         self.game.floating_text.update(dt)
 
     def enter(self, prev_scene=None):
-        self.game.sfx.play("game_over")
+        self.game.particles.emit_burst(
+            settings.WINDOW_WIDTH // 2, settings.WINDOW_HEIGHT // 2,
+            settings.GOLD, 50, 150, 1.0
+        )
+        self.game.sfx.play("victory")
 
     def draw(self, screen):
         self.game.scene_manager.get("gameplay").draw(screen)
-        self.game.ui.draw_game_over(screen, self.game.current_wave + 1)
+        self.game.ui.draw_victory(screen)

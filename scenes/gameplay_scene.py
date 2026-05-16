@@ -5,7 +5,7 @@ import math
 import settings
 from utils import draw_text, distance, angle_between
 from enemy import Enemy
-from scene import Scene
+from scenes.scene import Scene
 
 
 class GameplayScene(Scene):

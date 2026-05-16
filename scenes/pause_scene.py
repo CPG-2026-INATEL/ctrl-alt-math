@@ -1,6 +1,6 @@
 import pygame
 
-from scene import Scene
+from scenes.scene import Scene
 
 
 class PauseScene(Scene):
