@@ -4,6 +4,7 @@ import math
 
 import settings
 from utils import draw_text, distance, angle_between
+from i18n import t
 from enemy import Enemy
 from grid import Grid
 from turn_manager import TurnManager
@@ -344,7 +345,7 @@ class GameplayScene(Scene):
             self.game.player.toggle_skin()
             skin_name = self.game.player.skin_names[self.game.player.skin_index]
             self.game.floating_text.add_info(self.game.player.x, self.game.player.y - 40,
-                                            f"Class: {skin_name}", settings.CYAN)
+                                            t("class_label", name=skin_name), settings.CYAN)
             return
 
         if (mods & pygame.KMOD_CTRL):
@@ -364,7 +365,7 @@ class GameplayScene(Scene):
                 theme_name = self.game.math_bg.set_theme(theme_idx)
                 if theme_name:
                     self.game.floating_text.add_info(self.game.player.x, self.game.player.y - 40,
-                                                    f"Theme: {theme_name}", settings.GOLD)
+                                                    t("theme_label", name=theme_name), settings.GOLD)
                     self.game.sfx.play("menu_select")
                     
                     # Add extra feedback: particle burst and shake
@@ -614,10 +615,10 @@ class GameplayScene(Scene):
     def _on_enemy_death(self, enemy):
         self.game.floating_text.add_formula(
             enemy.x, enemy.y,
-            "exists=0 (eliminated)", settings.GREEN
+            t("eliminated"), settings.GREEN
         )
         self.game.particles.emit_burst(enemy.x, enemy.y, enemy.color, 15, 80, 0.4)
-        self.game.floating_text.add_info(enemy.x, enemy.y, "QED", settings.GREEN)
+        self.game.floating_text.add_info(enemy.x, enemy.y, t("qed"), settings.GREEN)
         self.game.screen_shake = 0.1
         self.game.shake_intensity = 4
         self.game.sfx.play("enemy_die")

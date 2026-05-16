@@ -3,6 +3,7 @@ import math
 
 import settings
 from utils import draw_text
+from i18n import t
 
 
 class SkillTree:
@@ -80,7 +81,7 @@ class SkillTree:
         overlay.fill(settings.BLACK)
         screen.blit(overlay, (0, 0))
 
-        draw_text(screen, "SKILL TREE", (settings.WINDOW_WIDTH // 2, 20),
+        draw_text(screen, t("skill_tree_title"), (settings.WINDOW_WIDTH // 2, 20),
                   settings.WHITE, 36)
 
         for sid, skill in self.skills.items():
@@ -140,28 +141,28 @@ class SkillTree:
             pygame.draw.rect(screen, border_color, rect, 2, border_radius=4)
 
             name_color = settings.WHITE if skill["unlocked"] or self.can_unlock(sid) else (120, 120, 120)
-            draw_text(screen, skill["name"], rect.center, name_color, 18)
-            cost_text = f"Cost: {skill['cost']}" if skill["cost"] > 0 else "Free"
+            draw_text(screen, t(skill["name"]), rect.center, name_color, 18)
+            cost_text = t("cost_label", cost=skill['cost']) if skill["cost"] > 0 else t("cost_free")
             draw_text(screen, cost_text, (rect.centerx, rect.bottom + 10),
                       settings.LIGHT_GRAY, 14)
 
             if skill["unlocked"]:
-                check_surf = pygame.font.Font(None, 20).render("OK", True, settings.GREEN)
+                check_surf = pygame.font.Font(None, 20).render(t("skill_unlocked_ok"), True, settings.GREEN)
                 screen.blit(check_surf, (rect.right - 20, rect.top + 5))
 
-        draw_text(screen, f"Skill Points: {self.skill_points}",
+        draw_text(screen, f"{t('skill_points')}: {self.skill_points}",
                   (settings.WINDOW_WIDTH // 2, 110),
                   settings.GOLD, 28)
 
         if self.hovered_id:
             skill = self.skills[self.hovered_id]
-            lines = skill["desc"].split('\n')
+            lines = t(skill["desc"]).split('\n')
             y_offset = settings.WINDOW_HEIGHT - 40 - len(lines) * 20
             for i, line in enumerate(lines):
                 draw_text(screen, line,
                           (settings.WINDOW_WIDTH // 2, y_offset + i * 22),
                           settings.LIGHT_GRAY, 16)
 
-        draw_text(screen, "Click to unlock | Tab / Esc to close",
+        draw_text(screen, t("skill_tree_footer"),
                   (settings.WINDOW_WIDTH // 2, settings.WINDOW_HEIGHT - 15),
                   settings.GRAY, 14)

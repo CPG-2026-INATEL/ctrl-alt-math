@@ -2,6 +2,7 @@ import pygame
 import math
 import settings
 from utils import draw_text
+from i18n import t
 
 
 class Room:
@@ -88,7 +89,7 @@ class WorldMap:
     def draw(self, screen):
         screen.fill(settings.DARK_BLUE)
 
-        draw_text(screen, "THE FORBIDDEN ARCHIVE",
+        draw_text(screen, t("map_title"),
                  (settings.WINDOW_WIDTH // 2, 25),
                  settings.CYAN, 32)
 
@@ -119,26 +120,26 @@ class WorldMap:
                         (avatar_x - 8, avatar_y - 8, 16, 16), 1)
 
         if player_room.state != "locked":
-            draw_text(screen, player_room.name,
+            draw_text(screen, t(player_room.name),
                      (settings.WINDOW_WIDTH // 2, 510),
                      settings.WHITE, 20)
-            draw_text(screen, player_room.narrative,
+            draw_text(screen, t(player_room.narrative),
                      (settings.WINDOW_WIDTH // 2, 535),
                      settings.GRAY, 14)
             if player_room.state == "available":
-                draw_text(screen, "Press ENTER to enter",
+                draw_text(screen, t("press_enter_room"),
                          (settings.WINDOW_WIDTH // 2, 565),
                          settings.GREEN, 16)
             elif player_room.state == "completed":
-                draw_text(screen, "Completed - ENTER to replay",
+                draw_text(screen, t("room_completed_replay"),
                          (settings.WINDOW_WIDTH // 2, 565),
                           settings.GOLD, 16)
         else:
-            draw_text(screen, "???",
+            draw_text(screen, t("unknown"),
                      (settings.WINDOW_WIDTH // 2, 535),
                      settings.GRAY, 16)
 
-        draw_text(screen, "WASD: Navigate | ENTER: Enter | ESC: Menu",
+        draw_text(screen, t("map_footer"),
                  (settings.WINDOW_WIDTH // 2, settings.WINDOW_HEIGHT - 15),
                  settings.GRAY, 14)
 
@@ -194,7 +195,7 @@ class WorldMap:
         name_color = settings.LIGHT_GRAY if room.state != "locked" else (50, 50, 50)
         if room.state == "completed":
             name_color = settings.GREEN
-        draw_text(screen, room.name,
+        draw_text(screen, t(room.name),
                  (rect.centerx, rect.bottom - 12),
                  name_color, 10)
 

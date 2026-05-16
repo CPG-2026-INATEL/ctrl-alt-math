@@ -3,6 +3,7 @@ import math
 
 import settings
 from utils import draw_text
+from i18n import t
 from scenes.scene import Scene
 
 
@@ -72,10 +73,10 @@ class VictoryScene(Scene):
             s.fill(settings.BLACK)
             screen.blit(s, (0, 0))
 
-            draw_text(screen, "Quod Erat Demonstrandum",
+            draw_text(screen, t("qed_full"),
                      (settings.WINDOW_WIDTH // 2, settings.WINDOW_HEIGHT // 2 + 30),
                      settings.GOLD, 18)
-            draw_text(screen, "\"What was to be demonstrated\"",
+            draw_text(screen, t("qed_translated"),
                      (settings.WINDOW_WIDTH // 2, settings.WINDOW_HEIGHT // 2 + 55),
                      settings.LIGHT_GRAY, 14)
 
