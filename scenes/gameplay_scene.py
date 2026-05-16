@@ -46,6 +46,7 @@ class GameplayScene(Scene):
 
         self.pending_player_col = None
         self.pending_player_row = None
+        self.hovered_enemy = None
 
     def enter(self, prev_scene=None):
         self.state = "WAVE_INTRO"
@@ -150,7 +151,7 @@ class GameplayScene(Scene):
             stairs_per_area=1,
             seed=seed,
         )
-        map_data, obstacle_data = gen.generate()
+        map_data, obstacles = gen.generate()
 
         ALL_STAIRS = {TILE_STAIRS_UP, TILE_STAIRS_DOWN, TILE_STAIRS_LEFT, TILE_STAIRS_RIGHT}
         HIGH_TILES = {TILE_HIGH, TILE_HIGH_EDGE}
@@ -199,6 +200,14 @@ class GameplayScene(Scene):
 
     def handle_event(self, event):
         if event.type != pygame.KEYDOWN:
+            return
+
+        mods = pygame.key.get_mods()
+        if (mods & pygame.KMOD_CTRL) and (mods & pygame.KMOD_ALT):
+            self.game.player.toggle_skin()
+            skin_name = self.game.player.skin_names[self.game.player.skin_index]
+            self.game.floating_text.add_info(self.game.player.x, self.game.player.y - 40, 
+                                            f"Class: {skin_name}", settings.CYAN)
             return
 
         if self.state == "WAVE_INTRO":
@@ -523,6 +532,18 @@ class GameplayScene(Scene):
 
         self.game.particles.update(dt)
         self.game.floating_text.update(dt)
+
+        # Mouse hover detection for enemies
+        mouse_pos = pygame.mouse.get_pos()
+        self.hovered_enemy = None
+        for enemy in self.game.enemies:
+            if enemy.dead:
+                continue
+            # Use hitbox for hover detection
+            hitbox = enemy.get_hitbox()
+            if hitbox.collidepoint(mouse_pos):
+                self.hovered_enemy = enemy
+                break
 
         arena_rect = pygame.Rect(
             settings.ARENA_OFFSET_X, settings.ARENA_OFFSET_Y,
@@ -937,6 +958,9 @@ class GameplayScene(Scene):
         self._draw_enemy_info(temp)
 
         self._draw_turn_hud(temp)
+
+        if self.hovered_enemy:
+            self.game.ui.draw_enemy_tooltip(temp, self.hovered_enemy, pygame.mouse.get_pos())
 
         if self.game.screen_shake > 0:
             sx = random.randint(-int(self.game.shake_intensity),

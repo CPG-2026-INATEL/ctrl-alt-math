@@ -438,3 +438,74 @@ class UI:
             r = random.choice([settings.RED, settings.PURPLE])
             s.fill(r)
             screen.blit(s, (x, y))
+
+    def draw_enemy_tooltip(self, screen, enemy, pos):
+        # Premium tooltip design
+        padding = 10
+        max_width = 200
+        title_font = pygame.font.Font(None, 20)
+        lore_font = pygame.font.Font(None, 16)
+        hp_font = pygame.font.Font(None, 14)
+
+        # Render elements to calculate size
+        title_surf = title_font.render(enemy.info_title, True, settings.GOLD)
+        hp_text = f"HP: {enemy.hp}/{enemy.max_hp}"
+        hp_surf = hp_font.render(hp_text, True, settings.WHITE)
+
+        # Wrap lore text
+        words = enemy.lore.split(' ')
+        lines = []
+        current_line = ""
+        for word in words:
+            test_line = current_line + word + " "
+            if lore_font.size(test_line)[0] < max_width - padding * 2:
+                current_line = test_line
+            else:
+                lines.append(current_line)
+                current_line = word + " "
+        lines.append(current_line)
+
+        lore_surfs = [lore_font.render(line, True, settings.LIGHT_GRAY) for line in lines]
+        
+        # Calculate box size
+        width = max(title_surf.get_width(), hp_surf.get_width(), max([s.get_width() for s in lore_surfs])) + padding * 2
+        height = title_surf.get_height() + hp_surf.get_height() + sum([s.get_height() for s in lore_surfs]) + padding * 2 + 10
+
+        # Adjust position to stay within screen
+        x, y = pos
+        x += 15
+        y += 15
+        if x + width > settings.WINDOW_WIDTH:
+            x -= width + 30
+        if y + height > settings.WINDOW_HEIGHT:
+            y -= height + 30
+
+        # Draw box background (glassmorphism effect)
+        bg_rect = pygame.Rect(x, y, width, height)
+        s = pygame.Surface((width, height), pygame.SRCALPHA)
+        pygame.draw.rect(s, (15, 15, 25, 230), (0, 0, width, height), border_radius=8)
+        screen.blit(s, (x, y))
+        
+        # Draw borders
+        pygame.draw.rect(screen, settings.GRAY, bg_rect, 1, border_radius=8)
+        pygame.draw.rect(screen, settings.GOLD, bg_rect, 2, border_radius=8)
+
+        # Draw content
+        curr_y = y + padding
+        screen.blit(title_surf, (x + padding, curr_y))
+        curr_y += title_surf.get_height() + 2
+        
+        # HP bar in tooltip
+        hp_bar_w = width - padding * 2
+        hp_bar_h = 4
+        hp_ratio = enemy.hp / enemy.max_hp
+        pygame.draw.rect(screen, (60, 20, 20), (x + padding, curr_y, hp_bar_w, hp_bar_h))
+        pygame.draw.rect(screen, settings.RED, (x + padding, curr_y, int(hp_bar_w * hp_ratio), hp_bar_h))
+        curr_y += hp_bar_h + 8
+
+        for surf in lore_surfs:
+            screen.blit(surf, (x + padding, curr_y))
+            curr_y += surf.get_height()
+        
+        curr_y += 5
+        screen.blit(hp_surf, (x + padding, curr_y))
