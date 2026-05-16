@@ -1274,7 +1274,6 @@ class GameplayScene(Scene):
         self.selected_skill = None
         self._generate_enemy_intents()
         self.danger_locked = False
-        self._save_rewind_state()
 
     def _get_game_state(self):
         return {
@@ -1308,7 +1307,8 @@ class GameplayScene(Scene):
             self.game.sfx.play("error")
             return
 
-        snapshot = self.turn_manager.undo()
+        steps = 2 if len(self.turn_manager.history) >= 2 else 1
+        snapshot = self.turn_manager.undo(steps)
         if snapshot is None:
             return
 
