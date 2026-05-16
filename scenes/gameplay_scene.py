@@ -354,6 +354,15 @@ class GameplayScene(Scene):
         return self._get_enemy_at_cursor() is not None
 
     def _confirm_action_cursor(self):
+        if (self.cursor_col, self.cursor_row) == (self.game.player.col, self.game.player.row):
+            self.turn_manager.player_acted = True
+            self.show_action_range = False
+            self.selected_skill = None
+            self.turn_log.append("Wait")
+            self._start_enemy_turn()
+            self.game.sfx.play("menu_select")
+            return
+
         if not self._can_execute_cursor_action():
             self.game.floating_text.add_info(
                 self.game.player.x,
@@ -473,14 +482,6 @@ class GameplayScene(Scene):
             self._confirm_player_cursor()
             return
 
-        if k == pygame.K_e and not self.turn_manager.player_moved:
-            self.turn_manager.player_moved = True
-            self.turn_manager.player_acted = True
-            self.show_move_range = False
-            self.show_action_range = False
-            self.turn_log.append("Wait")
-            self._start_enemy_turn()
-
     def _handle_action_input(self, event):
         k = event.key
 
@@ -504,12 +505,6 @@ class GameplayScene(Scene):
         elif k == pygame.K_r:
             if self.game.skill_tree.is_unlocked("ctrlz"):
                 self._try_rewind()
-        elif k == pygame.K_e:
-            self.turn_manager.player_acted = True
-            self.show_action_range = False
-            self.selected_skill = None
-            self.turn_log.append("Wait")
-            self._start_enemy_turn()
 
     def _execute_basic_attack(self, target_enemy=None):
         pc = self.game.player.col
@@ -1449,7 +1444,7 @@ class GameplayScene(Scene):
         screen.blit(log_title, (log_x, bar_y + 10))
         self._draw_combat_log(screen, log_x, bar_y + 22)
 
-        controls = "Mouse/WASD cursor  Click/Enter confirm  Space attack  1/2 toggle  R undo  E wait  Esc pause"
+        controls = "Mouse/WASD cursor  Enter confirm  Space confirm  1/2 toggle  R undo  Esc pause"
         controls_img = pygame.font.Font(None, 11).render(controls, True, settings.GRAY)
         screen.blit(controls_img, (settings.UI_PADDING, settings.WINDOW_HEIGHT - 14))
 
