@@ -22,6 +22,7 @@ class NetworkHost:
         self._next_id = 1
 
     def start(self):
+        self._ensure_firewall_rules()
         self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.server_socket.bind(("", self.port))
@@ -32,6 +33,29 @@ class NetworkHost:
         self.accept_thread.start()
         self.discovery_thread = threading.Thread(target=self._discovery_loop, daemon=True)
         self.discovery_thread.start()
+
+    @staticmethod
+    def _ensure_firewall_rules():
+        """Try to add Windows Firewall rules for the game ports (silently fails if no admin)."""
+        import subprocess, sys
+        if sys.platform != "win32":
+            return
+        rules = [
+            ("CtrlAltMath-TCP-In",  "TCP",  str(settings.LAN_PORT)),
+            ("CtrlAltMath-UDP-In",  "UDP",  str(settings.LAN_DISCOVERY_PORT)),
+            ("CtrlAltMath-UDP2-In", "UDP",  str(settings.LAN_DISCOVERY_PORT + 1)),
+        ]
+        for name, proto, port in rules:
+            try:
+                subprocess.run(
+                    ["netsh", "advfirewall", "firewall", "add", "rule",
+                     f"name={name}", "dir=in", "action=allow",
+                     f"protocol={proto}", f"localport={port}",
+                     "enable=yes", "profile=any"],
+                    capture_output=True, timeout=3
+                )
+            except Exception:
+                pass  # No admin rights or netsh not available — ignore
 
     def _accept_loop(self):
         while self.running:
