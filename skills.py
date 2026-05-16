@@ -78,100 +78,125 @@ class SkillTree:
         return False
 
     def draw(self, screen):
-        overlay = pygame.Surface((settings.WINDOW_WIDTH, settings.WINDOW_HEIGHT))
-        overlay.set_alpha(200)
-        overlay.fill(settings.BLACK)
+        # Semi-transparent background with a dark tint
+        overlay = pygame.Surface((settings.WINDOW_WIDTH, settings.WINDOW_HEIGHT), pygame.SRCALPHA)
+        overlay.fill((10, 10, 20, 230))
         screen.blit(overlay, (0, 0))
 
-        draw_text(screen, t("skill_tree_title"), (settings.WINDOW_WIDTH // 2, 20),
-                  settings.WHITE, 36)
+        # Title and Points
+        center_x = settings.WINDOW_WIDTH // 2
+        draw_text(screen, t("skill_tree_title"), (center_x, 25), settings.WHITE, 42)
+        
+        # Points indicator with a small box
+        points_text = f"{t('skill_points')}: {self.skill_points}"
+        points_surf = pygame.font.Font(None, int(30 * settings.UI_SCALE)).render(points_text, True, settings.GOLD)
+        points_rect = points_surf.get_rect(center=(center_x, 75))
+        pygame.draw.rect(screen, (40, 40, 60), points_rect.inflate(30, 10), border_radius=15)
+        pygame.draw.rect(screen, settings.GOLD, points_rect.inflate(30, 10), 2, border_radius=15)
+        screen.blit(points_surf, points_rect)
 
         offset_x = (settings.WINDOW_WIDTH - 800) // 2
+        
+        # Draw Connections First (to keep them behind nodes)
         for sid, skill in self.skills.items():
             for prereq in skill["prereqs"]:
                 if prereq in self.skills:
                     p = self.skills[prereq]
-                    start = (p["x"] + offset_x, p["y"] + 23)
-                    end = (skill["x"] + offset_x, skill["y"] - 23)
+                    start = (p["x"] + offset_x, p["y"])
+                    end = (skill["x"] + offset_x, skill["y"])
 
                     if skill["unlocked"]:
                         color = settings.GREEN
+                        width = 3
                     elif self.can_unlock(sid):
                         color = settings.GOLD
+                        width = 2
                     else:
-                        color = (60, 60, 60)
+                        color = (50, 50, 70)
+                        width = 1
 
-                    pygame.draw.line(screen, color, start, end, 2)
-
+                    pygame.draw.line(screen, color, start, end, width)
+                    
+                    # Add small flow particles for unlocked paths
                     if skill["unlocked"]:
-                        dx = end[0] - start[0]
-                        dy = end[1] - start[1]
-                        length = max(1, math.sqrt(dx * dx + dy * dy))
-                        steps = int(length / 8)
-                        for i in range(steps):
-                            frac = i / steps
-                            px = start[0] + dx * frac
-                            py = start[1] + dy * frac
-                            pygame.draw.circle(screen, (30, 120, 30), (int(px), int(py)), 1)
+                        time_mod = (pygame.time.get_ticks() / 1000.0) % 1.0
+                        px = start[0] + (end[0] - start[0]) * time_mod
+                        py = start[1] + (end[1] - start[1]) * time_mod
+                        pygame.draw.circle(screen, settings.WHITE, (int(px), int(py)), 2)
 
+        # Draw Nodes
         for sid, skill in self.skills.items():
             rect = self.get_node_rect(skill)
             is_hovered = (self.hovered_id == sid)
-            unlock_anim = self.unlock_animations.get(sid, 0)
-
+            
+            # Better colors and contrast
             if skill["unlocked"]:
-                color = (50, 180, 50)
+                bg_color = (20, 80, 20)
                 border_color = settings.GREEN
+                text_color = settings.WHITE
             elif self.can_unlock(sid):
-                color = (180, 160, 40)
+                bg_color = (80, 70, 20)
                 border_color = settings.GOLD
+                text_color = settings.WHITE
             else:
-                color = (50, 50, 50)
-                border_color = (80, 80, 80)
+                bg_color = (30, 30, 40)
+                border_color = (70, 70, 90)
+                text_color = (130, 130, 150)
 
             if is_hovered:
+                # Hover effect: Glow and brighter color
+                pygame.draw.rect(screen, settings.WHITE, rect.inflate(10, 10), 2, border_radius=8)
+                bg_color = tuple(min(255, c + 40) for c in bg_color)
                 border_color = settings.WHITE
-                color = tuple(min(255, c + 20) for c in color)
 
-            if unlock_anim > 0:
-                glow_size = int(10 * (unlock_anim / 0.5))
-                glow_surf = pygame.Surface((rect.width + glow_size * 2, rect.height + glow_size * 2))
-                glow_surf.set_alpha(int(100 * (unlock_anim / 0.5)))
-                glow_surf.fill(settings.GREEN)
-                screen.blit(glow_surf, (rect.x - glow_size, rect.y - glow_size))
+            # Draw Node Box
+            pygame.draw.rect(screen, bg_color, rect, border_radius=6)
+            pygame.draw.rect(screen, border_color, rect, 2, border_radius=6)
 
-            pygame.draw.rect(screen, color, rect, border_radius=4)
-            pygame.draw.rect(screen, border_color, rect, 2, border_radius=4)
+            # Skill Name
+            name_size = 20 if len(t(skill["name"])) < 12 else 18
+            draw_text(screen, t(skill["name"]), rect.center, text_color, name_size)
 
-            name_color = settings.WHITE if skill["unlocked"] or self.can_unlock(sid) else (120, 120, 120)
-            draw_text(screen, t(skill["name"]), rect.center, name_color, 18)
-            cost_text = t("cost_label", cost=skill['cost']) if skill["cost"] > 0 else t("cost_free")
-            draw_text(screen, cost_text, (rect.centerx, rect.bottom + 10),
-                      settings.LIGHT_GRAY, 14)
+            # Cost Badge (if not unlocked)
+            if not skill["unlocked"] and skill["cost"] > 0:
+                cost_color = settings.GOLD if self.skill_points >= skill["cost"] else settings.RED
+                cost_label = str(skill["cost"])
+                badge_rect = pygame.Rect(rect.right - 25, rect.bottom - 20, 20, 18)
+                pygame.draw.rect(screen, (20, 20, 30), badge_rect, border_radius=4)
+                pygame.draw.rect(screen, cost_color, badge_rect, 1, border_radius=4)
+                draw_text(screen, cost_label, badge_rect.center, cost_color, 14)
 
+            # Status Indicator
             if skill["unlocked"]:
-                check_surf = pygame.font.Font(None, 20).render(t("skill_unlocked_ok"), True, settings.GREEN)
-                screen.blit(check_surf, (rect.right - 20, rect.top + 5))
+                pygame.draw.circle(screen, settings.GREEN, (rect.right - 10, rect.top + 10), 4)
 
-        draw_text(screen, f"{t('skill_points')}: {self.skill_points}",
-                  (settings.WINDOW_WIDTH // 2, 110),
-                  settings.GOLD, 28)
-
+        # Detailed Info Panel for Hovered Skill
         if self.hovered_id:
             skill = self.skills[self.hovered_id]
-            lines = t(skill["desc"]).split('\n')
-            y_offset = settings.WINDOW_HEIGHT - 40 - len(lines) * 20
-            for i, line in enumerate(lines):
-                draw_text(screen, line,
-                          (settings.WINDOW_WIDTH // 2, y_offset + i * 22),
-                          settings.LIGHT_GRAY, 16)
+            panel_w, panel_h = 500, 220
+            # Position panel with some margin from the bottom
+            panel_rect = pygame.Rect((settings.WINDOW_WIDTH - panel_w) // 2, 
+                                     settings.WINDOW_HEIGHT - panel_h - 70, 
+                                     panel_w, panel_h)
             
-            # Draw Flavor Lore
+            # Panel Background with glow
+            pygame.draw.rect(screen, (15, 15, 30, 250), panel_rect, border_radius=15)
+            pygame.draw.rect(screen, settings.CYAN, panel_rect, 2, border_radius=15)
+            
+            # Skill Title
+            title_y = panel_rect.top + 30
+            draw_text(screen, t(skill["name"]).upper(), (panel_rect.centerx, title_y), settings.CYAN, 28)
+            
+            # Description (Handling multiple lines with better spacing)
+            desc_y = title_y + 45
+            draw_text(screen, t(skill["desc"]), (panel_rect.centerx, desc_y), settings.WHITE, 18)
+            
+            # Flavor Text (Always at the bottom of the panel)
             flavor_key = f"skill_{self.hovered_id}_flavor"
-            draw_text(screen, f"\"{t(flavor_key)}\"",
-                      (settings.WINDOW_WIDTH // 2, settings.WINDOW_HEIGHT - 65),
-                      settings.CYAN, 14)
+            draw_text(screen, f"\"{t(flavor_key)}\"", (panel_rect.centerx, panel_rect.bottom - 35), 
+                      (100, 200, 200), 15)
 
+        # Footer (Pushed slightly lower)
         draw_text(screen, t("skill_tree_footer"),
-                  (settings.WINDOW_WIDTH // 2, settings.WINDOW_HEIGHT - 15),
+                  (settings.WINDOW_WIDTH // 2, settings.WINDOW_HEIGHT - 20),
                   settings.GRAY, 14)
