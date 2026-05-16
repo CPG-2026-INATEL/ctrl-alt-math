@@ -256,6 +256,7 @@ class GameplayScene(Scene):
         self.show_move_range = True
         self._generate_enemy_intents()
         self.danger_locked = False
+        self._save_rewind_state()
         self.game.sfx.play("wave_start")
         self.game.tts.speak(t("wave_count", wave=self.turn_manager.turn_number), lang=settings.LANGUAGE)
 
@@ -1273,19 +1274,36 @@ class GameplayScene(Scene):
         self.selected_skill = None
         self._generate_enemy_intents()
         self.danger_locked = False
+        self._save_rewind_state()
+
+    def _get_game_state(self):
+        return {
+            "player_col": self.game.player.col,
+            "player_row": self.game.player.row,
+            "player_hp": self.game.player.hp,
+            "player_max_hp": self.game.player.max_hp,
+            "player_rigor": self.game.player.rigor,
+            "enemies": self.game.enemies,
+            "entropy": self.game.entropy,
+            "barrier_cells": self.grid.barrier_cells.copy(),
+        }
+
+    def _save_rewind_state(self):
+        gs = self._get_game_state()
+        self.turn_manager.snapshot(gs)
 
     def _try_rewind(self):
         if not self.game.skill_tree.is_unlocked("ctrlz"):
             self.game.floating_text.add_info(
                 self.game.player.x, self.game.player.y - 40,
-                t("not_enough_rigor"), settings.RED
+                t("rewind_locked"), settings.RED
             )
             self.game.sfx.play("error")
             return
         if not self.turn_manager.can_undo():
             self.game.floating_text.add_info(
                 self.game.player.x, self.game.player.y - 40,
-                "No rewind available", settings.GRAY
+                t("no_rewind_available"), settings.GRAY
             )
             self.game.sfx.play("error")
             return
@@ -1316,8 +1334,9 @@ class GameplayScene(Scene):
 
         self.game.entropy = snapshot["entropy"]
 
+        self.grid.clear_barriers()
         for col, row in snapshot.get("barrier_cells", []):
-            self.grid.mark_barrier(col, row, False)
+            self.grid.mark_barrier(col, row, True)
 
         self.game.entropy = min(
             self.game.entropy + settings.REWIND_ENTROPY_INCREASE,
@@ -1337,18 +1356,6 @@ class GameplayScene(Scene):
         self.danger_locked = False
 
         self.game.floating_text.add_info(self.game.player.x, self.game.player.y - 40, "<< REWIND >>", settings.GREEN)
-
-    def _get_game_state(self):
-        return {
-            "player_col": self.game.player.col,
-            "player_row": self.game.player.row,
-            "player_hp": self.game.player.hp,
-            "player_max_hp": self.game.player.max_hp,
-            "player_rigor": self.game.player.rigor,
-            "enemies": self.game.enemies,
-            "entropy": self.game.entropy,
-            "barrier_cells": self.grid.barrier_cells.copy(),
-        }
 
     def _draw_derivada_preview(self, screen):
         pc = self.game.player.col
