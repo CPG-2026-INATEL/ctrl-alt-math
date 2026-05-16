@@ -18,6 +18,8 @@ class Grid:
         self.blocked = set()
         self.barrier_cells = set()
         self.tile_types = {}
+        self.danger_tiles = set()
+        self.danger_locked = False
 
     def to_grid(self, x, y):
         col = int((x - self.offset_x) / self.cell_w)
@@ -230,6 +232,123 @@ class Grid:
         x1, y1 = self.to_pixel(col1, row1)
         x2, y2 = self.to_pixel(col2, row2)
         return math.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2)
+
+    def set_danger_tiles(self, intents, player_skills=None):
+        self.danger_tiles.clear()
+        for intent in intents:
+            if intent is None or intent.enemy.dead:
+                continue
+            tiles, is_fake = intent.get_display_tiles(player_skills)
+            for tile in tiles:
+                if self.is_valid(tile[0], tile[1]):
+                    self.danger_tiles.add((tile[0], tile[1], intent.telegraph_type, is_fake, intent.lock_mode))
+
+    def clear_danger_tiles(self):
+        self.danger_tiles.clear()
+        self.danger_locked = False
+
+    def lock_danger_indicators(self, intents):
+        self.danger_locked = True
+        self.danger_tiles.clear()
+        for intent in intents:
+            if intent is None or intent.enemy.dead:
+                continue
+            intent.lock()
+            for tile in intent.danger_tiles:
+                if self.is_valid(tile[0], tile[1]):
+                    self.danger_tiles.add((tile[0], tile[1], intent.telegraph_type, intent.is_fake, intent.lock_mode))
+
+    def draw_danger_indicators(self, screen, pulse_timer=0):
+        pulse_alpha = 0.5 + 0.3 * math.sin(pulse_timer * 5)
+        for entry in self.danger_tiles:
+            if len(entry) == 5:
+                col, row, telegraph_type, is_fake, lock_mode = entry
+            else:
+                col, row = entry[0], entry[1]
+                telegraph_type = "line"
+                is_fake = False
+                lock_mode = "fixed"
+
+            rect = self.cell_rect(col, row)
+
+            if self.danger_locked:
+                base_color = (255, 50, 50)
+                border_color = (255, 80, 80)
+                base_alpha = int(100 * pulse_alpha + 60)
+            elif is_fake:
+                base_color = (255, 140, 30)
+                border_color = (255, 160, 60)
+                base_alpha = int(50 * pulse_alpha + 30)
+            else:
+                base_color = (255, 200, 50)
+                border_color = (255, 220, 80)
+                base_alpha = int(70 * pulse_alpha + 40)
+
+            s = pygame.Surface((int(rect.width), int(rect.height)))
+            s.set_alpha(base_alpha)
+            s.fill(base_color)
+            screen.blit(s, rect)
+
+            pygame.draw.rect(screen, border_color, rect, 2)
+
+            if telegraph_type == "area":
+                inner = rect.inflate(-4, -4)
+                pygame.draw.rect(screen, border_color, inner, 1)
+            elif telegraph_type == "cross":
+                cx, cy = rect.centerx, rect.centery
+                sz = min(rect.width, rect.height) // 4
+                pygame.draw.line(screen, border_color, (cx - sz, cy), (cx + sz, cy), 2)
+                pygame.draw.line(screen, border_color, (cx, cy - sz), (cx, cy + sz), 2)
+            elif telegraph_type == "line":
+                cx, cy = rect.centerx, rect.centery
+                sz = min(rect.width, rect.height) // 3
+                pygame.draw.line(screen, border_color, (cx, cy - sz), (cx, cy + sz), 2)
+
+    def draw_intent_arrows(self, screen, intents, player_skills=None):
+        for intent in intents:
+            if intent is None or intent.enemy.dead:
+                continue
+            if not intent.danger_tiles:
+                continue
+            origin = intent.attack_origin
+            if origin is None:
+                origin = (intent.enemy.col, intent.enemy.row)
+            fx, fy = self.to_pixel(origin[0], origin[1])
+
+            target_list = list(intent.danger_tiles)
+            if not target_list:
+                continue
+            mid_tile = target_list[len(target_list) // 2]
+            tx, ty = self.to_pixel(mid_tile[0], mid_tile[1])
+
+            if self.danger_locked:
+                arrow_color = (255, 80, 80)
+            elif intent.is_fake:
+                arrow_color = (255, 140, 30)
+            else:
+                arrow_color = (255, 200, 50)
+
+            pygame.draw.line(screen, arrow_color, (int(fx), int(fy)), (int(tx), int(ty)), 2)
+
+            angle = math.atan2(ty - fy, tx - fx)
+            arrow_len = 10
+            for a in [angle - math.pi / 5, angle + math.pi / 5]:
+                ax = tx - arrow_len * math.cos(a)
+                ay = ty - arrow_len * math.sin(a)
+                pygame.draw.line(screen, arrow_color, (int(tx), int(ty)), (int(ax), int(ay)), 2)
+
+        if player_skills and "derivada" in player_skills:
+            for intent in intents:
+                if intent is None or intent.enemy.dead or not intent.move_target:
+                    continue
+                if intent.move_target == (intent.enemy.col, intent.enemy.row):
+                    continue
+                sx, sy = self.to_pixel(intent.enemy.col, intent.enemy.row)
+                ex, ey = self.to_pixel(intent.move_target[0], intent.move_target[1])
+                ghost_color = (100, 255, 100, 80)
+                s = pygame.Surface((16, 16), pygame.SRCALPHA)
+                s.fill(ghost_color)
+                screen.blit(s, (int(ex) - 8, int(ey) - 8))
 
     def draw(self, screen, highlight_cells=None, highlight_color=None,
              show_grid=False, grid_color=None, highlight_outline=False):

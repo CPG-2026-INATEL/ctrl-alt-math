@@ -76,6 +76,21 @@ BOSS_DAMAGE = 15
 BOSS_ATTACK_RANGE = 4
 BOSS_ACTION_INTERVAL = 0.9
 
+ORTOGONAL_HP = 35
+ORTOGONAL_MOVE_RANGE = 1
+ORTOGONAL_DAMAGE = 12
+ORTOGONAL_ATTACK_RANGE = 1
+
+ATIRADOR_HP = 20
+ATIRADOR_MOVE_RANGE = 1
+ATIRADOR_DAMAGE = 8
+ATIRADOR_ATTACK_RANGE = 6
+
+GRANADEIRO_HP = 25
+GRANADEIRO_MOVE_RANGE = 1
+GRANADEIRO_DAMAGE = 15
+GRANADEIRO_ATTACK_RANGE = 4
+
 ENEMY_CRIT_CHANCE = 0.08
 ENEMY_CRIT_MULTIPLIER = 1.8
 ENEMY_DAMAGE_VARIANCE = 0.15
@@ -104,7 +119,16 @@ COLOR_CENSOR = RED
 COLOR_STRAWMAN = ORANGE
 COLOR_BAYESIAN = PURPLE
 COLOR_BOSS = (180, 20, 20)
+COLOR_ORTOGONAL = (50, 180, 180)
+COLOR_ATIRADOR = (180, 180, 50)
+COLOR_GRANADEIRO = (180, 100, 50)
 COLOR_PROJECTILE = YELLOW
+INDICATOR_YELLOW = (255, 200, 50, 80)
+INDICATOR_ORANGE = (255, 140, 30, 100)
+INDICATOR_RED = (255, 50, 50, 120)
+INDICATOR_BLUE = (80, 140, 255, 100)
+INDICATOR_PURPLE = (180, 50, 255, 100)
+INDICATOR_LOCK_DURATION = 0.5
 COLOR_DECOY = (255, 100, 50)
 COLOR_HEAL = GREEN
 COLOR_RIGOR = BLUE
@@ -137,18 +161,28 @@ WAVES = [
         "post_narrative": "wave_2_post"
     },
     {
-        "enemies": [("censor", 1), ("strawman", 1)],
+        "enemies": [("censor", 1), ("ortogonal", 1)],
         "narrative": "wave_3_narr",
         "post_narrative": "wave_3_post"
     },
     {
-        "enemies": [("censor", 1), ("strawman", 1), ("bayesian", 1)],
+        "enemies": [("censor", 1), ("ortogonal", 1), ("atirador", 1)],
         "narrative": "wave_4_narr",
         "post_narrative": "wave_4_post"
     },
     {
-        "enemies": [("boss", 1)],
+        "enemies": [("censor", 1), ("strawman", 1), ("granadeiro", 1)],
         "narrative": "wave_5_narr",
+        "post_narrative": ""
+    },
+    {
+        "enemies": [("ortogonal", 1), ("atirador", 1), ("granadeiro", 1)],
+        "narrative": "wave_6_narr",
+        "post_narrative": ""
+    },
+    {
+        "enemies": [("boss", 1)],
+        "narrative": "wave_7_narr",
         "post_narrative": ""
     },
 ]
