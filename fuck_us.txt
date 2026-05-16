@@ -1,5 +1,12 @@
-[Client] Connecting to 10.42.31.204:5555...
-[Client] Async thread started for 10.42.31.204
-[Client] Failed to connect to 10.42.31.204:5555
-[Client] Connection TIMEOUT: Host at 10.42.31.204:5555 is unreachable.
+[Discovery] Starting LAN scan...
+[Discovery] Broadcasting UDP discovery to ['255.255.255.255', '172.19.160.255', '10.42.31.255'] (reply to port 5557)
+[Client] Connecting to 10.42.31.181:5555...
+[Client] Async thread started for 10.42.31.181
+[Client] Socket error: InvalidMessage: did not receive a valid HTTP response
 [Client] Client connection closed.
+[Client] Failed to connect to 10.42.31.181:5555
+[Client] Connecting to 10.42.31.255:5555...
+[Client] Async thread started for 10.42.31.255
+[Client] Socket error: OSError: [WinError 1214] O formato do nome da rede especificado é inválido
+[Client] Client connection closed.
+[Client] Failed to connect to 10.42.31.255:5555
