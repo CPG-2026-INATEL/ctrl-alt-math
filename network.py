@@ -8,6 +8,19 @@ from py_localtunnel.tunnel import Tunnel
 
 import settings
 
+# Monkeypatch asyncio primitives to support older libraries (like aiohttp)
+# passing the deprecated 'loop' parameter in Python 3.10+ / 3.13+
+for _cls_name in ('Lock', 'Event', 'Condition', 'Semaphore', 'Queue'):
+    _cls = getattr(asyncio, _cls_name, None)
+    if _cls and hasattr(_cls, '__init__'):
+        _original_init = _cls.__init__
+        def _make_patched_init(orig):
+            def _patched_init(self, *args, **kwargs):
+                kwargs.pop('loop', None)
+                return orig(self, *args, **kwargs)
+            return _patched_init
+        _cls.__init__ = _make_patched_init(_original_init)
+
 
 class NetworkHost:
     def __init__(self, port=settings.LAN_PORT):
