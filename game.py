@@ -11,6 +11,7 @@ from floating_text import FloatingTextSystem
 from math_bg import MathBackground
 from map import WorldMap
 from rewind_fx import RewindEffects
+from tts_manager import TTSManager
 
 from scenes.scene_manager import SceneManager
 from scenes.menu_scene import MenuScene
@@ -36,6 +37,7 @@ class Game:
         self.ui = UI()
         self.sfx = SFX()
         self.rewind_fx = RewindEffects()
+        self.tts = TTSManager()
 
         self._init_shared_state()
 
@@ -135,15 +137,16 @@ class Game:
                 else:
                     if self.scene_manager.current:
                         self.scene_manager.current.handle_event(event)
-
             if self.scene_manager.current:
                 self.scene_manager.current.update(dt)
 
+            self.tts.update()
             self.screen.fill(self.math_bg.get_bg_color())
             if self.scene_manager.current:
                 self.scene_manager.current.draw(self.screen)
 
             pygame.display.flip()
 
+        self.tts.stop()
         pygame.quit()
         sys.exit()

@@ -84,6 +84,10 @@ class GameplayScene(Scene):
 
             if len(room.enemies) == 0:
                 self.state = "NO_COMBAT"
+            
+            # Speak room narrative
+            text = f"{t(room.name)}. {t(room.narrative)}"
+            self.game.tts.speak(text, lang=settings.LANGUAGE)
         else:
             self.obstacles_data = settings.ARENA_OBSTACLES
             self.game.obstacles = self.grid.obstacle_rects(settings.ARENA_OBSTACLES)
@@ -211,6 +215,7 @@ class GameplayScene(Scene):
         self.turn_manager.start_turn()
         self.show_move_range = True
         self.game.sfx.play("wave_start")
+        self.game.tts.speak(t("wave_count", wave=self.turn_manager.turn_number), lang=settings.LANGUAGE)
 
     def _leave_no_combat_room(self):
         self.game.scene_manager.switch("map")
@@ -669,6 +674,7 @@ class GameplayScene(Scene):
         self.game.floating_text.update(dt)
 
         # Mouse hover detection for enemies
+        old_hovered = getattr(self, 'hovered_enemy', None)
         mouse_pos = pygame.mouse.get_pos()
         self.hovered_enemy = None
         for enemy in self.game.enemies:
@@ -679,6 +685,10 @@ class GameplayScene(Scene):
             if hitbox.collidepoint(mouse_pos):
                 self.hovered_enemy = enemy
                 break
+        
+        if self.hovered_enemy and self.hovered_enemy != old_hovered:
+            text = f"{t(self.hovered_enemy.info_title)}. {t(self.hovered_enemy.lore)}"
+            self.game.tts.speak(text, lang=settings.LANGUAGE)
 
         arena_rect = pygame.Rect(
             settings.ARENA_OFFSET_X, settings.ARENA_OFFSET_Y,

@@ -8,6 +8,7 @@ class SkillTreeScene(Scene):
 
     def __init__(self, game):
         super().__init__(game)
+        self.last_hovered = None
 
     def handle_event(self, event):
         if event.type == pygame.KEYDOWN:
@@ -26,6 +27,14 @@ class SkillTreeScene(Scene):
     def update(self, dt):
         self.game.particles.update(dt)
         self.game.floating_text.update(dt)
+        
+        current_hovered = self.game.skill_tree.hovered_id
+        if current_hovered and current_hovered != self.last_hovered:
+            skill = self.game.skill_tree.get_skill(current_hovered)
+            if skill:
+                text = f"{t(skill['name'])}. {t(skill['desc'])}"
+                self.game.tts.speak(text, lang=settings.LANGUAGE)
+        self.last_hovered = current_hovered
 
     def draw(self, screen):
         self.game.scene_manager.get("gameplay").draw(screen)
