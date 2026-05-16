@@ -52,6 +52,7 @@ class GameplayScene(Scene):
 
         self.turn_log = []
         self.last_enemy_death_pos = None
+        self.mp_sync_timer = 0
 
         self.pending_player_col = None
         self.pending_player_row = None
@@ -60,10 +61,133 @@ class GameplayScene(Scene):
         
         self.lore_timer = 15.0 # Start after 15 seconds
         self.lore_toast = None
+        self.players = []
+        self.active_player_idx = 0
+
+    def _is_true_coop(self):
+        return bool(self.game.mp_is_multiplayer)
+
+    def _refresh_players(self):
+        self.players = getattr(self.game, "players", [self.game.player])
+        if not self.players:
+            self.players = [self.game.player]
+        self.game.players = self.players
+        self.game.player2 = self.players[1] if len(self.players) > 1 else self.players[0]
+
+    def _living_players(self):
+        return [player for player in self.players if player.hp > 0]
+
+    def _player_label(self, idx):
+        return f"P{idx + 1}"
+
+    def _restore_primary_player(self):
+        if self.players:
+            self.game.player = self.players[0]
+
+    def _current_player_owner(self):
+        if not self._is_true_coop():
+            return "local"
+        return "host" if self.active_player_idx == 0 else "client"
+
+    def _is_local_turn(self):
+        owner = self._current_player_owner()
+        if owner == "local":
+            return True
+        if owner == "host":
+            return bool(self.game.mp_host)
+        return False
+
+    def _is_remote_turn(self):
+        return self._is_true_coop() and self._current_player_owner() == "client" and bool(self.game.mp_host)
+
+    def _is_client_control_turn(self):
+        return self._is_true_coop() and bool(self.game.mp_client) and self.game.mp_player_index == 2 and self.active_player_idx == 1
+
+    def _set_active_player(self, idx, reset_ui=True):
+        self._refresh_players()
+        idx = max(0, min(idx, len(self.players) - 1))
+        if self.players[idx].hp <= 0:
+            alt_idx = self._next_living_player_idx(-1)
+            if alt_idx is not None:
+                idx = alt_idx
+        self.active_player_idx = idx
+        self.game.player = self.players[idx]
+        if reset_ui:
+            self.cursor_col = self.game.player.col
+            self.cursor_row = self.game.player.row
+            self.show_move_range = True
+            self.show_action_range = False
+            self.selected_skill = None
+
+    def _next_living_player_idx(self, start_idx):
+        self._refresh_players()
+        for idx in range(start_idx + 1, len(self.players)):
+            if self.players[idx].hp > 0:
+                return idx
+        return None
+
+    def _first_living_player_idx(self):
+        return self._next_living_player_idx(-1)
+
+    def _target_player_for_enemy(self, enemy):
+        living = self._living_players()
+        if not living:
+            return None
+        return min(
+            living,
+            key=lambda player: (
+                self.grid.grid_distance(enemy.col, enemy.row, player.col, player.row),
+                player.hp,
+            ),
+        )
+
+    def _target_player_for_cell(self, col, row):
+        living = self._living_players()
+        for player in living:
+            if (player.col, player.row) == (col, row):
+                return player
+        return None
+
+    def _other_player_occupied_cells(self, current_player=None):
+        if current_player is None:
+            current_player = self.game.player
+        return {
+            (player.col, player.row)
+            for player in self.players
+            if player is not current_player and player.hp > 0
+        }
+
+    def _apply_enemy_damage_to_player(self, enemy, player, dmg, reason):
+        if not player:
+            return False
+        if player.take_damage(dmg):
+            self.game.floating_text.add_damage(player.x, player.y, dmg, enemy.last_crit)
+            self.game.particles.emit_burst(player.x, player.y, settings.RED, 10, 60, 0.3)
+            self.game.screen_shake = 0.15 if enemy.last_crit else 0.1
+            self.game.shake_intensity = 8 if enemy.last_crit else 6
+            self.game.sfx.play("player_hit")
+            self.turn_log.append(reason)
+            return True
+        self.game.floating_text.add_blocked(player.x, player.y)
+        self.turn_log.append(f"{reason} (blocked)")
+        return False
+
+    def _advance_after_player_turn(self):
+        next_idx = self._next_living_player_idx(self.active_player_idx)
+        if next_idx is not None:
+            self.turn_manager.start_turn()
+            self.state = "PLAYER_INPUT"
+            self._set_active_player(next_idx)
+            self._generate_enemy_intents()
+            return
+        self._start_enemy_turn()
 
     def enter(self, prev_scene=None):
         self.state = "WAVE_INTRO"
         self.turn_manager = TurnManager()
+        self._refresh_players()
+        self.active_player_idx = 0
+        self.game.player = self.players[0]
         self.enemy_actions = []
         self.enemy_resolve_idx = 0
         self.enemy_phase = None
@@ -77,6 +201,7 @@ class GameplayScene(Scene):
         self.show_action_range = False
         self.selected_skill = None
         self.turn_log = []
+        self.mp_sync_timer = 0
 
         if prev_scene and hasattr(prev_scene, "room"):
             room = prev_scene.room
@@ -124,9 +249,26 @@ class GameplayScene(Scene):
         self._generate_tilemap()
 
         pcol, prow = self.grid.cols // 2, self.grid.rows - 2
-        self.game.player.set_grid_position(pcol, prow, self.grid)
-        self.cursor_col = pcol
-        self.cursor_row = prow
+        spawn_cells = [(pcol, prow)]
+        if len(self.players) > 1:
+            candidate_cells = [
+                (pcol - 1, prow),
+                (pcol + 1, prow),
+                (pcol, prow - 1),
+                (pcol - 1, prow - 1),
+                (pcol + 1, prow - 1),
+            ]
+            for cell in candidate_cells:
+                if self.grid.is_valid(cell[0], cell[1]) and not self.grid.is_blocked(cell[0], cell[1]):
+                    spawn_cells.append(cell)
+                    break
+        while len(spawn_cells) < len(self.players):
+            spawn_cells.append((pcol, prow))
+
+        for player, (col, row) in zip(self.players, spawn_cells):
+            player.set_grid_position(col, row, self.grid)
+
+        self._set_active_player(0)
 
         for enemy in self.game.enemies:
             if not enemy.dead:
@@ -155,7 +297,11 @@ class GameplayScene(Scene):
         return x, y
 
     def _find_spawn_grid_cell(self):
-        occupied = {(self.game.player.col, self.game.player.row)}
+        occupied = {
+            (player.col, player.row)
+            for player in self.players
+            if self.grid.is_valid(player.col, player.row)
+        }
         occupied.update(
             (enemy.col, enemy.row)
             for enemy in self.game.enemies
@@ -253,8 +399,8 @@ class GameplayScene(Scene):
     def _begin_room(self):
         self.state = "PLAYER_INPUT"
         self.turn_manager.start_turn()
+        self._set_active_player(0)
         self.turn_manager.snapshot(self._get_game_state()) # Initial snapshot for Turn 1
-        self.show_move_range = True
         self._generate_enemy_intents()
         self.danger_locked = False
         self._save_rewind_state()
@@ -262,12 +408,13 @@ class GameplayScene(Scene):
         self.game.tts.speak(t("wave_count", wave=self.turn_manager.turn_number), lang=settings.LANGUAGE)
 
     def _generate_enemy_intents(self):
-        pc = self.game.player.col
-        pr = self.game.player.row
         alive_enemies = [e for e in self.game.enemies if not e.dead]
         self.enemy_intents = []
         for enemy in alive_enemies:
-            new_intents = enemy.decide_intent(pc, pr, self.grid, self.game.enemies)
+            target_player = self._target_player_for_enemy(enemy)
+            if target_player is None:
+                continue
+            new_intents = enemy.decide_intent(target_player.col, target_player.row, self.grid, self.game.enemies)
             self.enemy_intents.extend(new_intents)
         player_skills = self._get_player_skill_ids()
         self.grid.set_danger_tiles(self.enemy_intents, player_skills)
@@ -288,8 +435,12 @@ class GameplayScene(Scene):
                 (self.game.current_room.col, self.game.current_room.row)
             )
             if self.game.current_room.type == "victory" and self.game.world_map.all_required_rooms_completed():
+                self._broadcast_scene_switch("victory")
+                self._restore_primary_player()
                 self.game.scene_manager.switch("victory")
                 return
+        self._broadcast_scene_switch("map")
+        self._restore_primary_player()
         self.game.scene_manager.switch("map")
 
     def _set_cursor_from_mouse(self, pos):
@@ -365,7 +516,8 @@ class GameplayScene(Scene):
     def _confirm_player_cursor(self):
         pc = self.game.player.col
         pr = self.game.player.row
-        reachable = self.grid.get_reachable_cells(pc, pr, self.game.player.move_range)
+        occupied = self._other_player_occupied_cells(self.game.player)
+        reachable = self.grid.get_reachable_cells(pc, pr, self.game.player.move_range, extra_blocked=occupied)
 
         if (self.cursor_col, self.cursor_row) == (pc, pr):
             self._enter_action_select()
@@ -377,7 +529,7 @@ class GameplayScene(Scene):
             self.pending_player_row = self.cursor_row
             self.state = "RESOLVE_MOVE"
             self.turn_manager.resolve_timer = 0
-            anim_path = self._build_anim_path(pc, pr, self.cursor_col, self.cursor_row)
+            anim_path = self._build_anim_path(pc, pr, self.cursor_col, self.cursor_row, extra_blocked=occupied)
             self.game.player.start_move_anim(
                 pc, pr, self.cursor_col, self.cursor_row, self.grid, path=anim_path
             )
@@ -440,7 +592,7 @@ class GameplayScene(Scene):
             self.show_action_range = False
             self.selected_skill = None
             self.turn_log.append("Wait")
-            self._start_enemy_turn()
+            self._advance_after_player_turn()
             self.game.sfx.play("menu_select")
             self.game.floating_text.add_info(self.game.player.x, self.game.player.y - 40, t("wait"), settings.LIGHT_GRAY)
             return
@@ -463,6 +615,92 @@ class GameplayScene(Scene):
             self._execute_basic_attack(target_enemies=target_enemies)
 
     def handle_event(self, event):
+        if self.game.mp_is_multiplayer and self.game.mp_client:
+            if not self._is_client_control_turn() and self.state not in ("WAVE_INTRO", "NO_COMBAT"):
+                return
+
+            if event.type == pygame.MOUSEMOTION and self.state in ("PLAYER_INPUT", "PLAYER_ACTION_SELECT"):
+                world_x = event.pos[0] + self.camera_x
+                world_y = event.pos[1] + self.camera_y
+                col, row = self.grid.to_grid(world_x, world_y)
+                self._send_mp_command("cursor_abs", col=col, row=row)
+                return
+
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if self.state == "WAVE_INTRO" and event.button == 1:
+                    self._send_mp_command("begin_room")
+                    return
+                if self.state == "NO_COMBAT" and event.button == 1:
+                    self._send_mp_command("leave_no_combat")
+                    return
+                if event.button == 1 and self.state in ("PLAYER_INPUT", "PLAYER_ACTION_SELECT"):
+                    world_x = event.pos[0] + self.camera_x
+                    world_y = event.pos[1] + self.camera_y
+                    col, row = self.grid.to_grid(world_x, world_y)
+                    self._send_mp_command("cursor_abs", col=col, row=row)
+                    self._send_mp_command("confirm")
+                    return
+                if event.button == 3 and self.state == "PLAYER_ACTION_SELECT":
+                    self._send_mp_command("cancel_action")
+                    return
+
+            if event.type != pygame.KEYDOWN:
+                return
+
+            if self.state == "WAVE_INTRO":
+                self._send_mp_command("begin_room")
+                return
+
+            if self.state == "NO_COMBAT":
+                if event.key in (pygame.K_RETURN, pygame.K_ESCAPE, pygame.K_SPACE):
+                    self._send_mp_command("leave_no_combat")
+                return
+
+            if event.key == pygame.K_ESCAPE:
+                self.game.scene_manager.push("pause")
+                return
+
+            if event.key == pygame.K_TAB and self.state in ("PLAYER_INPUT", "PLAYER_ACTION_SELECT"):
+                self.game.scene_manager.push("skill_tree")
+                return
+
+            if event.key == pygame.K_r and self.state in ("PLAYER_INPUT", "PLAYER_ACTION_SELECT"):
+                self._send_mp_command("rewind")
+                return
+
+            if self.state in ("PLAYER_INPUT", "PLAYER_ACTION_SELECT"):
+                if event.key in (pygame.K_w, pygame.K_UP, pygame.K_s, pygame.K_DOWN, pygame.K_a, pygame.K_LEFT, pygame.K_d, pygame.K_RIGHT):
+                    col, row = self.cursor_col, self.cursor_row
+                    if event.key in (pygame.K_w, pygame.K_UP):
+                        row -= 1
+                    elif event.key in (pygame.K_s, pygame.K_DOWN):
+                        row += 1
+                    elif event.key in (pygame.K_a, pygame.K_LEFT):
+                        col -= 1
+                    elif event.key in (pygame.K_d, pygame.K_RIGHT):
+                        col += 1
+                    self._send_mp_command("cursor_abs", col=col, row=row)
+                    return
+                if event.key in (pygame.K_RETURN, pygame.K_SPACE):
+                    self._send_mp_command("confirm")
+                    return
+                if self.state == "PLAYER_ACTION_SELECT":
+                    if event.key == pygame.K_x:
+                        self._send_mp_command("cursor_abs", col=self.game.player.col, row=self.game.player.row)
+                        self._send_mp_command("confirm")
+                    elif event.key == pygame.K_1:
+                        self._send_mp_command("select_skill", skill_id="pitagoras")
+                    elif event.key == pygame.K_2:
+                        self._send_mp_command("select_skill", skill_id="reflexao")
+                return
+
+            return
+
+        if self.game.mp_is_multiplayer and self._is_remote_turn():
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                self.game.scene_manager.push("pause")
+            return
+
         if event.type == pygame.MOUSEMOTION:
             if self.state in ("PLAYER_INPUT", "PLAYER_ACTION_SELECT"):
                 self._set_cursor_from_mouse(event.pos)
@@ -574,10 +812,6 @@ class GameplayScene(Scene):
             self._confirm_player_cursor()
             return
 
-        if k == pygame.K_r:
-            self._rewind_turn()
-            return
-
     def _handle_action_input(self, event):
         k = event.key
 
@@ -602,8 +836,6 @@ class GameplayScene(Scene):
         elif k == pygame.K_2:
             if self.game.skill_tree.is_unlocked("reflexao"):
                 self._toggle_skill("reflexao")
-        elif k == pygame.K_r:
-            self._rewind_turn()
 
     def _execute_basic_attack(self, target_enemies=None):
         pc = self.game.player.col
@@ -654,7 +886,7 @@ class GameplayScene(Scene):
         self.turn_manager.player_acted = True
         self.show_action_range = False
         self.selected_skill = None
-        self._start_enemy_turn()
+        self._advance_after_player_turn()
 
     def _execute_skill(self):
         pc = self.game.player.col
@@ -729,85 +961,8 @@ class GameplayScene(Scene):
         self.turn_manager.player_acted = True
         self.show_action_range = False
         self.selected_skill = None
-        self._start_enemy_turn()
+        self._advance_after_player_turn()
         return True
-
-    def _rewind_turn(self):
-        if not self.game.skill_tree.is_unlocked("ctrlz"):
-            self.game.floating_text.add_info(self.game.player.x, self.game.player.y - 40, "SKILL LOCKED", settings.GRAY)
-            return
-        
-        if not self.turn_manager.can_undo():
-            self.game.floating_text.add_info(self.game.player.x, self.game.player.y - 40, "CAN'T UNDO", settings.RED)
-            return
-
-        snapshot = self.turn_manager.undo()
-        if snapshot:
-            # Restore Player
-            self.game.player.col = snapshot["player"]["col"]
-            self.game.player.row = snapshot["player"]["row"]
-            self.game.player.hp = snapshot["player"]["hp"]
-            self.game.player.rigor = snapshot["player"]["rigor"]
-            self.game.player.x, self.game.player.y = self.grid.to_pixel(self.game.player.col, self.game.player.row)
-            
-            # Restore Enemies
-            # Note: TurnManager stores a copy of enemy state. 
-            # We match them by index for consistency.
-            for i, enemy_data in enumerate(snapshot["enemies"]):
-                if i < len(self.game.enemies):
-                    e = self.game.enemies[i]
-                    e.col = enemy_data["col"]
-                    e.row = enemy_data["row"]
-                    e.hp = enemy_data["hp"]
-                    e.max_hp = enemy_data["max_hp"]
-                    e.alive = enemy_data["alive"]
-                    e.dead = enemy_data["dead"]
-                    e.x, e.y = self.grid.to_pixel(e.col, e.row)
-                    e.current_anim = "idle"
-                    e.anim_timer = 0
-            
-            # Restore Entropy and other state
-            self.game.entropy = snapshot["entropy"]
-            self.grid.clear_barriers()
-            for bc in snapshot["barrier_cells"]:
-                self.grid.mark_barrier(bc[0], bc[1], True)
-
-            # Apply penalty: Increase entropy
-            # If "entropia" skill is unlocked, reduce penalty
-            penalty = settings.REWIND_ENTROPY_INCREASE
-            if self.game.skill_tree.is_unlocked("entropia"):
-                penalty //= 2
-            
-            self.game.entropy = min(settings.MAX_ENTROPY, self.game.entropy + penalty)
-            self.turn_manager.rewind_cooldown_turns = settings.REWIND_COOLDOWN_TURNS
-            
-            # HP Regeneration
-            heal = settings.REWIND_HEAL_AMOUNT
-            old_hp = self.game.player.hp
-            self.game.player.hp = min(self.game.player.max_hp, self.game.player.hp + heal)
-            actual_heal = self.game.player.hp - old_hp
-            
-            # Visuals and feedback
-            self.game.sfx.play("reflexao") # Glitchy sound
-            self.game.floating_text.add_info(self.game.player.x, self.game.player.y - 60, "CTRL+Z REWIND", settings.CYAN)
-            if actual_heal > 0:
-                self.game.floating_text.add_info(self.game.player.x, self.game.player.y - 80, f"+{actual_heal} HP", settings.GREEN)
-            
-            self.game.particles.emit_burst(self.game.player.x, self.game.player.y, settings.CYAN, 20, 100, 0.5)
-            self.game.screen_shake = 0.2
-            self.game.shake_intensity = 8
-            
-            # Reset UI state
-            self.state = "PLAYER_INPUT"
-            self.turn_manager.start_turn()
-            self.show_move_range = True
-            self.show_action_range = False
-            self.selected_skill = None
-            self.cursor_col, self.cursor_row = self.game.player.col, self.game.player.row
-            self._generate_enemy_intents()
-            
-            # Special: log it
-            self.turn_log.append(f"REWIND to Turn {self.turn_manager.turn_number}")
 
     def _on_enemy_death(self, enemy):
         self.game.floating_text.add_formula(
@@ -860,6 +1015,21 @@ class GameplayScene(Scene):
         self.state = "LOCK_INDICATORS"
 
     def update(self, dt):
+        if self.game.mp_is_multiplayer and self.game.mp_client:
+            if self.game.mp_client:
+                for msg in self.game.mp_client.poll():
+                    if msg.get("type") == "gp_state":
+                        self._apply_mp_state(msg)
+                    elif msg.get("type") == "scene_switch":
+                        self.game.scene_manager.switch(msg.get("scene", "map"))
+                        return
+            return
+
+        if self.game.mp_is_multiplayer and self.game.mp_host:
+            for msg in self.game.mp_host.poll():
+                if msg.get("type") == "gp_cmd":
+                    self._apply_remote_gameplay_command(msg)
+
         self.cursor_timer += dt
 
         if self.game.rewind_fx_timer > 0:
@@ -976,7 +1146,12 @@ class GameplayScene(Scene):
             if not self.hovered_intent_data:
                 pc, pr = self.game.player.col, self.game.player.row
                 if self.state == "PLAYER_INPUT":
-                    reachable = self.grid.get_reachable_cells(pc, pr, self.game.player.move_range)
+                    reachable = self.grid.get_reachable_cells(
+                        pc,
+                        pr,
+                        self.game.player.move_range,
+                        extra_blocked=self._other_player_occupied_cells(self.game.player),
+                    )
                     if (grid_mx, grid_my) in reachable:
                         self.hovered_intent_data = ("player_move", False)
                 elif self.state == "PLAYER_ACTION_SELECT":
@@ -1043,21 +1218,35 @@ class GameplayScene(Scene):
                     # If victory room (and all requirements met) OR final boss gate completed, go to victory screen
                     if (self.game.current_room.type == "victory" and self.game.world_map.all_required_rooms_completed()) or \
                        getattr(self.game.current_room, "is_final_gate", False):
+                        self._broadcast_scene_switch("victory")
+                        self._restore_primary_player()
                         self.game.scene_manager.switch("victory")
                     else:
+                        self._broadcast_scene_switch("map")
+                        self._restore_primary_player()
                         self.game.scene_manager.switch("map")
                 else:
+                    self._broadcast_scene_switch("victory")
+                    self._restore_primary_player()
                     self.game.scene_manager.switch("victory")
 
         elif self.state == "GAME_OVER_TRANSITION":
             self.game_over_timer += dt
             self.game.player.flash_timer = max(0, self.game.player.flash_timer - dt)
             if self.game_over_timer >= settings.GAME_OVER_TRANSITION_DURATION:
+                self._broadcast_scene_switch("game_over")
+                self._restore_primary_player()
                 self.game.scene_manager.switch("game_over")
 
         if self.state == "PLAYER_INPUT" or self.state == "PLAYER_ACTION_SELECT":
             self.game.entropy = min(settings.MAX_ENTROPY,
                                     self.game.entropy + settings.ENTROPY_PER_TURN * dt * 0.1)
+
+        if self.game.mp_is_multiplayer and self.game.mp_host:
+            self.mp_sync_timer += dt
+            if self.mp_sync_timer >= 1.0 / settings.LAN_TICK_RATE:
+                self.mp_sync_timer = 0
+                self.game.mp_host.broadcast(self._serialize_mp_state())
 
     def _resolve_enemy_turn(self, dt):
         if self.enemy_resolve_idx >= len(self.enemy_actions):
@@ -1065,7 +1254,7 @@ class GameplayScene(Scene):
             self.state = "TURN_END"
             return
 
-        if self.game.player.hp <= 0:
+        if not self._living_players():
             self.enemy_phase = None
             self.state = "TURN_END"
             return
@@ -1180,29 +1369,22 @@ class GameplayScene(Scene):
         self.enemy_resolve_idx += 1
 
     def _enemy_attack(self, enemy):
-        pc = self.game.player.col
-        pr = self.game.player.row
-        d = self.grid.grid_distance(enemy.col, enemy.row, pc, pr)
+        target = self._target_player_for_enemy(enemy)
+        if target is None:
+            self.turn_log.append(f"{enemy.type} attack missed")
+            return
 
-        if d <= enemy.attack_range and not self.grid.is_level_change(enemy.col, enemy.row, pc, pr):
+        d = self.grid.grid_distance(enemy.col, enemy.row, target.col, target.row)
+        if d <= enemy.attack_range and not self.grid.is_level_change(enemy.col, enemy.row, target.col, target.row):
             dmg = enemy.roll_damage(self.game.entropy)
-            dx = abs(pc - enemy.col)
-            dy = abs(pr - enemy.row)
-            if self.game.player.take_damage(dmg):
-                self.game.floating_text.add_damage(self.game.player.x, self.game.player.y, dmg, enemy.last_crit)
-                self.game.particles.emit_burst(self.game.player.x, self.game.player.y, settings.RED, 10, 60, 0.3)
-                self.game.screen_shake = 0.15 if enemy.last_crit else 0.1
-                self.game.shake_intensity = 8 if enemy.last_crit else 6
-                self.game.sfx.play("player_hit")
+            dx = abs(target.col - enemy.col)
+            dy = abs(target.row - enemy.row)
+            if self._apply_enemy_damage_to_player(enemy, target, dmg, f"{enemy.type} hit {self._player_label(self.players.index(target))} for {dmg}{' (CRIT!)' if enemy.last_crit else ''}"):
                 if enemy.last_crit:
                     self.game.floating_text.add_formula(
-                        self.game.player.x, self.game.player.y + 15,
+                        target.x, target.y + 15,
                         f"CRITICAL! ({dx}+{dy}={dx+dy})", settings.ORANGE
                     )
-                self.turn_log.append(f"{enemy.type} hit for {dmg}{' (CRIT!)' if enemy.last_crit else ''}")
-            else:
-                self.game.floating_text.add_blocked(self.game.player.x, self.game.player.y)
-                self.turn_log.append(f"{enemy.type} attacked (blocked)")
         elif d <= enemy.attack_range:
             self.game.floating_text.add_evasion(enemy.x, enemy.y)
             self.turn_log.append(f"{enemy.type} can't reach (elevation)")
@@ -1210,20 +1392,13 @@ class GameplayScene(Scene):
             self.turn_log.append(f"{enemy.type} attack missed")
 
     def _enemy_cross_attack(self, enemy):
-        pc = self.game.player.col
-        pr = self.game.player.row
         ec, er = enemy.col, enemy.row
         hit_cells = [(ec, er - 1), (ec, er + 1), (ec - 1, er), (ec + 1, er)]
-        player_hit = (pc, pr) in hit_cells and not self.grid.is_level_change(ec, er, pc, pr)
-        if player_hit:
-            dmg = enemy.roll_damage()
-            if self.game.player.take_damage(dmg):
-                self.game.floating_text.add_damage(self.game.player.x, self.game.player.y, dmg, enemy.last_crit)
-                self.game.particles.emit_burst(self.game.player.x, self.game.player.y, settings.RED, 10, 60, 0.3)
-                self.game.screen_shake = 0.15 if enemy.last_crit else 0.1
-                self.game.shake_intensity = 8 if enemy.last_crit else 6
-                self.game.sfx.play("player_hit")
-                self.turn_log.append(f"Ortogonal cross hit for {dmg}{' (CRIT!)' if enemy.last_crit else ''}")
+        dmg = enemy.roll_damage()
+        for player in self._living_players():
+            if (player.col, player.row) in hit_cells and not self.grid.is_level_change(ec, er, player.col, player.row):
+                label = self._player_label(self.players.index(player))
+                self._apply_enemy_damage_to_player(enemy, player, dmg, f"Ortogonal cross hit {label} for {dmg}{' (CRIT!)' if enemy.last_crit else ''}")
         for cx, cy in hit_cells:
             if self.grid.is_valid(cx, cy):
                 px, py = self.grid.to_pixel(cx, cy)
@@ -1261,22 +1436,21 @@ class GameplayScene(Scene):
             c = max(0, min(self.grid.cols - 1, c))
             r = max(0, min(self.grid.rows - 1, r))
 
-            if c == self.game.player.col and r == self.game.player.row:
-                if self.game.player.take_damage(dmg):
-                    self.game.floating_text.add_damage(self.game.player.x, self.game.player.y, dmg, enemy.last_crit)
-                    self.game.particles.emit_burst(self.game.player.x, self.game.player.y, settings.RED, 10, 60, 0.3)
-                    self.game.screen_shake = 0.15
-                    self.game.shake_intensity = 6
-                    self.game.sfx.play("player_hit")
-                    self.turn_log.append(f"Boss line attack hit for {dmg}!")
+            for player in self._living_players():
+                if c == player.col and r == player.row:
+                    label = self._player_label(self.players.index(player))
+                    self._apply_enemy_damage_to_player(enemy, player, dmg, f"Boss line attack hit {label} for {dmg}!")
 
         self.game.particles.emit_burst(enemy.x, enemy.y, (255, 100, 100), 10, 50, 0.3)
         self.game.sfx.play("pitagoras")
         self.turn_log.append(f"Boss line attack")
 
     def _enemy_ranged_line_attack(self, enemy):
-        pc = self.game.player.col
-        pr = self.game.player.row
+        target = self._target_player_for_enemy(enemy)
+        if target is None:
+            return
+        pc = target.col
+        pr = target.row
         ec, er = enemy.col, enemy.row
         dc = pc - ec
         dr = pr - er
@@ -1302,14 +1476,10 @@ class GameplayScene(Scene):
                 break
             px, py = self.grid.to_pixel(c, r)
             self.game.particles.emit_burst(px, py, settings.ORANGE, 3, 30, 0.2)
-            if c == pc and r == pr:
-                if not self.grid.is_level_change(ec, er, c, r):
-                    if self.game.player.take_damage(dmg):
-                        self.game.floating_text.add_damage(self.game.player.x, self.game.player.y, dmg, enemy.last_crit)
-                        self.game.particles.emit_burst(self.game.player.x, self.game.player.y, settings.RED, 8, 50, 0.3)
-                        self.game.screen_shake = 0.12
-                        self.game.shake_intensity = 5
-                        self.game.sfx.play("player_hit")
+            for player in self._living_players():
+                if c == player.col and r == player.row and not self.grid.is_level_change(ec, er, c, r):
+                    label = self._player_label(self.players.index(player))
+                    if self._apply_enemy_damage_to_player(enemy, player, dmg, f"Atirador line attack hit {label} for {dmg}{' (CRIT!)' if enemy.last_crit else ''}"):
                         hit = True
 
         self.game.sfx.play("hit")
@@ -1326,15 +1496,11 @@ class GameplayScene(Scene):
         )
         for col in range(tc - radius, tc + radius + 1):
             for row in range(tr - radius, tr + radius + 1):
-                if col == self.game.player.col and row == self.game.player.row:
-                    if self.game.player.take_damage(dmg):
-                        self.game.floating_text.add_damage(self.game.player.x, self.game.player.y, dmg, enemy.last_crit)
-                        self.game.particles.emit_burst(self.game.player.x, self.game.player.y, settings.RED, 10, 60, 0.3)
-                        self.game.screen_shake = 0.15
-                        self.game.shake_intensity = 6
-                        self.game.sfx.play("player_hit")
-                        hit = True
-                        self.turn_log.append(f"Boss AoE hit for {dmg}!")
+                for player in self._living_players():
+                    if col == player.col and row == player.row:
+                        label = self._player_label(self.players.index(player))
+                        if self._apply_enemy_damage_to_player(enemy, player, dmg, f"Boss AoE hit {label} for {dmg}!"):
+                            hit = True
 
         cx, cy = self.grid.to_pixel(tc, tr)
         self.game.particles.emit_burst(cx, cy, settings.RED, 20, 80, 0.4)
@@ -1344,14 +1510,15 @@ class GameplayScene(Scene):
 
     def _end_turn(self):
         # Apply regeneration first
-        self.game.player.rigor = min(
-            self.game.player.max_rigor,
-            self.game.player.rigor + settings.RIGOR_REGEN_RATE
-        )
-        self.game.floating_text.add_rigor(
-            self.game.player.x, self.game.player.y - 20,
-            settings.RIGOR_REGEN_RATE
-        )
+        for player in self._living_players():
+            player.rigor = min(
+                player.max_rigor,
+                player.rigor + settings.RIGOR_REGEN_RATE
+            )
+            self.game.floating_text.add_rigor(
+                player.x, player.y - 20,
+                settings.RIGOR_REGEN_RATE
+            )
         self.grid.clear_barriers()
 
         # Check for room completion or death before taking snapshot for next turn
@@ -1366,11 +1533,11 @@ class GameplayScene(Scene):
             )
             return
 
-        if self.game.player.hp <= 0:
+        if not self._living_players():
             self.state = "GAME_OVER_TRANSITION"
             self.game_over_timer = 0
             self.game.particles.emit_burst(
-                self.game.player.x, self.game.player.y, settings.RED, 20, 80, 0.5
+                self.players[0].x, self.players[0].y, settings.RED, 20, 80, 0.5
             )
             self.game.screen_shake = 0.3
             self.game.shake_intensity = 10
@@ -1380,9 +1547,7 @@ class GameplayScene(Scene):
         # Prepare for next turn and take snapshot
         self.state = "PLAYER_INPUT"
         self.turn_manager.start_turn()
-        self.show_move_range = True
-        self.show_action_range = False
-        self.selected_skill = None
+        self._set_active_player(0)
         self._generate_enemy_intents()
         self.danger_locked = False
         
@@ -1397,6 +1562,16 @@ class GameplayScene(Scene):
             "player_hp": self.game.player.hp,
             "player_max_hp": self.game.player.max_hp,
             "player_rigor": self.game.player.rigor,
+            "players": [
+                {
+                    "col": player.col,
+                    "row": player.row,
+                    "hp": player.hp,
+                    "max_hp": player.max_hp,
+                    "rigor": player.rigor,
+                }
+                for player in self.players
+            ],
             "enemies": self.game.enemies,
             "entropy": self.game.entropy,
             "barrier_cells": self.grid.barrier_cells.copy(),
@@ -1405,6 +1580,236 @@ class GameplayScene(Scene):
     def _save_rewind_state(self):
         gs = self._get_game_state()
         self.turn_manager.snapshot(gs)
+
+    def _serialize_mp_state(self):
+        room = None
+        if self.game.current_room:
+            room = [self.game.current_room.col, self.game.current_room.row]
+
+        enemy_intents = []
+        for intent in self.enemy_intents:
+            if intent is None or intent.enemy.dead:
+                continue
+            try:
+                enemy_index = self.game.enemies.index(intent.enemy)
+            except ValueError:
+                continue
+            enemy_intents.append({
+                "enemy_index": enemy_index,
+                "move_target": list(intent.move_target) if intent.move_target else None,
+                "attack_origin": list(intent.attack_origin) if intent.attack_origin else None,
+                "target_tile": list(intent.target_tile) if intent.target_tile else None,
+                "danger_tiles": [list(tile) for tile in intent.danger_tiles],
+                "attack_type": intent.attack_type,
+                "is_fake": intent.is_fake,
+                "telegraph_type": intent.telegraph_type,
+                "lock_mode": intent.lock_mode,
+            })
+
+        return {
+            "type": "gp_state",
+            "room": room,
+            "state": self.state,
+            "grid_cols": self.grid.cols,
+            "grid_rows": self.grid.rows,
+            "blocked": [list(cell) for cell in self.grid.blocked],
+            "barriers": [list(cell) for cell in self.grid.barrier_cells],
+            "tile_types": [[c, r, tval] for (c, r), tval in self.grid.tile_types.items()],
+            "tilemap": self.tilemap.map_data if self.tilemap else None,
+            "player": {
+                "col": self.game.player.col,
+                "row": self.game.player.row,
+                "x": self.game.player.x,
+                "y": self.game.player.y,
+                "hp": self.game.player.hp,
+                "max_hp": self.game.player.max_hp,
+                "rigor": self.game.player.rigor,
+            },
+            "players": [
+                {
+                    "col": player.col,
+                    "row": player.row,
+                    "x": player.x,
+                    "y": player.y,
+                    "hp": player.hp,
+                    "max_hp": player.max_hp,
+                    "rigor": player.rigor,
+                    "player_id": getattr(player, "player_id", idx + 1),
+                }
+                for idx, player in enumerate(self.players)
+            ],
+            "enemies": [
+                {
+                    "type": enemy.type,
+                    "col": enemy.col,
+                    "row": enemy.row,
+                    "x": enemy.x,
+                    "y": enemy.y,
+                    "hp": enemy.hp,
+                    "max_hp": enemy.max_hp,
+                    "alive": enemy.alive,
+                    "dead": enemy.dead,
+                }
+                for enemy in self.game.enemies
+            ],
+            "cursor": [self.cursor_col, self.cursor_row],
+            "active_player_idx": self.active_player_idx,
+            "show_move_range": self.show_move_range,
+            "show_action_range": self.show_action_range,
+            "selected_skill": self.selected_skill,
+            "turn": self.turn_manager.turn_number,
+            "player_moved": self.turn_manager.player_moved,
+            "player_acted": self.turn_manager.player_acted,
+            "danger_locked": self.danger_locked,
+            "danger_tiles": [list(entry) for entry in self.grid.danger_tiles],
+            "enemy_intents": enemy_intents,
+            "camera": [self.camera_x, self.camera_y],
+            "entropy": self.game.entropy,
+        }
+
+    def _apply_mp_state(self, msg):
+        room = msg.get("room")
+        if room:
+            self.game.current_room = self.game.world_map.rooms.get((room[0], room[1]))
+
+        cols = msg.get("grid_cols", self.grid.cols)
+        rows = msg.get("grid_rows", self.grid.rows)
+        if self.grid.cols != cols or self.grid.rows != rows:
+            self.grid = Grid(cols, rows)
+
+        self.grid.blocked = {tuple(cell) for cell in msg.get("blocked", [])}
+        self.grid.barrier_cells = {tuple(cell) for cell in msg.get("barriers", [])}
+        self.grid.tile_types = {(c, r): tval for c, r, tval in msg.get("tile_types", [])}
+        self.grid.danger_tiles = {tuple(entry) for entry in msg.get("danger_tiles", [])}
+        self.danger_locked = msg.get("danger_locked", False)
+        self.grid.danger_locked = self.danger_locked
+
+        tilemap_data = msg.get("tilemap")
+        if tilemap_data is not None:
+            try:
+                self.tilemap = TileMap(self.TILESET_PATH, tile_size=self.TILE_SIZE)
+                self.tilemap.load_from_list(tilemap_data)
+            except Exception:
+                pass
+
+        players_data = msg.get("players")
+        if players_data and len(self.players) != len(players_data):
+            self.players = [Player() for _ in players_data]
+            for idx, player in enumerate(self.players):
+                player.player_id = idx + 1
+                if idx == 1:
+                    player.skin_index = 1
+            self.game.players = self.players
+            self.game.player2 = self.players[1] if len(self.players) > 1 else self.players[0]
+
+        if players_data:
+            for idx, data in enumerate(players_data):
+                if idx >= len(self.players):
+                    break
+                player = self.players[idx]
+                player.col = data.get("col", player.col)
+                player.row = data.get("row", player.row)
+                player.x = data.get("x", player.x)
+                player.y = data.get("y", player.y)
+                player.hp = data.get("hp", player.hp)
+                player.max_hp = data.get("max_hp", player.max_hp)
+                player.rigor = data.get("rigor", player.rigor)
+        else:
+            pdata = msg.get("player", {})
+            self.players[0].col = pdata.get("col", self.players[0].col)
+            self.players[0].row = pdata.get("row", self.players[0].row)
+            self.players[0].x = pdata.get("x", self.players[0].x)
+            self.players[0].y = pdata.get("y", self.players[0].y)
+            self.players[0].hp = pdata.get("hp", self.players[0].hp)
+            self.players[0].max_hp = pdata.get("max_hp", self.players[0].max_hp)
+            self.players[0].rigor = pdata.get("rigor", self.players[0].rigor)
+
+        enemy_data = msg.get("enemies", [])
+        if len(self.game.enemies) != len(enemy_data) or any(
+            i >= len(self.game.enemies) or self.game.enemies[i].type != data.get("type")
+            for i, data in enumerate(enemy_data)
+        ):
+            self.game.enemies = [Enemy(0, 0, data.get("type", "censor")) for data in enemy_data]
+
+        for enemy, data in zip(self.game.enemies, enemy_data):
+            enemy.col = data.get("col", enemy.col)
+            enemy.row = data.get("row", enemy.row)
+            enemy.x = data.get("x", enemy.x)
+            enemy.y = data.get("y", enemy.y)
+            enemy.hp = data.get("hp", enemy.hp)
+            enemy.max_hp = data.get("max_hp", enemy.max_hp)
+            enemy.alive = data.get("alive", enemy.alive)
+            enemy.dead = data.get("dead", enemy.dead)
+
+        self.enemy_intents = []
+        for data in msg.get("enemy_intents", []):
+            idx = data.get("enemy_index")
+            if idx is None or idx >= len(self.game.enemies):
+                continue
+            self.enemy_intents.append(EnemyIntent(
+                enemy=self.game.enemies[idx],
+                move_target=tuple(data["move_target"]) if data.get("move_target") else None,
+                attack_type=data.get("attack_type"),
+                attack_origin=tuple(data["attack_origin"]) if data.get("attack_origin") else None,
+                target_tile=tuple(data["target_tile"]) if data.get("target_tile") else None,
+                danger_tiles={tuple(tile) for tile in data.get("danger_tiles", [])},
+                lock_mode=data.get("lock_mode", "fixed"),
+                telegraph_type=data.get("telegraph_type", "line"),
+                is_fake=data.get("is_fake", False),
+            ))
+
+        self.state = msg.get("state", self.state)
+        self._set_active_player(msg.get("active_player_idx", self.active_player_idx), reset_ui=False)
+        self.cursor_col, self.cursor_row = msg.get("cursor", [self.cursor_col, self.cursor_row])
+        self.show_move_range = msg.get("show_move_range", self.show_move_range)
+        self.show_action_range = msg.get("show_action_range", self.show_action_range)
+        self.selected_skill = msg.get("selected_skill", self.selected_skill)
+        self.turn_manager.turn_number = msg.get("turn", self.turn_manager.turn_number)
+        self.turn_manager.player_moved = msg.get("player_moved", self.turn_manager.player_moved)
+        self.turn_manager.player_acted = msg.get("player_acted", self.turn_manager.player_acted)
+        self.camera_x, self.camera_y = msg.get("camera", [self.camera_x, self.camera_y])
+        self.game.entropy = msg.get("entropy", self.game.entropy)
+
+    def _broadcast_scene_switch(self, scene_name):
+        if self.game.mp_is_multiplayer and self.game.mp_host:
+            self.game.mp_host.broadcast({"type": "scene_switch", "scene": scene_name})
+
+    def _send_mp_command(self, cmd, **payload):
+        if self.game.mp_client:
+            msg = {"type": "gp_cmd", "cmd": cmd}
+            msg.update(payload)
+            self.game.mp_client.send(msg)
+
+    def _apply_remote_gameplay_command(self, msg):
+        if not self._is_remote_turn():
+            return
+
+        cmd = msg.get("cmd")
+        if cmd == "begin_room" and self.state == "WAVE_INTRO":
+            self._begin_room()
+        elif cmd == "leave_no_combat" and self.state == "NO_COMBAT":
+            self._leave_no_combat_room()
+        elif cmd == "cursor_abs" and self.state in ("PLAYER_INPUT", "PLAYER_ACTION_SELECT"):
+            col = int(msg.get("col", self.cursor_col))
+            row = int(msg.get("row", self.cursor_row))
+            self.cursor_col = max(0, min(self.grid.cols - 1, col))
+            self.cursor_row = max(0, min(self.grid.rows - 1, row))
+        elif cmd == "confirm":
+            if self.state == "PLAYER_INPUT":
+                self._confirm_player_cursor()
+            elif self.state == "PLAYER_ACTION_SELECT":
+                self._confirm_action_cursor()
+        elif cmd == "cancel_action" and self.state == "PLAYER_ACTION_SELECT":
+            self.selected_skill = None
+            self.show_action_range = True
+        elif cmd == "select_skill" and self.state == "PLAYER_ACTION_SELECT":
+            skill_id = msg.get("skill_id")
+            if skill_id == "pitagoras" and self.game.skill_tree.is_unlocked("pitagoras"):
+                self._toggle_skill("pitagoras")
+            elif skill_id == "reflexao" and self.game.skill_tree.is_unlocked("reflexao"):
+                self._toggle_skill("reflexao")
+        elif cmd == "rewind" and self.state in ("PLAYER_INPUT", "PLAYER_ACTION_SELECT"):
+            self._try_rewind()
 
     def _try_rewind(self):
         if not self.game.skill_tree.is_unlocked("ctrlz"):
@@ -1427,15 +1832,22 @@ class GameplayScene(Scene):
         if snapshot is None:
             return
 
-        self.game.player.col = snapshot["player"]["col"]
-        self.game.player.row = snapshot["player"]["row"]
-        self.game.player.hp = snapshot["player"]["hp"]
-        self.game.player.max_hp = snapshot["player"]["max_hp"]
-        self.game.player.hp = min(self.game.player.hp + 10, self.game.player.max_hp)
-        self.game.player.rigor = snapshot["player"]["rigor"]
-        self.game.player.x, self.game.player.y = self.grid.to_pixel(
-            self.game.player.col, self.game.player.row
-        )
+        player_snaps = snapshot.get("players", [snapshot["player"]])
+        actual_heal = 0
+        for idx, player_snap in enumerate(player_snaps):
+            if idx >= len(self.players):
+                break
+            player = self.players[idx]
+            player.col = player_snap["col"]
+            player.row = player_snap["row"]
+            player.hp = player_snap["hp"]
+            player.max_hp = player_snap["max_hp"]
+            old_hp = player.hp
+            player.hp = min(player.hp + settings.REWIND_HEAL_AMOUNT, player.max_hp)
+            if idx == self.active_player_idx:
+                actual_heal = player.hp - old_hp
+            player.rigor = player_snap["rigor"]
+            player.x, player.y = self.grid.to_pixel(player.col, player.row)
 
         for i, e_snap in enumerate(snapshot["enemies"]):
             if i < len(self.game.enemies):
@@ -1454,8 +1866,12 @@ class GameplayScene(Scene):
         for col, row in snapshot.get("barrier_cells", []):
             self.grid.mark_barrier(col, row, True)
 
+        penalty = settings.REWIND_ENTROPY_INCREASE
+        if self.game.skill_tree.is_unlocked("entropia"):
+            penalty //= 2
+
         self.game.entropy = min(
-            self.game.entropy + settings.REWIND_ENTROPY_INCREASE,
+            self.game.entropy + penalty,
             settings.MAX_ENTROPY
         )
         self.turn_manager.rewind_cooldown_turns = settings.REWIND_COOLDOWN_TURNS
@@ -1465,14 +1881,13 @@ class GameplayScene(Scene):
 
         self.state = "PLAYER_INPUT"
         self.turn_manager.start_turn()
-        self.show_move_range = True
-        self.show_action_range = False
-        self.selected_skill = None
+        self._set_active_player(0)
         self._generate_enemy_intents()
         self.danger_locked = False
 
         self.game.floating_text.add_info(self.game.player.x, self.game.player.y - 40, "<< REWIND >>", settings.GREEN)
-        self.game.floating_text.add_info(self.game.player.x, self.game.player.y - 60, "+10 HP", settings.GREEN)
+        if actual_heal > 0:
+            self.game.floating_text.add_info(self.game.player.x, self.game.player.y - 60, f"+{actual_heal} HP", settings.GREEN)
 
     def _draw_derivada_preview(self, screen):
         pc = self.game.player.col
@@ -1560,7 +1975,12 @@ class GameplayScene(Scene):
         if self.state == "PLAYER_INPUT" and self.show_move_range:
             pc = self.game.player.col
             pr = self.game.player.row
-            reachable = self.grid.get_reachable_cells(pc, pr, self.game.player.move_range)
+            reachable = self.grid.get_reachable_cells(
+                pc,
+                pr,
+                self.game.player.move_range,
+                extra_blocked=self._other_player_occupied_cells(self.game.player),
+            )
             self.grid.draw(temp, highlight_cells=reachable, highlight_color=settings.BLUE, offset=world_offset)
 
         if self.state == "PLAYER_ACTION_SELECT" and self.show_action_range:
@@ -1649,7 +2069,14 @@ class GameplayScene(Scene):
         for enemy in self.game.enemies:
             enemy.draw(temp, offset=world_offset)
 
-        self.game.player.draw(temp, offset=world_offset)
+        for idx, player in enumerate(self.players):
+            if player.hp <= 0:
+                continue
+            player.draw(temp, offset=world_offset)
+            px = int(player.x + world_offset[0])
+            py = int(player.y + world_offset[1] - player.size - 28)
+            label_color = settings.CYAN if idx == 0 else settings.PURPLE
+            draw_text(temp, self._player_label(idx), (px, py), label_color, 14)
 
         cursor_rect = self.grid.cell_rect(self.cursor_col, self.cursor_row)
         cursor_rect.x += world_offset[0]
@@ -1691,10 +2118,10 @@ class GameplayScene(Scene):
         if self.state == "WAVE_INTRO":
             room = self.game.current_room
             if room:
-                draw_text(screen, room.name,
+                draw_text(screen, t(room.name),
                          (settings.WINDOW_WIDTH // 2, settings.WINDOW_HEIGHT // 2 - 40),
                          settings.CYAN, 28)
-                for i, line in enumerate(room.narrative.split("\n")):
+                for i, line in enumerate(t(room.narrative).split("\n")):
                     draw_text(screen, line,
                              (settings.WINDOW_WIDTH // 2, settings.WINDOW_HEIGHT // 2 + i * 24),
                              settings.WHITE, 18)
@@ -1713,10 +2140,10 @@ class GameplayScene(Scene):
                 overlay.set_alpha(180)
                 overlay.fill(settings.BLACK)
                 screen.blit(overlay, (0, 0))
-                draw_text(screen, room.name,
+                draw_text(screen, t(room.name),
                          (settings.WINDOW_WIDTH // 2, settings.WINDOW_HEIGHT // 2 - 40),
                          settings.CYAN, 32)
-                for i, line in enumerate(room.narrative.split("\n")):
+                for i, line in enumerate(t(room.narrative).split("\n")):
                     draw_text(screen, line,
                              (settings.WINDOW_WIDTH // 2, settings.WINDOW_HEIGHT // 2 + i * 24),
                              settings.LIGHT_GRAY, 18)
@@ -1773,7 +2200,12 @@ class GameplayScene(Scene):
             tile_name = "STAIRS"
         lines.append((f"Tile: {tile_name}", settings.LIGHT_GRAY))
 
-        reachable = self.grid.get_reachable_cells(pc, pr, self.game.player.move_range)
+        reachable = self.grid.get_reachable_cells(
+            pc,
+            pr,
+            self.game.player.move_range,
+            extra_blocked=self._other_player_occupied_cells(self.game.player),
+        )
         if (cc, cr) in reachable or (cc, cr) == (pc, pr):
             can_reach = True
         else:
@@ -1861,28 +2293,29 @@ class GameplayScene(Scene):
         pygame.draw.line(screen, settings.GRAY, (0, bar_y),
                          (settings.WINDOW_WIDTH, bar_y), 1)
 
-        hp_pct = self.game.player.hp / self.game.player.max_hp
-        rigor_pct = self.game.player.rigor / self.game.player.max_rigor
+        current_player = self.game.player
+        hp_pct = current_player.hp / current_player.max_hp
+        rigor_pct = current_player.rigor / current_player.max_rigor
         entropy_pct = self.game.entropy / settings.MAX_ENTROPY
 
         hp_color = settings.GREEN if hp_pct > 0.5 else settings.ORANGE if hp_pct > 0.25 else settings.RED
         self._draw_bar(screen, settings.UI_PADDING, bar_y + 10, 160, 14,
                        hp_pct, hp_color, (60, 20, 20))
-        draw_text(screen, f"HP: {self.game.player.hp}/{self.game.player.max_hp}",
+        draw_text(screen, f"{self._player_label(self.active_player_idx)} HP: {current_player.hp}/{current_player.max_hp}",
                   (settings.UI_PADDING + 80, bar_y + 17),
                   settings.WHITE, 14)
 
         self._draw_bar(screen, settings.UI_PADDING, bar_y + 31, 160, 14,
                        rigor_pct, settings.BLUE, (20, 20, 60))
-        draw_text(screen, f"{t('rigor')}: {self.game.player.rigor:.0f}/{self.game.player.max_rigor}",
+        draw_text(screen, f"{t('rigor')}: {current_player.rigor:.0f}/{current_player.max_rigor}",
                   (settings.UI_PADDING + 80, bar_y + 38),
                   settings.WHITE, 14)
 
         # EXP Bar
-        exp_pct = self.game.player.exp / self.game.player.next_level_exp
+        exp_pct = current_player.exp / current_player.next_level_exp
         self._draw_bar(screen, settings.UI_PADDING + 180, bar_y + 10, 120, 14,
                        exp_pct, settings.GOLD, (40, 40, 10))
-        draw_text(screen, f"LVL {self.game.player.level} ({int(exp_pct*100)}%)",
+        draw_text(screen, f"LVL {current_player.level} ({int(exp_pct*100)}%)",
                   (settings.UI_PADDING + 240, bar_y + 17),
                   settings.WHITE, 13)
 
@@ -1896,9 +2329,19 @@ class GameplayScene(Scene):
         draw_text(screen, f"Crit: {int(settings.PLAYER_CRIT_CHANCE * 100)}% x{settings.PLAYER_CRIT_MULTIPLIER:.0f}",
                   (settings.UI_PADDING + 340, bar_y + 17),
                   settings.GOLD, 12)
-        draw_text(screen, f"Dmg: {self.game.player.base_damage}",
+        draw_text(screen, f"Dmg: {current_player.base_damage}",
                   (settings.UI_PADDING + 340, bar_y + 38),
                   settings.CYAN, 12)
+
+        if len(self.players) > 1:
+            p1 = self.players[0]
+            p2 = self.players[1]
+            draw_text(screen, f"P1 {p1.hp}/{p1.max_hp}",
+                      (settings.UI_PADDING + 430, bar_y + 17),
+                      settings.CYAN, 12)
+            draw_text(screen, f"P2 {p2.hp}/{p2.max_hp}",
+                      (settings.UI_PADDING + 430, bar_y + 38),
+                      settings.PURPLE, 12)
 
         phase_text = "PLAYER MOVE"
         phase_symbol = "dx"
@@ -1956,6 +2399,9 @@ class GameplayScene(Scene):
         self._draw_combat_log(screen, log_x, bar_y + 22)
 
         controls = "WASD/click move + confirm  1/2 skills  R rewind  Esc pause"
+        if self._is_true_coop():
+            turn_owner = "HOST" if self._current_player_owner() == "host" else "CLIENT"
+            controls = f"{controls}  Turn: {turn_owner} {self._player_label(self.active_player_idx)}"
         controls_img = pygame.font.Font(None, 11).render(controls, True, settings.GRAY)
         screen.blit(controls_img, (settings.UI_PADDING, settings.WINDOW_HEIGHT - 14))
 

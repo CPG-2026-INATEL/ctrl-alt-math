@@ -17,7 +17,17 @@ class VictoryScene(Scene):
         self.qed_size = 16
         self.qed_color = settings.WHITE
 
+    def _continue_rect(self):
+        font = pygame.font.Font(None, 18)
+        return font.render("x", True, (0, 0, 0)).get_rect(center=(settings.WINDOW_WIDTH // 2, 420)).inflate(420, 26)
+
     def handle_event(self, event):
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            if self._continue_rect().collidepoint(event.pos):
+                self.game.sfx.play("menu_select")
+                self.game.scene_manager.switch("map")
+            return
+
         if event.type != pygame.KEYDOWN:
             return
         if event.key == pygame.K_RETURN:
@@ -81,4 +91,3 @@ class VictoryScene(Scene):
                      settings.LIGHT_GRAY, 14)
 
         self.game.ui.draw_victory(screen)
-

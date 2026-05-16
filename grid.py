@@ -1,4 +1,5 @@
 import pygame
+import heapq
 import math
 from collections import deque
 
@@ -148,7 +149,7 @@ class Grid:
         start_row,
         end_col,
         end_row,
-        allow_diagonal=True,
+        allow_diagonal=False,
         include_barriers=False,
         extra_blocked=None,
     ):
@@ -163,27 +164,40 @@ class Grid:
         if allow_diagonal:
             directions += [(-1, -1), (-1, 1), (1, -1), (1, 1)]
 
-        queue = deque()
-        queue.append((start_col, start_row, []))
-        visited = {(start_col, start_row)}
+        def heuristic(col, row):
+            return abs(end_col - col) + abs(end_row - row)
 
-        while queue:
-            col, row, path = queue.popleft()
+        open_set = []
+        heapq.heappush(open_set, (heuristic(start_col, start_row), 0, start_col, start_row, []))
+        best_cost = {(start_col, start_row): 0}
+
+        while open_set:
+            _, cost, col, row, path = heapq.heappop(open_set)
+            if cost > best_cost.get((col, row), float("inf")):
+                continue
+
             for dc, dr in directions:
                 nc, nr = col + dc, row + dr
                 if not self.is_valid(nc, nr):
-                    continue
-                if (nc, nr) in visited:
                     continue
                 if self.is_blocked(nc, nr, include_barriers, extra_blocked) and (nc, nr) != (end_col, end_row):
                     continue
                 if self.is_level_change(col, row, nc, nr):
                     continue
+
+                new_cost = cost + 1
+                if new_cost >= best_cost.get((nc, nr), float("inf")):
+                    continue
+
                 new_path = path + [(nc, nr)]
                 if (nc, nr) == (end_col, end_row):
                     return new_path
-                visited.add((nc, nr))
-                queue.append((nc, nr, new_path))
+
+                best_cost[(nc, nr)] = new_cost
+                heapq.heappush(
+                    open_set,
+                    (new_cost + heuristic(nc, nr), new_cost, nc, nr, new_path),
+                )
 
         return []
 
@@ -318,72 +332,24 @@ class Grid:
             if intent is None or intent.enemy.dead:
                 continue
             
-            # 1. Draw Movement Vector (from enemy to move_target or attack_origin)
-            start_node = (intent.enemy.col, intent.enemy.row)
-            target_node = intent.move_target or (intent.attack_origin if not intent.is_fake else None)
-            
-            if target_node and target_node != start_node:
-                fx, fy = self.to_pixel(start_node[0], start_node[1])
-                tx, ty = self.to_pixel(target_node[0], target_node[1])
-                fx += ox; fy += oy; tx += ox; ty += oy
-                
-                arrow_color = (255, 140, 30) if intent.is_fake else (255, 180, 50)
-                self.draw_vector_arrow(screen, start_node[0], start_node[1], 
-                                       target_node[0], target_node[1], arrow_color, 2, offset=offset)
-
-            # 2. Draw Attack Direction (from attack_origin to danger area)
-            if not intent.danger_tiles:
-                continue
-                
-            origin = intent.attack_origin
-            if origin is None:
-                origin = (intent.enemy.col, intent.enemy.row)
-            
-            fx, fy = self.to_pixel(origin[0], origin[1])
-            fx += ox; fy += oy
-            
-            target_list = list(intent.danger_tiles)
-            if not target_list:
-                continue
-                
-            mid_tile = target_list[len(target_list) // 2]
-            tx, ty = self.to_pixel(mid_tile[0], mid_tile[1])
-            tx += ox; ty += oy
-            
-            if self.danger_locked:
-                arrow_color = (255, 80, 80)
-            elif intent.is_fake:
-                arrow_color = (255, 140, 30)
-            else:
-                arrow_color = (255, 200, 50)
-
-            # Only draw attack line if it's not redundant with move arrow
-            if math.hypot(tx - fx, ty - fy) > 5:
-                pygame.draw.line(screen, arrow_color, (int(fx), int(fy)), (int(tx), int(ty)), 1)
-
-            angle = math.atan2(ty - fy, tx - fx)
-            arrow_len = 10
-            for a in [angle - math.pi / 5, angle + math.pi / 5]:
-                ax = tx - arrow_len * math.cos(a)
-                ay = ty - arrow_len * math.sin(a)
-                pygame.draw.line(screen, arrow_color, (int(tx), int(ty)), (int(ax), int(ay)), 2)
-
-        if player_skills and "derivada" in player_skills:
-            for intent in intents:
-                if intent is None or intent.enemy.dead or not intent.move_target:
-                    continue
-                if intent.move_target == (intent.enemy.col, intent.enemy.row):
-                    continue
+            if intent.move_target and intent.move_target != (intent.enemy.col, intent.enemy.row):
                 sx, sy = self.to_pixel(intent.enemy.col, intent.enemy.row)
                 ex, ey = self.to_pixel(intent.move_target[0], intent.move_target[1])
-                sx += ox
-                sy += oy
-                ex += ox
-                ey += oy
-                ghost_color = (100, 255, 100, 80)
-                s = pygame.Surface((16, 16), pygame.SRCALPHA)
-                s.fill(ghost_color)
-                screen.blit(s, (int(ex) - 8, int(ey) - 8))
+                sx += ox; sy += oy; ex += ox; ey += oy
+                
+                move_color = (100, 255, 100, 120) if not intent.is_fake else (255, 140, 30, 80)
+                s = pygame.Surface((self.cell_w, self.cell_h), pygame.SRCALPHA)
+                s.fill(move_color)
+                screen.blit(s, (int(ex) - self.cell_w // 2, int(ey) - self.cell_h // 2))
+                
+                move_arrow_color = (100, 255, 100) if not intent.is_fake else (255, 140, 30)
+                for dx, dy in [(-3, -6), (0, -6), (3, -6)]:
+                    pygame.draw.circle(screen, move_arrow_color, (int(ex + dx), int(ey + dy - self.cell_h // 2 + 4)), 2)
+
+                if not intent.is_fake:
+                    font = pygame.font.Font(None, 14)
+                    label = font.render("v", True, move_arrow_color)
+                    screen.blit(label, (int(ex) - label.get_width() // 2, int(ey) - self.cell_h // 2 + 2))
 
     def draw(self, screen, highlight_cells=None, highlight_color=None,
              show_grid=False, grid_color=None, highlight_outline=False, offset=(0, 0)):

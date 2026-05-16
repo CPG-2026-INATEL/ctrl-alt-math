@@ -41,7 +41,7 @@ STRINGS = {
     "how_to_space": {LANG_EN: "  Space - Basic attack (melee range)", LANG_PT: "  Espaço - Ataque básico (curto alcance)"},
     "how_to_1": {LANG_EN: "  1 - Pitagoras theorem attack (if unlocked)", LANG_PT: "  1 - Ataque do teorema de Pitágoras (se desbloqueado)"},
     "how_to_2": {LANG_EN: "  2 - Reflexao defensive burst (if unlocked)", LANG_PT: "  2 - Explosão defensiva de Reflexão (se desbloqueado)"},
-    "how_to_r": {LANG_EN: "  R - Ctrl+Z rewind (if unlocked, increases Entropy)", LANG_PT: "  R - Desfazer Ctrl+Z (se desbloqueado, aumenta Entropia)"},
+    "how_to_r": {LANG_EN: "  R - Ctrl+Z rewind (+10 HP, increases Entropy)", LANG_PT: "  R - Desfazer Ctrl+Z (+10 HP, aumenta Entropia)"},
     "how_to_skills": {LANG_EN: "SKILL TREE:", LANG_PT: "ÁRVORE DE HABILIDADES:"},
     "how_to_tab": {LANG_EN: "  Press Tab to open the skill tree.", LANG_PT: "  Pressione Tab para abrir a árvore de habilidades."},
     "how_to_spend": {LANG_EN: "  Spend skill points to unlock theorem abilities.", LANG_PT: "  Gaste pontos de habilidade para desbloquear teoremas."},
@@ -157,8 +157,8 @@ STRINGS = {
     },
     "skill_ctrlz_name": {LANG_EN: "Ctrl+Z", LANG_PT: "Ctrl+Z"},
     "skill_ctrlz_desc": {
-        LANG_EN: "Rewind 2 turns back.\nR^-1: undo(R) -> R^-2\nRestores +10 HP. Press R.",
-        LANG_PT: "Volte 2 turnos atrás.\nR^-1: desfazer(R) -> R^-2\nCura +10 HP. Pressione R."
+        LANG_EN: "Rewind to the previous turn.\nRestore +10 HP on rewind.\nPress R.",
+        LANG_PT: "Volte ao turno anterior.\nRecupere +10 HP ao rebobinar.\nPressione R."
     },
     "skill_bayes_name": {LANG_EN: "Bayes", LANG_PT: "Bayes"},
     "skill_bayes_desc": {
@@ -172,8 +172,8 @@ STRINGS = {
     },
     "skill_entropia_name": {LANG_EN: "Entropia Controlada", LANG_PT: "Entropia Controlada"},
     "skill_entropia_desc": {
-        LANG_EN: "Reduce entropy gain\nfrom rewinding.\ndS -> 0",
-        LANG_PT: "Reduza o ganho de entropia\nao desfazer turnos.\ndS -> 0"
+        LANG_EN: "Halve rewind entropy gain.\ndS -> dS/2\nMakes time theft safer.",
+        LANG_PT: "Reduz pela metade a entropia do rewind.\ndS -> dS/2\nTorna o rewind mais seguro."
     },
     "skill_teoria_jogos_name": {LANG_EN: "Teoria dos Jogos", LANG_PT: "Teoria dos Jogos"},
     "skill_teoria_jogos_desc": {
@@ -231,6 +231,7 @@ STRINGS = {
     "room_sanctuary_narr": {LANG_EN: "Accumulated knowledge flows here.", LANG_PT: "Conhecimento acumulado flui aqui."},
     "room_vault_name": {LANG_EN: "Matrix Vault", LANG_PT: "Cofre de Matrizes"},
     "room_vault_narr": {LANG_EN: "Linear transformations guard this room.", LANG_PT: "Transformações lineares guardam esta sala."},
+    "room_lab_name": {LANG_EN: "Chaos Lab", LANG_PT: "Laboratório do Caos"},
     "room_lab_narr": {LANG_EN: "Small changes have massive consequences.", LANG_PT: "Pequenas mudanças têm consequências massivas."},
     
     # Intent Tooltips
@@ -255,15 +256,19 @@ STRINGS = {
     "lobby_player_joined": {LANG_EN: "Player 2 connected!", LANG_PT: "Jogador 2 conectado!"},
     "lobby_start_prompt": {LANG_EN: "Press ENTER to start game", LANG_PT: "Pressione ENTER para comecar"},
     "lobby_esc_cancel": {LANG_EN: "ESC to cancel", LANG_PT: "ESC para cancelar"},
+    "lobby_choose_help": {LANG_EN: "Host on one PC, join from another on the same LAN.", LANG_PT: "Hospede em um PC e entre de outro na mesma rede."},
+    "lobby_share_ip": {LANG_EN: "Share this IP with the second player.", LANG_PT: "Compartilhe este IP com o segundo jogador."},
     "lobby_joining": {LANG_EN: "Join Game", LANG_PT: "Entrar no Jogo"},
     "lobby_enter_ip": {LANG_EN: "Enter host IP address:", LANG_PT: "Digite o IP do host:"},
     "lobby_scan_hint": {LANG_EN: "Ctrl+S to scan LAN", LANG_PT: "Ctrl+S para escanear LAN"},
+    "lobby_join_help": {LANG_EN: "You can type an IP or scan/click a discovered host.", LANG_PT: "Voce pode digitar um IP ou escanear/clicar em um host encontrado."},
     "lobby_scanning": {LANG_EN: "Scanning LAN...", LANG_PT: "Escaneando LAN..."},
     "lobby_found": {LANG_EN: "Found {n} host(s)", LANG_PT: "{n} host(s) encontrado(s)"},
     "lobby_no_hosts": {LANG_EN: "No hosts found", LANG_PT: "Nenhum host encontrado"},
     "lobby_select_host": {LANG_EN: "Select a host:", LANG_PT: "Selecione um host:"},
     "lobby_connected": {LANG_EN: "Connected!", LANG_PT: "Conectado!"},
     "lobby_press_start": {LANG_EN: "Press ENTER to ready up", LANG_PT: "Pressione ENTER para pronto"},
+    "lobby_connected_help": {LANG_EN: "Both players are in. Click or press ENTER to continue.", LANG_PT: "Os dois jogadores entraram. Clique ou pressione ENTER para continuar."},
     "menu_multiplayer": {LANG_EN: "LAN Co-op", LANG_PT: "Co-op LAN"},
 }
 

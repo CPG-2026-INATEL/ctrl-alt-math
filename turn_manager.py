@@ -74,15 +74,22 @@ class TurnManager:
             self.phase = "TURN_END"
 
     def snapshot(self, game_state):
+        players = game_state.get("players")
+        if players is None:
+            players = [
+                {
+                    "col": game_state["player_col"],
+                    "row": game_state["player_row"],
+                    "hp": game_state["player_hp"],
+                    "max_hp": game_state["player_max_hp"],
+                    "rigor": game_state["player_rigor"],
+                }
+            ]
+
         snap = {
             "turn": self.turn_number,
-            "player": {
-                "col": game_state["player_col"],
-                "row": game_state["player_row"],
-                "hp": game_state["player_hp"],
-                "max_hp": game_state["player_max_hp"],
-                "rigor": game_state["player_rigor"],
-            },
+            "player": players[0],
+            "players": players,
             "enemies": [],
             "entropy": game_state["entropy"],
             "barrier_cells": list(game_state.get("barrier_cells", set())),

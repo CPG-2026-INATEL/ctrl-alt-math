@@ -35,6 +35,11 @@ class LobbyScene(Scene):
         self.ip_editing = False
 
     def enter(self, prev_scene=None):
+        self.mode_options = [
+            (t("lobby_host"), "host"),
+            (t("lobby_join"), "join"),
+            (t("lobby_back"), "back"),
+        ]
         self.mode = "choose"
         self.selected_option = 0
         self.status = ""
@@ -42,6 +47,32 @@ class LobbyScene(Scene):
         self.ip_input = ""
         self.ip_editing = False
         self.scan_hosts = []
+
+    def _text_rect(self, text, center, size, pad_x=30, pad_y=16):
+        font = pygame.font.Font(None, size)
+        rect = font.render(text, True, settings.WHITE).get_rect(center=center)
+        return rect.inflate(pad_x, pad_y)
+
+    def _choose_option_rect(self, index):
+        label, _ = self.mode_options[index]
+        return self._text_rect(label, (settings.WINDOW_WIDTH // 2, 180 + index * 50), 24)
+
+    def _cancel_rect(self):
+        return self._text_rect(t("lobby_esc_cancel"), (settings.WINDOW_WIDTH // 2, settings.WINDOW_HEIGHT - 40), 14)
+
+    def _start_rect(self):
+        if self.mode == "hosting":
+            return self._text_rect(t("lobby_start_prompt"), (settings.WINDOW_WIDTH // 2, 380), 24)
+        return self._text_rect(t("lobby_press_start"), (settings.WINDOW_WIDTH // 2, 280), 24)
+
+    def _join_input_rect(self):
+        return self._text_rect(self.ip_input + "_", (settings.WINDOW_WIDTH // 2, 280), 24, 80, 20)
+
+    def _scan_rect(self):
+        return self._text_rect(t("lobby_scan_hint"), (settings.WINDOW_WIDTH // 2, 330), 14)
+
+    def _host_rect(self, index, ip):
+        return self._text_rect(ip, (settings.WINDOW_WIDTH // 2, 280 + index * 30), 20)
 
     def _start_host(self):
         self.host = NetworkHost()
@@ -93,15 +124,87 @@ class LobbyScene(Scene):
             self.host.broadcast({
                 "type": "start_game",
                 "seed": int(pygame.time.get_ticks()),
+                "difficulty": settings.DIFFICULTY,
             })
         self.game.mp_host = self.host
         self.game.mp_client = self.client
         self.game.mp_player_index = self.player_index
         self.game.mp_is_multiplayer = True
         self.game.reset_game_state()
-        self.game.scene_manager.switch("gameplay")
+        self.game.scene_manager.switch("map")
 
     def handle_event(self, event):
+        if event.type == pygame.MOUSEMOTION:
+            if self.mode == "choose":
+                for i in range(len(self.mode_options)):
+                    if self._choose_option_rect(i).collidepoint(event.pos):
+                        self.selected_option = i
+                        return
+            elif self.mode == "join" and not self.ip_editing:
+                for i, ip in enumerate(self.scan_hosts):
+                    if self._host_rect(i, ip).collidepoint(event.pos):
+                        self.selected_host = i
+                        return
+            return
+
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            if self.mode == "choose":
+                for i, (_, action) in enumerate(self.mode_options):
+                    if self._choose_option_rect(i).collidepoint(event.pos):
+                        self.selected_option = i
+                        self.game.sfx.play("menu_confirm")
+                        if action == "host":
+                            self._start_host()
+                        elif action == "join":
+                            self._start_join()
+                        else:
+                            self.game.scene_manager.switch("menu")
+                        return
+            elif self.mode == "hosting":
+                if self.connected and self._start_rect().collidepoint(event.pos):
+                    self._start_game()
+                    return
+                if self._cancel_rect().collidepoint(event.pos):
+                    if self.host:
+                        self.host.stop()
+                        self.host = None
+                    self.mode = "choose"
+                    self.status = ""
+                    return
+            elif self.mode == "join":
+                if self._cancel_rect().collidepoint(event.pos):
+                    self.ip_editing = False
+                    self.mode = "choose"
+                    self.status = ""
+                    return
+                if self.ip_editing and self._scan_rect().collidepoint(event.pos):
+                    self._scan_lan()
+                    return
+                if self.ip_editing and self._join_input_rect().collidepoint(event.pos):
+                    self.ip_editing = True
+                    return
+                if not self.ip_editing:
+                    for i, ip in enumerate(self.scan_hosts):
+                        if self._host_rect(i, ip).collidepoint(event.pos):
+                            self.selected_host = i
+                            self._connect_to(ip)
+                            return
+            elif self.mode == "connected":
+                if self._start_rect().collidepoint(event.pos):
+                    if self.client:
+                        self.client.send({"type": "client_ready"})
+                    self._start_game()
+                    return
+                if self._cancel_rect().collidepoint(event.pos):
+                    if self.client:
+                        self.client.disconnect()
+                        self.client = None
+                    self.mode = "choose"
+                    self.connected = False
+                    self.status = ""
+                    return
+            return
+
         if event.type != pygame.KEYDOWN:
             return
 
@@ -187,23 +290,25 @@ class LobbyScene(Scene):
                     self.status = t("lobby_player_joined")
                     self.status_color = settings.GREEN
                 elif msg.get("type") == "start_game":
+                    settings.DIFFICULTY = msg.get("difficulty", settings.DIFFICULTY)
                     self.game.mp_host = self.host
                     self.game.mp_client = None
                     self.game.mp_player_index = self.player_index
                     self.game.mp_is_multiplayer = True
                     self.game.reset_game_state()
-                    self.game.scene_manager.switch("gameplay")
+                    self.game.scene_manager.switch("map")
 
         if self.client:
             msgs = self.client.poll()
             for msg in msgs:
                 if msg.get("type") == "start_game":
+                    settings.DIFFICULTY = msg.get("difficulty", settings.DIFFICULTY)
                     self.game.mp_client = self.client
                     self.game.mp_host = None
                     self.game.mp_player_index = self.player_index
                     self.game.mp_is_multiplayer = True
                     self.game.reset_game_state()
-                    self.game.scene_manager.switch("gameplay")
+                    self.game.scene_manager.switch("map")
 
         if self.discovery and self.discovery.scan_thread and not self.discovery.scan_thread.is_alive():
             self.scan_hosts = list(set(self.discovery.hosts))
@@ -228,6 +333,8 @@ class LobbyScene(Scene):
                 color = settings.GOLD if i == self.selected_option else settings.WHITE
                 y = 180 + i * 50
                 draw_text(screen, label, (settings.WINDOW_WIDTH // 2, y), color, 24)
+            draw_text(screen, t("lobby_choose_help"),
+                      (settings.WINDOW_WIDTH // 2, 360), settings.GRAY, 16)
 
         elif self.mode == "hosting":
             draw_text(screen, t("lobby_hosting"),
@@ -237,6 +344,8 @@ class LobbyScene(Scene):
                           (settings.WINDOW_WIDTH // 2, 240), settings.WHITE, 22)
             draw_text(screen, self.status,
                       (settings.WINDOW_WIDTH // 2, 300), self.status_color, 20)
+            draw_text(screen, t("lobby_share_ip"),
+                      (settings.WINDOW_WIDTH // 2, 335), settings.LIGHT_GRAY, 16)
             if self.connected:
                 draw_text(screen, t("lobby_start_prompt"),
                           (settings.WINDOW_WIDTH // 2, 380), settings.GOLD, 24)
@@ -253,6 +362,8 @@ class LobbyScene(Scene):
                           (settings.WINDOW_WIDTH // 2, 280), settings.WHITE, 24)
                 draw_text(screen, t("lobby_scan_hint"),
                           (settings.WINDOW_WIDTH // 2, 330), settings.GRAY, 14)
+                draw_text(screen, t("lobby_join_help"),
+                          (settings.WINDOW_WIDTH // 2, 365), settings.LIGHT_GRAY, 15)
             elif self.scan_hosts:
                 draw_text(screen, t("lobby_select_host"),
                           (settings.WINDOW_WIDTH // 2, 240), settings.CYAN, 18)
@@ -270,3 +381,5 @@ class LobbyScene(Scene):
                       (settings.WINDOW_WIDTH // 2, 220), settings.GREEN, 28)
             draw_text(screen, t("lobby_press_start"),
                       (settings.WINDOW_WIDTH // 2, 280), settings.GOLD, 24)
+            draw_text(screen, t("lobby_connected_help"),
+                      (settings.WINDOW_WIDTH // 2, 330), settings.LIGHT_GRAY, 15)

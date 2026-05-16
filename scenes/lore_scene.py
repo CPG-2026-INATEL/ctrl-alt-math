@@ -11,6 +11,18 @@ class LoreScene(Scene):
         self.scroll_y = 0
         self.max_scroll = 0
 
+    def _left_rect(self):
+        return pygame.Rect(settings.WINDOW_WIDTH // 2 - 220, 70, 80, 40)
+
+    def _right_rect(self):
+        return pygame.Rect(settings.WINDOW_WIDTH // 2 + 140, 70, 80, 40)
+
+    def _content_rect(self):
+        return pygame.Rect(60, 120, settings.WINDOW_WIDTH - 120, settings.WINDOW_HEIGHT - 200)
+
+    def _footer_rect(self):
+        return pygame.Rect(settings.WINDOW_WIDTH // 2 - 220, settings.WINDOW_HEIGHT - 56, 440, 32)
+
     def enter(self, prev_scene=None):
         self.scroll_y = 0
         self._speak_category()
@@ -20,6 +32,26 @@ class LoreScene(Scene):
         self.game.tts.speak(t(cat_key), lang=settings.LANGUAGE)
 
     def handle_event(self, event):
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            if self._left_rect().collidepoint(event.pos):
+                self.category_index = (self.category_index - 1) % len(LORE_CATEGORIES)
+                self.scroll_y = 0
+                self.game.sfx.play("menu_select")
+                self._speak_category()
+            elif self._right_rect().collidepoint(event.pos):
+                self.category_index = (self.category_index + 1) % len(LORE_CATEGORIES)
+                self.scroll_y = 0
+                self.game.sfx.play("menu_select")
+                self._speak_category()
+            elif self._footer_rect().collidepoint(event.pos):
+                self.game.sfx.play("menu_select")
+                self.game.scene_manager.switch("menu")
+            return
+
+        if event.type == pygame.MOUSEWHEEL:
+            self.scroll_y = max(0, min(self.max_scroll, self.scroll_y - event.y * 40))
+            return
+
         if event.type != pygame.KEYDOWN:
             return
 

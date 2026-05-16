@@ -114,7 +114,12 @@ class Game:
         settings.MAP_OFFSET_Y = max(top_space, (settings.WINDOW_HEIGHT - bottom_space - map_height) // 2)
 
     def _init_shared_state(self):
-        self.player = Player()
+        self.players = [Player(), Player()]
+        self.players[0].player_id = 1
+        self.players[1].player_id = 2
+        self.players[1].skin_index = 1
+        self.player = self.players[0]
+        self.player2 = self.players[1]
         self.skill_tree = SkillTree()
         self.particles = ParticleSystem()
         self.enemies = []
@@ -146,7 +151,12 @@ class Game:
 
     def reset_game_state(self):
         self._configure_display()
-        self.player = Player()
+        self.players = [Player(), Player()]
+        self.players[0].player_id = 1
+        self.players[1].player_id = 2
+        self.players[1].skin_index = 1
+        self.player = self.players[0]
+        self.player2 = self.players[1]
         self.skill_tree = SkillTree()
         self.particles = ParticleSystem()
         self.enemies = []
@@ -173,7 +183,12 @@ class Game:
         self.obstacles = Grid().obstacle_rects(settings.ARENA_OBSTACLES)
 
     def reset_player_state(self):
-        self.player = Player()
+        self.players = [Player(), Player()]
+        self.players[0].player_id = 1
+        self.players[1].player_id = 2
+        self.players[1].skin_index = 1
+        self.player = self.players[0]
+        self.player2 = self.players[1]
         self.skill_tree = SkillTree()
         self.particles = ParticleSystem()
         self.enemies = []
