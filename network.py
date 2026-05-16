@@ -31,6 +31,15 @@ class NetworkHost:
     def start(self):
         self._log(f"Starting WebSocket host on port {self.port}")
         self.running = True
+        self.server_ready = threading.Event()
+
+        # Start the WebSocket server in a background thread
+        threading.Thread(target=self._run_server, daemon=True).start()
+
+        # Wait for the WebSocket server to be fully bound and listening (timeout 5s)
+        if not self.server_ready.wait(timeout=5.0):
+            self._log("Error: WebSocket server failed to start within timeout.")
+            return
 
         # Programmatically start the localtunnel
         try:
@@ -41,18 +50,17 @@ class NetworkHost:
             self.public_url = raw_url.replace("https://", "wss://").replace("http://", "ws://")
             self._log(f"Localtunnel generated: {raw_url} -> {self.public_url}")
 
-            # Start the tunnel in a daemon thread to prevent blocking the main loop
+            # Start the tunnel in a daemon thread, passing 127.0.0.1 as local_host
+            # to prevent Windows IPv6 localhost connection refusal (WinError 10061)
             threading.Thread(
                 target=self.tunnel.create_tunnel,
-                args=(self.port,),
+                args=(self.port, "127.0.0.1"),
                 daemon=True
             ).start()
         except Exception as e:
             self._log(f"Failed to start localtunnel: {e}")
             self.public_url = None
 
-        # Start the WebSocket server in a background thread
-        threading.Thread(target=self._run_server, daemon=True).start()
         # Also start discovery loop for LAN discovery compatibility
         threading.Thread(target=self._discovery_loop, daemon=True).start()
 
@@ -63,6 +71,7 @@ class NetworkHost:
         async def main():
             self.server = await websockets.serve(self._handler, "0.0.0.0", self.port)
             self._log(f"WebSocket server listening on port {self.port}")
+            self.server_ready.set()
             while self.running:
                 await asyncio.sleep(0.1)
             self.server.close()
@@ -72,6 +81,8 @@ class NetworkHost:
             self.loop.run_until_complete(main())
         except Exception as e:
             self._log(f"Server thread error: {e}")
+            if not self.server_ready.is_set():
+                self.server_ready.set()
         finally:
             self.loop.close()
 
