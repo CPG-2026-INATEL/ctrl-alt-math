@@ -141,7 +141,7 @@ class Game:
             if self.scene_manager.current:
                 self.scene_manager.current.update(dt)
 
-            self.screen.fill(settings.COLOR_BG)
+            self.screen.fill(self.math_bg.get_bg_color())
             if self.scene_manager.current:
                 self.scene_manager.current.draw(self.screen)
 

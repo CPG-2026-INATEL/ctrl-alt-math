@@ -210,6 +210,32 @@ class GameplayScene(Scene):
                                             f"Class: {skin_name}", settings.CYAN)
             return
 
+        if (mods & pygame.KMOD_CTRL):
+            theme_idx = None
+            if event.key == pygame.K_0: theme_idx = 0
+            elif event.key == pygame.K_1: theme_idx = 1
+            elif event.key == pygame.K_2: theme_idx = 2
+            elif event.key == pygame.K_3: theme_idx = 3
+            elif event.key == pygame.K_4: theme_idx = 4
+            elif event.key == pygame.K_5: theme_idx = 5
+            elif event.key == pygame.K_6: theme_idx = 6
+            elif event.key == pygame.K_7: theme_idx = 7
+            elif event.key == pygame.K_8: theme_idx = 8
+            elif event.key == pygame.K_9: theme_idx = 9
+            
+            if theme_idx is not None:
+                theme_name = self.game.math_bg.set_theme(theme_idx)
+                if theme_name:
+                    self.game.floating_text.add_info(self.game.player.x, self.game.player.y - 40,
+                                                    f"Theme: {theme_name}", settings.GOLD)
+                    self.game.sfx.play("menu_select")
+                    
+                    # Add extra feedback: particle burst and shake
+                    self.game.particles.emit_burst(self.game.player.x, self.game.player.y, settings.WHITE, 20, 120, 0.5)
+                    self.game.screen_shake = 0.2
+                    self.game.shake_intensity = 5
+                return
+
         if self.state == "WAVE_INTRO":
             self.state = "PLAYER_INPUT"
             self.turn_manager.start_turn()
@@ -812,7 +838,7 @@ class GameplayScene(Scene):
 
     def draw(self, screen):
         temp = pygame.Surface((settings.WINDOW_WIDTH, settings.WINDOW_HEIGHT))
-        temp.fill(settings.COLOR_BG)
+        temp.fill(self.game.math_bg.get_bg_color())
 
         arena_rect = pygame.Rect(
             settings.ARENA_OFFSET_X, settings.ARENA_OFFSET_Y,
@@ -839,7 +865,7 @@ class GameplayScene(Scene):
                     dy = settings.ARENA_OFFSET_Y + row * scaled_h
                     temp.blit(tile_surf, (dx, dy))
         else:
-            pygame.draw.rect(temp, settings.COLOR_ARENA, arena_rect)
+            pygame.draw.rect(temp, self.game.math_bg.get_arena_color(), arena_rect)
 
         pygame.draw.rect(temp, settings.COLOR_WALL, arena_rect, 2)
 
