@@ -195,10 +195,13 @@ class UI:
 
         import math
         time_val = pygame.time.get_ticks() / 1000.0
+        cx = settings.WINDOW_WIDTH // 2
+        cy = settings.WINDOW_HEIGHT // 2
+        top_y = int(160 * settings.UI_SCALE)
 
         for i in range(40):
-            x = int(400 + math.sin(time_val * 0.5 + i * 0.8) * 350)
-            y = int(300 + math.cos(time_val * 0.3 + i * 1.2) * 250)
+            x = int(cx + math.sin(time_val * 0.5 + i * 0.8) * settings.WINDOW_WIDTH * 0.42)
+            y = int(cy + math.cos(time_val * 0.3 + i * 1.2) * settings.WINDOW_HEIGHT * 0.38)
             alpha = int(30 + math.sin(time_val + i) * 20)
             s = pygame.Surface((2, 2))
             s.set_alpha(alpha)
@@ -207,40 +210,40 @@ class UI:
 
         symbols = ["int", "sum", "sqrt", "pi", "inf", "dx", "grad", "sig"]
         for i, sym in enumerate(symbols):
-            x = 50 + i * 95
-            y = 80 + int(math.sin(time_val * 2 + i) * 10)
+            x = int(settings.WINDOW_WIDTH * 0.08 + i * settings.WINDOW_WIDTH * 0.1)
+            y = int(80 * settings.UI_SCALE + math.sin(time_val * 2 + i) * 10 * settings.UI_SCALE)
             alpha = int(40 + math.sin(time_val + i * 0.5) * 20)
-            font = pygame.font.Font(None, 28)
+            font = pygame.font.Font(None, max(16, int(28 * settings.UI_SCALE)))
             img = font.render(sym, True, settings.CYAN)
             img.set_alpha(alpha)
             screen.blit(img, (x, y))
 
         draw_text(screen, t("game_title"),
-                  (settings.WINDOW_WIDTH // 2, 160),
+                  (cx, top_y),
                   settings.CYAN, 52)
 
         draw_text(screen, t("game_subtitle"),
-                  (settings.WINDOW_WIDTH // 2, 205),
+                  (cx, top_y + int(45 * settings.UI_SCALE)),
                   settings.LIGHT_GRAY, 18)
 
         draw_text(screen, t("intro_1"),
-                  (settings.WINDOW_WIDTH // 2, 250),
+                  (cx, top_y + int(90 * settings.UI_SCALE)),
                   settings.GRAY, 16)
         draw_text(screen, t("intro_2"),
-                  (settings.WINDOW_WIDTH // 2, 272),
+                  (cx, top_y + int(112 * settings.UI_SCALE)),
                   settings.GRAY, 16)
         draw_text(screen, t("intro_3"),
-                  (settings.WINDOW_WIDTH // 2, 294),
+                  (cx, top_y + int(134 * settings.UI_SCALE)),
                   settings.GRAY, 16)
 
-        y_start = 360
+        y_start = top_y + int(200 * settings.UI_SCALE)
         for i, (text, desc) in enumerate(menu_items):
             color = settings.WHITE if i == selected_item else settings.GRAY
             if i == selected_item:
-                draw_text(screen, f"> {text} <", (settings.WINDOW_WIDTH // 2, y_start + i * 50),
+                draw_text(screen, f"> {text} <", (cx, y_start + i * int(50 * settings.UI_SCALE)),
                           color, 28)
             else:
-                draw_text(screen, text, (settings.WINDOW_WIDTH // 2, y_start + i * 50),
+                draw_text(screen, text, (cx, y_start + i * int(50 * settings.UI_SCALE)),
                           color, 28)
 
         draw_text(screen, t("menu_nav"),

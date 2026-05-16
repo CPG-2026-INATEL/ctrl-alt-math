@@ -128,11 +128,15 @@ class WorldMap:
     def draw(self, screen, player=None):
         screen.fill(settings.DARK_BLUE)
 
-        player_room = self.rooms[self.player_room]
-        title_text = t(player_room.name) if player_room.state != "locked" else t("unknown")
-        
-        draw_text(screen, title_text,
-                 (settings.WINDOW_WIDTH // 2, 25),
+        title_y = int(30 * settings.UI_SCALE)
+        info_name_y = settings.WINDOW_HEIGHT - int(150 * settings.UI_SCALE)
+        info_text_y = settings.WINDOW_HEIGHT - int(110 * settings.UI_SCALE)
+        info_action_y = settings.WINDOW_HEIGHT - int(65 * settings.UI_SCALE)
+        avatar_size = max(12, int(16 * settings.UI_SCALE))
+        avatar_offset_y = int(20 * settings.UI_SCALE)
+
+        draw_text(screen, t("archive_title"),
+                 (settings.WINDOW_WIDTH // 2, title_y),
                  settings.CYAN, 32)
 
         for room in self.rooms.values():
@@ -152,46 +156,46 @@ class WorldMap:
         for room in self.rooms.values():
             self._draw_room(screen, room)
 
+        player_room = self.rooms[self.player_room]
         bob_y = int(math.sin(self.anim_timer * 4) * 4)
         avatar_draw_y = self.avatar_y + bob_y
-        
+
         if player:
-            # Draw player skin
             sprite = player.get_current_sprite()
             if sprite:
                 if player.dir_x < 0:
                     sprite = pygame.transform.flip(sprite, True, False)
-                sprite = pygame.transform.scale(sprite, (48, 48))
-                screen.blit(sprite, (self.avatar_x - 24, avatar_draw_y - 24))
+                sprite = pygame.transform.scale(sprite, (avatar_size, avatar_size))
+                screen.blit(sprite, (self.avatar_x - avatar_size // 2, avatar_draw_y - avatar_size // 2))
             else:
                 pygame.draw.rect(screen, settings.CYAN,
-                                (self.avatar_x - 8, avatar_draw_y - 8, 16, 16))
+                                (self.avatar_x - avatar_size // 2, avatar_draw_y - avatar_size // 2, avatar_size, avatar_size))
                 pygame.draw.rect(screen, settings.WHITE,
-                                (self.avatar_x - 8, avatar_draw_y - 8, 16, 16), 1)
+                                (self.avatar_x - avatar_size // 2, avatar_draw_y - avatar_size // 2, avatar_size, avatar_size), 1)
         else:
             pygame.draw.rect(screen, settings.CYAN,
-                            (self.avatar_x - 8, avatar_draw_y - 8, 16, 16))
+                            (self.avatar_x - avatar_size // 2, avatar_draw_y - avatar_size // 2, avatar_size, avatar_size))
             pygame.draw.rect(screen, settings.WHITE,
-                            (self.avatar_x - 8, avatar_draw_y - 8, 16, 16), 1)
+                            (self.avatar_x - avatar_size // 2, avatar_draw_y - avatar_size // 2, avatar_size, avatar_size), 1)
 
         if player_room.state != "locked":
             draw_text(screen, t(player_room.name),
-                     (settings.WINDOW_WIDTH // 2, 510),
+                     (settings.WINDOW_WIDTH // 2, info_name_y),
                      settings.WHITE, 20)
             draw_text(screen, t(player_room.narrative),
-                     (settings.WINDOW_WIDTH // 2, 535),
+                     (settings.WINDOW_WIDTH // 2, info_text_y),
                      settings.GRAY, 14)
             if player_room.state == "available":
                 draw_text(screen, t("press_enter_room"),
-                         (settings.WINDOW_WIDTH // 2, 565),
+                         (settings.WINDOW_WIDTH // 2, info_action_y),
                          settings.GREEN, 16)
             elif player_room.state == "completed":
                 draw_text(screen, t("room_completed_replay"),
-                         (settings.WINDOW_WIDTH // 2, 565),
+                         (settings.WINDOW_WIDTH // 2, info_action_y),
                           settings.GOLD, 16)
         else:
             draw_text(screen, t("unknown"),
-                     (settings.WINDOW_WIDTH // 2, 535),
+                     (settings.WINDOW_WIDTH // 2, info_text_y),
                      settings.GRAY, 16)
 
         draw_text(screen, t("map_footer"),
@@ -251,7 +255,7 @@ class WorldMap:
         if room.state == "completed":
             name_color = settings.GREEN
         draw_text(screen, t(room.name),
-                 (rect.centerx, rect.bottom - 12),
+                 (rect.centerx, rect.bottom - int(12 * settings.UI_SCALE)),
                  name_color, 10)
 
     def _get_room_icon(self, room):

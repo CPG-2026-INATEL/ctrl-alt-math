@@ -28,9 +28,7 @@ from scenes.lore_scene import LoreScene
 class Game:
     def __init__(self):
         pygame.init()
-        self.screen = pygame.display.set_mode(
-            (settings.WINDOW_WIDTH, settings.WINDOW_HEIGHT)
-        )
+        self._configure_display()
         pygame.display.set_caption("Ctrl + Alt + Math")
         self.clock = pygame.time.Clock()
         self.running = True
@@ -53,6 +51,46 @@ class Game:
         self.scene_manager.add("tilemap", TilemapScene)
         self.scene_manager.add("lore", LoreScene)
         self.scene_manager.switch("menu")
+
+    def _configure_display(self):
+        display_info = pygame.display.Info()
+        if settings.FULLSCREEN:
+            settings.WINDOW_WIDTH = display_info.current_w
+            settings.WINDOW_HEIGHT = display_info.current_h
+            self.screen = pygame.display.set_mode(
+                (settings.WINDOW_WIDTH, settings.WINDOW_HEIGHT),
+                pygame.FULLSCREEN,
+            )
+        else:
+            self.screen = pygame.display.set_mode(
+                (settings.WINDOW_WIDTH, settings.WINDOW_HEIGHT)
+            )
+
+        settings.UI_SCALE = min(
+            settings.WINDOW_WIDTH / settings.BASE_WIDTH,
+            settings.WINDOW_HEIGHT / settings.BASE_HEIGHT,
+        )
+        settings.UI_BAR_HEIGHT = int(72 * settings.UI_SCALE)
+
+        available_w = settings.WINDOW_WIDTH - 40
+        available_h = settings.WINDOW_HEIGHT - settings.UI_BAR_HEIGHT - 30
+        arena_w_from_h = int(available_h * settings.GRID_COLS / settings.GRID_ROWS)
+        settings.ARENA_WIDTH = min(available_w, arena_w_from_h)
+        settings.ARENA_HEIGHT = int(settings.ARENA_WIDTH * settings.GRID_ROWS / settings.GRID_COLS)
+        settings.ARENA_OFFSET_X = (settings.WINDOW_WIDTH - settings.ARENA_WIDTH) // 2
+        settings.ARENA_OFFSET_Y = max(15, (available_h - settings.ARENA_HEIGHT) // 2 + 10)
+
+        settings.MAP_ROOM_WIDTH = int(120 * settings.UI_SCALE)
+        settings.MAP_ROOM_HEIGHT = int(80 * settings.UI_SCALE)
+        settings.MAP_ROOM_GAP = int(30 * settings.UI_SCALE)
+        map_cols = 5
+        map_rows = 3
+        map_width = map_cols * settings.MAP_ROOM_WIDTH + (map_cols - 1) * settings.MAP_ROOM_GAP
+        map_height = map_rows * settings.MAP_ROOM_HEIGHT + (map_rows - 1) * settings.MAP_ROOM_GAP
+        settings.MAP_OFFSET_X = max(40, (settings.WINDOW_WIDTH - map_width) // 2)
+        top_space = int(90 * settings.UI_SCALE)
+        bottom_space = int(170 * settings.UI_SCALE)
+        settings.MAP_OFFSET_Y = max(top_space, (settings.WINDOW_HEIGHT - bottom_space - map_height) // 2)
 
     def _init_shared_state(self):
         self.player = Player()
