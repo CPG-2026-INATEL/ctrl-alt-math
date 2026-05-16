@@ -334,6 +334,10 @@ class LobbyScene(Scene):
 
             # Update client list for display
             self.connected_clients = self.host.get_connected_clients_info()
+            if self.connected_clients and not self.connected:
+                self.connected = True
+                self.status = t("lobby_player_joined")
+                self.status_color = settings.GREEN
 
         if self.client:
             msgs = self.client.poll()

@@ -7,12 +7,12 @@
     "no_damage": {
         "easy": false,
         "medium": false,
-        "hard": false
+        "hard": true
     },
     "fast_win": {
         "easy": true,
         "medium": false,
-        "hard": false
+        "hard": true
     },
     "skill_master": {
         "easy": false,
