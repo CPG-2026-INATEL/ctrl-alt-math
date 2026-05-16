@@ -4,6 +4,7 @@ import random
 
 import settings
 from utils import distance, angle_between, clamp
+from enemy_intent import EnemyIntent
 
 
 class Enemy:
@@ -43,7 +44,10 @@ class Enemy:
             "censor": "Spider",
             "strawman": "Scarab",
             "bayesian": "Hornet",
-            "boss": "Centipede"
+            "boss": "Centipede",
+            "ortogonal": "Spider",
+            "atirador": "Hornet",
+            "granadeiro": "Scarab",
         }.get(enemy_type, "Spider")
 
         self.spritesheet = None
@@ -122,19 +126,46 @@ class Enemy:
             self.last_phase = 1
             self.pulse_timer = 0
             self.area_attack_telegraph = 0
+        elif enemy_type == "ortogonal":
+            self.hp = settings.ORTOGONAL_HP
+            self.max_hp = settings.ORTOGONAL_HP
+            self.damage = settings.ORTOGONAL_DAMAGE
+            self.move_range = settings.ORTOGONAL_MOVE_RANGE
+            self.attack_range = settings.ORTOGONAL_ATTACK_RANGE
+            self.color = settings.COLOR_ORTOGONAL
+        elif enemy_type == "atirador":
+            self.hp = settings.ATIRADOR_HP
+            self.max_hp = settings.ATIRADOR_HP
+            self.damage = settings.ATIRADOR_DAMAGE
+            self.move_range = settings.ATIRADOR_MOVE_RANGE
+            self.attack_range = settings.ATIRADOR_ATTACK_RANGE
+            self.color = settings.COLOR_ATIRADOR
+        elif enemy_type == "granadeiro":
+            self.hp = settings.GRANADEIRO_HP
+            self.max_hp = settings.GRANADEIRO_HP
+            self.damage = settings.GRANADEIRO_DAMAGE
+            self.move_range = settings.GRANADEIRO_MOVE_RANGE
+            self.attack_range = settings.GRANADEIRO_ATTACK_RANGE
+            self.color = settings.COLOR_GRANADEIRO
 
         self.info_title = {
             "censor": "enemy_censor",
             "strawman": "enemy_strawman",
             "bayesian": "enemy_bayesian",
-            "boss": "enemy_boss"
+            "boss": "enemy_boss",
+            "ortogonal": "enemy_ortogonal",
+            "atirador": "enemy_atirador",
+            "granadeiro": "enemy_granadeiro",
         }.get(enemy_type, "enemy_unknown")
 
         self.lore = {
             "censor": "lore_censor",
             "strawman": "lore_strawman",
             "bayesian": "lore_bayesian",
-            "boss": "lore_boss"
+            "boss": "lore_boss",
+            "ortogonal": "lore_ortogonal",
+            "atirador": "lore_atirador",
+            "granadeiro": "lore_granadeiro",
         }.get(enemy_type, "lore_unknown")
 
         self.decoy_lifetime = 0
@@ -236,6 +267,234 @@ class Enemy:
         pred_row = max(0, min(grid.rows - 1, pred_row))
         return (pred_col, pred_row)
 
+    def decide_intent(self, player_col, player_row, grid, all_enemies):
+        if self.dead:
+            return None
+
+        dist = grid.grid_distance(self.col, self.row, player_col, player_row)
+        action = self.decide_action(player_col, player_row, grid, all_enemies)
+        if action is None:
+            return None
+
+        move_target = None
+        attack_origin = (self.col, self.row)
+
+        if action["type"] in ("move", "move_then_attack"):
+            tc, tr = action["target_col"], action["target_row"]
+            if grid.is_valid(tc, tr) and not grid.is_blocked(tc, tr):
+                if not grid.is_level_change(self.col, self.row, tc, tr):
+                    move_target = (tc, tr)
+                    attack_origin = (tc, tr)
+
+        intent = EnemyIntent(
+            enemy=self,
+            move_target=move_target,
+            attack_type=action["type"],
+            attack_origin=attack_origin,
+            target_tile=(player_col, player_row),
+            danger_tiles=set(),
+            damage=self.damage,
+        )
+
+        if self.type == "censor":
+            self._censor_intent(intent, player_col, player_row, grid)
+        elif self.type == "strawman":
+            self._strawman_intent(intent, player_col, player_row, grid)
+        elif self.type == "bayesian":
+            self._bayesian_intent(intent, player_col, player_row, grid)
+        elif self.type == "boss":
+            self._boss_intent(intent, action, player_col, player_row, grid)
+        elif self.type == "ortogonal":
+            self._ortogonal_intent(intent, player_col, player_row, grid)
+        elif self.type == "atirador":
+            self._atirador_intent(intent, player_col, player_row, grid)
+        elif self.type == "granadeiro":
+            self._granadeiro_intent(intent, player_col, player_row, grid)
+
+        return intent
+
+    def _get_line_cells(self, from_col, from_row, to_col, to_row, max_range=8, grid=None):
+        cells = set()
+        dc = to_col - from_col
+        dr = to_row - from_row
+        if dc == 0 and dr == 0:
+            return cells
+        steps = max(abs(dc), abs(dr))
+        step_dc = (1 if dc > 0 else -1) if dc != 0 else 0
+        step_dr = (1 if dr > 0 else -1) if dr != 0 else 0
+        for i in range(1, min(steps, max_range) + 1):
+            c = from_col + step_dc * i
+            r = from_row + step_dr * i
+            if grid and not grid.is_valid(c, r):
+                break
+            if grid and grid.is_blocked(c, r):
+                break
+            cells.add((c, r))
+        return cells
+
+    def _get_cross_cells(self, col, row, distance=1):
+        cells = set()
+        for dc, dr in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+            for i in range(1, distance + 1):
+                cells.add((col + dc * i, row + dr * i))
+        return cells
+
+    def _censor_intent(self, intent, player_col, player_row, grid):
+        origin = intent.attack_origin
+        dist = grid.grid_distance(origin[0], origin[1], player_col, player_row)
+        if dist <= self.attack_range:
+            danger = self._get_line_cells(
+                origin[0], origin[1], player_col, player_row,
+                max_range=self.attack_range, grid=grid
+            )
+            intent.danger_tiles = danger
+            intent.telegraph_type = "line"
+            intent.lock_mode = "fixed"
+        elif intent.move_target:
+            tc, tr = intent.move_target
+            dist2 = grid.grid_distance(tc, tr, player_col, player_row)
+            if dist2 <= self.attack_range:
+                danger = self._get_line_cells(
+                    tc, tr, player_col, player_row,
+                    max_range=self.attack_range, grid=grid
+                )
+                intent.danger_tiles = danger
+                intent.telegraph_type = "line"
+                intent.lock_mode = "fixed"
+            else:
+                intent.danger_tiles = set()
+                intent.telegraph_type = "none"
+        else:
+            intent.danger_tiles = set()
+            intent.telegraph_type = "none"
+
+    def _strawman_intent(self, intent, player_col, player_row, grid):
+        origin = intent.attack_origin
+        dist = grid.grid_distance(origin[0], origin[1], player_col, player_row)
+        if dist <= 1:
+            intent.danger_tiles = self._get_cross_cells(origin[0], origin[1], distance=1)
+            intent.telegraph_type = "cross"
+            intent.lock_mode = "fixed"
+        elif intent.move_target:
+            tc, tr = intent.move_target
+            dist2 = grid.grid_distance(tc, tr, player_col, player_row)
+            if dist2 <= 1:
+                intent.danger_tiles = self._get_cross_cells(tc, tr, distance=1)
+                intent.telegraph_type = "cross"
+                intent.lock_mode = "fixed"
+        else:
+            intent.danger_tiles = set()
+            intent.telegraph_type = "none"
+
+    def _bayesian_intent(self, intent, player_col, player_row, grid):
+        origin = intent.attack_origin
+        dist = grid.grid_distance(origin[0], origin[1], player_col, player_row)
+        if dist <= self.attack_range:
+            danger = self._get_line_cells(
+                origin[0], origin[1], player_col, player_row,
+                max_range=self.attack_range, grid=grid
+            )
+            intent.danger_tiles = danger
+            intent.telegraph_type = "line"
+            intent.lock_mode = "post_move"
+        elif intent.move_target:
+            tc, tr = intent.move_target
+            dist2 = grid.grid_distance(tc, tr, player_col, player_row)
+            if dist2 <= self.attack_range:
+                danger = self._get_line_cells(
+                    tc, tr, player_col, player_row,
+                    max_range=self.attack_range, grid=grid
+                )
+                intent.danger_tiles = danger
+                intent.telegraph_type = "line"
+                intent.lock_mode = "post_move"
+        else:
+            intent.danger_tiles = set()
+            intent.telegraph_type = "none"
+
+    def _boss_intent(self, intent, action, player_col, player_row, grid):
+        origin = intent.attack_origin
+        if action["type"] == "line_attack":
+            danger = self._get_line_cells(
+                origin[0], origin[1], player_col, player_row,
+                max_range=self.attack_range, grid=grid
+            )
+            intent.danger_tiles = danger
+            intent.telegraph_type = "line"
+            intent.lock_mode = "fixed"
+        elif action["type"] == "area_attack":
+            cells = grid.get_cells_in_radius(player_col, player_row, 2)
+            intent.danger_tiles = set(cells)
+            intent.telegraph_type = "area"
+            intent.lock_mode = "fixed"
+        else:
+            intent.danger_tiles = set()
+            intent.telegraph_type = "none"
+
+    def _ortogonal_intent(self, intent, player_col, player_row, grid):
+        origin = intent.attack_origin
+        dist = grid.grid_distance(origin[0], origin[1], player_col, player_row)
+        if dist <= self.attack_range:
+            intent.danger_tiles = self._get_cross_cells(origin[0], origin[1], distance=1)
+            intent.telegraph_type = "cross"
+            intent.lock_mode = "fixed"
+        elif intent.move_target:
+            tc, tr = intent.move_target
+            dist2 = grid.grid_distance(tc, tr, player_col, player_row)
+            if dist2 <= self.attack_range:
+                intent.danger_tiles = self._get_cross_cells(tc, tr, distance=1)
+                intent.telegraph_type = "cross"
+                intent.lock_mode = "fixed"
+        else:
+            intent.danger_tiles = set()
+            intent.telegraph_type = "none"
+
+    def _atirador_intent(self, intent, player_col, player_row, grid):
+        origin = intent.attack_origin
+        dist = grid.grid_distance(origin[0], origin[1], player_col, player_row)
+        if dist <= self.attack_range:
+            danger = self._get_line_cells(
+                origin[0], origin[1], player_col, player_row,
+                max_range=self.attack_range, grid=grid
+            )
+            intent.danger_tiles = danger
+            intent.telegraph_type = "line"
+            intent.lock_mode = "post_move"
+        elif intent.move_target:
+            tc, tr = intent.move_target
+            dist2 = grid.grid_distance(tc, tr, player_col, player_row)
+            if dist2 <= self.attack_range:
+                danger = self._get_line_cells(
+                    tc, tr, player_col, player_row,
+                    max_range=self.attack_range, grid=grid
+                )
+                intent.danger_tiles = danger
+                intent.telegraph_type = "line"
+                intent.lock_mode = "post_move"
+        else:
+            intent.danger_tiles = set()
+            intent.telegraph_type = "none"
+
+    def _granadeiro_intent(self, intent, player_col, player_row, grid):
+        origin = intent.attack_origin
+        dist = grid.grid_distance(origin[0], origin[1], player_col, player_row)
+        cells = grid.get_cells_in_radius(player_col, player_row, 1)
+        target_tiles = set((c, r) for c, r in cells if grid.is_valid(c, r))
+        if dist <= self.attack_range:
+            intent.danger_tiles = target_tiles
+            intent.telegraph_type = "area"
+            intent.lock_mode = "fixed"
+        elif intent.move_target:
+            tc, tr = intent.move_target
+            dist2 = grid.grid_distance(tc, tr, player_col, player_row)
+            if dist2 <= self.attack_range:
+                intent.danger_tiles = target_tiles
+                intent.telegraph_type = "area"
+                intent.lock_mode = "fixed"
+        else:
+            intent.danger_tiles = set()
+            intent.telegraph_type = "none"
+
     def decide_action(self, player_col, player_row, grid, all_enemies):
         if self.dead:
             return None
@@ -249,6 +508,13 @@ class Enemy:
 
         if self.type == "boss":
             return self._boss_decide(dist, player_col, player_row, grid, occupied)
+
+        if self.type == "ortogonal":
+            return self._ortogonal_decide(dist, player_col, player_row, grid)
+        elif self.type == "atirador":
+            return self._atirador_decide(dist, player_col, player_row, grid)
+        elif self.type == "granadeiro":
+            return self._granadeiro_decide(dist, player_col, player_row, grid)
 
         if dist <= self.attack_range and not grid.is_level_change(self.col, self.row, player_col, player_row):
             return {"type": "attack", "target_col": player_col, "target_row": player_row}
@@ -368,6 +634,115 @@ class Enemy:
             return {"type": "area_attack", "target_col": player_col, "target_row": player_row}
         return {"type": "wait"}
 
+    def _ortogonal_decide(self, dist, player_col, player_row, grid):
+        if dist <= self.attack_range and not grid.is_level_change(self.col, self.row, player_col, player_row):
+            return {"type": "attack", "target_col": player_col, "target_row": player_row}
+
+        reachable = grid.get_reachable_cells(self.col, self.row, self.move_range)
+        path = grid.pathfind(self.col, self.row, player_col, player_row)
+        if path:
+            reachable_set = set(reachable)
+            for i, step in enumerate(path):
+                if step in reachable_set:
+                    td = grid.grid_distance(step[0], step[1], player_col, player_row)
+                    if td <= self.attack_range:
+                        return {"type": "move_then_attack",
+                                "target_col": step[0], "target_row": step[1],
+                                "attack_after": True}
+            for i, step in enumerate(path):
+                if step in reachable_set:
+                    return {"type": "move", "target_col": step[0], "target_row": step[1]}
+
+        if reachable:
+            best = min(reachable, key=lambda c: grid.grid_distance(c[0], c[1], player_col, player_row))
+            return {"type": "move", "target_col": best[0], "target_row": best[1]}
+        return {"type": "wait"}
+
+    def _atirador_decide(self, dist, player_col, player_row, grid):
+        if dist <= self.attack_range and not grid.is_level_change(self.col, self.row, player_col, player_row):
+            if dist <= 2:
+                path = grid.pathfind(self.col, self.row, player_col, player_row)
+                if path and len(path) > 0:
+                    retreat_dir = (-1 if path[0][0] > self.col else (1 if path[0][0] < self.col else 0),
+                                    -1 if path[0][1] > self.row else (1 if path[0][1] < self.row else 0))
+                    retreat_col = self.col + retreat_dir[0] * 2
+                    retreat_row = self.row + retreat_dir[1] * 2
+                    retreat_col = max(0, min(grid.cols - 1, retreat_col))
+                    retreat_row = max(0, min(grid.rows - 1, retreat_row))
+                    reachable = grid.get_reachable_cells(self.col, self.row, self.move_range)
+                    best = None
+                    best_dist = 0
+                    for cell in reachable:
+                        cd = grid.grid_distance(cell[0], cell[1], player_col, player_row)
+                        if cd >= 3 and cd <= self.attack_range and cd > best_dist:
+                            if not grid.is_level_change(self.col, self.row, cell[0], cell[1]):
+                                best = cell
+                                best_dist = cd
+                    if best:
+                        return {"type": "move", "target_col": best[0], "target_row": best[1]}
+            return {"type": "attack", "target_col": player_col, "target_row": player_row}
+
+        reachable = grid.get_reachable_cells(self.col, self.row, self.move_range)
+        best = None
+        best_score = -999
+        for cell in reachable:
+            cd = grid.grid_distance(cell[0], cell[1], player_col, player_row)
+            if cd >= 3 and cd <= self.attack_range:
+                score = cd
+                if score > best_score:
+                    best = cell
+                    best_score = score
+        if best:
+            return {"type": "move_then_attack",
+                    "target_col": best[0], "target_row": best[1],
+                    "attack_after": True}
+
+        path = grid.pathfind(self.col, self.row, player_col, player_row)
+        if path:
+            reachable_set = set(reachable)
+            for i, step in enumerate(path):
+                if step in reachable_set:
+                    return {"type": "move", "target_col": step[0], "target_row": step[1]}
+        return {"type": "wait"}
+
+    def _granadeiro_decide(self, dist, player_col, player_row, grid):
+        if dist <= self.attack_range:
+            return {"type": "area_attack", "target_col": player_col, "target_row": player_row}
+
+        reachable = grid.get_reachable_cells(self.col, self.row, self.move_range)
+        best_attack = None
+        best_attack_dist = 999
+        best_retreat = None
+        best_retreat_score = -999
+
+        for cell in reachable:
+            cd = grid.grid_distance(cell[0], cell[1], player_col, player_row)
+            if 2 <= cd <= self.attack_range:
+                if cd < best_attack_dist:
+                    best_attack = cell
+                    best_attack_dist = cd
+            if cd > dist and cd <= self.attack_range + 2:
+                score = cd - dist
+                if score > best_retreat_score:
+                    best_retreat = cell
+                    best_retreat_score = score
+
+        if best_attack:
+            return {"type": "move_then_attack",
+                    "target_col": best_attack[0], "target_row": best_attack[1],
+                    "attack_after": True}
+
+        path = grid.pathfind(self.col, self.row, player_col, player_row)
+        if path:
+            reachable_set = set(reachable)
+            for i, step in enumerate(path):
+                if step in reachable_set:
+                    return {"type": "move", "target_col": step[0], "target_row": step[1]}
+
+        if best_retreat:
+            return {"type": "move", "target_col": best_retreat[0], "target_row": best_retreat[1]}
+        return {"type": "wait"}
+
     def draw(self, screen):
         if self.dead:
             return
@@ -409,6 +784,12 @@ class Enemy:
                 self._draw_bayesian(screen, self.x, draw_y, size, color, spawn_alpha)
             elif self.type == "boss":
                 self._draw_boss(screen, self.x, draw_y, size, color, spawn_alpha)
+            elif self.type == "ortogonal":
+                self._draw_ortogonal(screen, self.x, draw_y, size, color, spawn_alpha)
+            elif self.type == "atirador":
+                self._draw_atirador(screen, self.x, draw_y, size, color, spawn_alpha)
+            elif self.type == "granadeiro":
+                self._draw_granadeiro(screen, self.x, draw_y, size, color, spawn_alpha)
 
         if self.type != "boss" and self.hp < self.max_hp:
             self._draw_hp_bar(screen, self.x, draw_y - size - 6, size)
@@ -494,6 +875,53 @@ class Enemy:
         font = pygame.font.Font(None, 16)
         img = font.render(phase_text, True, settings.WHITE)
         screen.blit(img, (x - img.get_width() // 2, y + size + 2))
+
+    def _draw_ortogonal(self, screen, x, y, size, color, alpha):
+        rect = pygame.Rect(x - size, y - size, size * 2, size * 2)
+        s = pygame.Surface((size * 2, size * 2))
+        s.set_alpha(alpha)
+        s.fill(color)
+        screen.blit(s, rect)
+        pygame.draw.rect(screen, settings.WHITE, rect, 2)
+        cross_len = size - 2
+        pygame.draw.line(screen, settings.WHITE, (x - cross_len, y), (x + cross_len, y), 3)
+        pygame.draw.line(screen, settings.WHITE, (x, y - cross_len), (x, y + cross_len), 3)
+        font = pygame.font.Font(None, 12)
+        label = font.render("+", True, settings.WHITE)
+        label.set_alpha(alpha)
+        screen.blit(label, (x - label.get_width() // 2, y - size - 14))
+
+    def _draw_atirador(self, screen, x, y, size, color, alpha):
+        rect = pygame.Rect(x - size, y - size, size * 2, size * 2)
+        s = pygame.Surface((size * 2, size * 2))
+        s.set_alpha(alpha)
+        s.fill(color)
+        screen.blit(s, rect)
+        pygame.draw.rect(screen, settings.WHITE, rect, 1)
+        pts = [(x, y - size), (x + size, y), (x, y + size), (x - size, y)]
+        pygame.draw.polygon(screen, settings.WHITE, pts, 1)
+        pygame.draw.line(screen, settings.WHITE, (x, y - size + 2), (x, y + size - 2), 2)
+        pygame.draw.line(screen, settings.WHITE, (x, y - size + 5), (x + 3, y - size + 8), 1)
+        font = pygame.font.Font(None, 12)
+        label = font.render("AIM", True, settings.YELLOW)
+        label.set_alpha(alpha)
+        screen.blit(label, (x - label.get_width() // 2, y - size - 14))
+
+    def _draw_granadeiro(self, screen, x, y, size, color, alpha):
+        rect = pygame.Rect(x - size, y - size, size * 2, size * 2)
+        s = pygame.Surface((size * 2, size * 2))
+        s.set_alpha(alpha)
+        s.fill(color)
+        screen.blit(s, rect)
+        pygame.draw.rect(screen, settings.WHITE, rect, 2)
+        inner_size = size // 2
+        pygame.draw.rect(screen, settings.WHITE,
+                        (x - inner_size, y - inner_size, inner_size * 2, inner_size * 2), 1)
+        pygame.draw.circle(screen, settings.ORANGE, (x, y), inner_size - 1)
+        font = pygame.font.Font(None, 12)
+        label = font.render("3x3", True, settings.ORANGE)
+        label.set_alpha(alpha)
+        screen.blit(label, (x - label.get_width() // 2, y - size - 14))
 
     def _draw_hp_bar(self, screen, x, y, size):
         bar_w = size * 2

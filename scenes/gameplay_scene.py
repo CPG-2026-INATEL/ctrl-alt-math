@@ -6,6 +6,7 @@ import settings
 from utils import draw_text, distance, angle_between
 from i18n import t
 from enemy import Enemy
+from enemy_intent import EnemyIntent
 from grid import Grid
 from turn_manager import TurnManager
 from tilemap import TileMap, MapGenerator
@@ -64,6 +65,9 @@ class GameplayScene(Scene):
         self.enemy_phase = None
         self.enemy_pending_attack = None
         self.enemy_attack_delay_timer = 0
+        self.enemy_intents = []
+        self.danger_locked = False
+        self.lock_timer = 0
         self.victory_timer = 0
         self.show_move_range = False
         self.show_action_range = False
@@ -230,8 +234,31 @@ class GameplayScene(Scene):
         self.state = "PLAYER_INPUT"
         self.turn_manager.start_turn()
         self.show_move_range = True
+        self._generate_enemy_intents()
+        self.danger_locked = False
         self.game.sfx.play("wave_start")
         self.game.tts.speak(t("wave_count", wave=self.turn_manager.turn_number), lang=settings.LANGUAGE)
+
+    def _generate_enemy_intents(self):
+        pc = self.game.player.col
+        pr = self.game.player.row
+        alive_enemies = [e for e in self.game.enemies if not e.dead]
+        self.enemy_intents = []
+        for enemy in alive_enemies:
+            intent = enemy.decide_intent(pc, pr, self.grid, self.game.enemies)
+            self.enemy_intents.append(intent)
+        player_skills = self._get_player_skill_ids()
+        self.grid.set_danger_tiles(self.enemy_intents, player_skills)
+
+    def _get_player_skill_ids(self):
+        skills = []
+        if self.game.skill_tree.is_unlocked("derivada"):
+            skills.append("derivada")
+        if self.game.skill_tree.is_unlocked("bayes"):
+            skills.append("bayes")
+        if self.game.skill_tree.is_unlocked("teoria_jogos"):
+            skills.append("teoria_jogos")
+        return skills
 
     def _leave_no_combat_room(self):
         self.game.scene_manager.switch("map")
@@ -686,21 +713,11 @@ class GameplayScene(Scene):
     def _start_enemy_turn(self):
         if self.state == "VICTORY_TRANSITION":
             return
-        self.state = "ENEMY_TURN"
-        self.enemy_actions = []
-        self.enemy_resolve_idx = 0
-        self.enemy_phase = "MOVE"
-        self.enemy_pending_attack = None
-        self.enemy_attack_delay_timer = 0
 
-        pc = self.game.player.col
-        pr = self.game.player.row
-        alive_enemies = [e for e in self.game.enemies if not e.dead]
-
-        for enemy in alive_enemies:
-            action = enemy.decide_action(pc, pr, self.grid, self.game.enemies)
-            if action:
-                self.enemy_actions.append((enemy, action))
+        self.grid.lock_danger_indicators(self.enemy_intents)
+        self.danger_locked = True
+        self.lock_timer = 0
+        self.state = "LOCK_INDICATORS"
 
     def update(self, dt):
         self.cursor_timer += dt
@@ -775,6 +792,30 @@ class GameplayScene(Scene):
                     self.pending_player_col = None
                     self.pending_player_row = None
                 self._enter_action_select()
+                self._generate_enemy_intents()
+
+        elif self.state == "LOCK_INDICATORS":
+            self.lock_timer += dt
+            if self.lock_timer >= settings.INDICATOR_LOCK_DURATION:
+                self.grid.clear_danger_tiles()
+                self.danger_locked = False
+                self.state = "ENEMY_TURN"
+                self.enemy_actions = []
+                self.enemy_resolve_idx = 0
+                self.enemy_phase = "MOVE"
+                self.enemy_pending_attack = None
+                self.enemy_attack_delay_timer = 0
+
+                pc = self.game.player.col
+                pr = self.game.player.row
+                alive_enemies = [e for e in self.game.enemies if not e.dead]
+
+                for intent in self.enemy_intents:
+                    if intent is None or intent.enemy.dead:
+                        continue
+                    action = intent.enemy.decide_action(pc, pr, self.grid, self.game.enemies)
+                    if action:
+                        self.enemy_actions.append((intent.enemy, action))
 
         elif self.state == "RESOLVE_ACTION":
             self.turn_manager.resolve_timer += dt
@@ -833,6 +874,10 @@ class GameplayScene(Scene):
                 self._enemy_line_attack(enemy, action)
             elif attack_type == "area_attack":
                 self._enemy_area_attack(enemy, action)
+            elif attack_type == "cross_attack":
+                self._enemy_cross_attack(enemy)
+            elif attack_type == "ranged_line_attack":
+                self._enemy_ranged_line_attack(enemy)
             self.enemy_resolve_idx += 1
             return
 
@@ -884,22 +929,41 @@ class GameplayScene(Scene):
             else:
                 self.turn_log.append(f"{enemy.type} blocked")
             if moved:
-                self.enemy_pending_attack = (enemy, "attack", action)
+                attack_type = "attack"
+                if enemy.type == "ortogonal":
+                    attack_type = "cross_attack"
+                elif enemy.type == "atirador":
+                    attack_type = "ranged_line_attack"
+                elif enemy.type == "granadeiro":
+                    attack_type = "area_attack"
+                self.enemy_pending_attack = (enemy, attack_type, action)
                 self.enemy_attack_delay_timer = 0
                 self.enemy_phase = "ATTACK"
                 return
 
         elif action["type"] == "attack":
             self.enemy_phase = "ATTACK"
-            self._enemy_attack(enemy)
+            if enemy.type == "ortogonal":
+                self._enemy_cross_attack(enemy)
+            elif enemy.type == "atirador":
+                self._enemy_ranged_line_attack(enemy)
+            else:
+                self._enemy_attack(enemy)
 
         elif action["type"] == "line_attack":
             self.enemy_phase = "ATTACK"
-            self._enemy_line_attack(enemy, action)
+            if enemy.type == "boss":
+                self._enemy_line_attack(enemy, action)
+            else:
+                self._enemy_ranged_line_attack(enemy)
 
         elif action["type"] == "area_attack":
             self.enemy_phase = "ATTACK"
             self._enemy_area_attack(enemy, action)
+
+        elif action["type"] == "cross_attack":
+            self.enemy_phase = "ATTACK"
+            self._enemy_cross_attack(enemy)
 
         self.enemy_resolve_idx += 1
 
@@ -932,6 +996,27 @@ class GameplayScene(Scene):
             self.turn_log.append(f"{enemy.type} can't reach (elevation)")
         else:
             self.turn_log.append(f"{enemy.type} attack missed")
+
+    def _enemy_cross_attack(self, enemy):
+        pc = self.game.player.col
+        pr = self.game.player.row
+        ec, er = enemy.col, enemy.row
+        hit_cells = [(ec, er - 1), (ec, er + 1), (ec - 1, er), (ec + 1, er)]
+        player_hit = (pc, pr) in hit_cells and not self.grid.is_level_change(ec, er, pc, pr)
+        if player_hit:
+            dmg = enemy.roll_damage()
+            if self.game.player.take_damage(dmg):
+                self.game.floating_text.add_damage(self.game.player.x, self.game.player.y, dmg, enemy.last_crit)
+                self.game.particles.emit_burst(self.game.player.x, self.game.player.y, settings.RED, 10, 60, 0.3)
+                self.game.screen_shake = 0.15 if enemy.last_crit else 0.1
+                self.game.shake_intensity = 8 if enemy.last_crit else 6
+                self.game.sfx.play("player_hit")
+                self.turn_log.append(f"Ortogonal cross hit for {dmg}{' (CRIT!)' if enemy.last_crit else ''}")
+        for cx, cy in hit_cells:
+            if self.grid.is_valid(cx, cy):
+                px, py = self.grid.to_pixel(cx, cy)
+                self.game.particles.emit_burst(px, py, settings.ORANGE, 5, 40, 0.3)
+        self.game.sfx.play("hit")
 
     def _enemy_line_attack(self, enemy, action):
         tc, tr = action["target_col"], action["target_row"]
@@ -976,6 +1061,47 @@ class GameplayScene(Scene):
         self.game.particles.emit_burst(enemy.x, enemy.y, (255, 100, 100), 10, 50, 0.3)
         self.game.sfx.play("pitagoras")
         self.turn_log.append(f"Boss line attack")
+
+    def _enemy_ranged_line_attack(self, enemy):
+        pc = self.game.player.col
+        pr = self.game.player.row
+        ec, er = enemy.col, enemy.row
+        dc = pc - ec
+        dr = pr - er
+        if dc == 0 and dr == 0:
+            return
+        step_dc = 1 if dc > 0 else (-1 if dc < 0 else 0)
+        step_dr = 1 if dr > 0 else (-1 if dr < 0 else 0)
+        range_val = enemy.attack_range
+        dmg = enemy.roll_damage()
+        hit = False
+
+        self.game.floating_text.add_formula(
+            enemy.x, enemy.y - 30,
+            f"|v|={range_val}", settings.YELLOW
+        )
+
+        for i in range(1, range_val + 1):
+            c = ec + step_dc * i
+            r = er + step_dr * i
+            if not self.grid.is_valid(c, r):
+                break
+            if self.grid.is_blocked(c, r):
+                break
+            px, py = self.grid.to_pixel(c, r)
+            self.game.particles.emit_burst(px, py, settings.ORANGE, 3, 30, 0.2)
+            if c == pc and r == pr:
+                if not self.grid.is_level_change(ec, er, c, r):
+                    if self.game.player.take_damage(dmg):
+                        self.game.floating_text.add_damage(self.game.player.x, self.game.player.y, dmg, enemy.last_crit)
+                        self.game.particles.emit_burst(self.game.player.x, self.game.player.y, settings.RED, 8, 50, 0.3)
+                        self.game.screen_shake = 0.12
+                        self.game.shake_intensity = 5
+                        self.game.sfx.play("player_hit")
+                        hit = True
+
+        self.game.sfx.play("hit")
+        self.turn_log.append(f"Atirador line attack{' hit!' if hit else ' missed'}")
 
     def _enemy_area_attack(self, enemy, action):
         tc, tr = action["target_col"], action["target_row"]
@@ -1038,6 +1164,8 @@ class GameplayScene(Scene):
         self.show_move_range = True
         self.show_action_range = False
         self.selected_skill = None
+        self._generate_enemy_intents()
+        self.danger_locked = False
 
     def _get_game_state(self):
         return {
@@ -1175,7 +1303,11 @@ class GameplayScene(Scene):
                     continue
                 if self.grid.grid_distance(enemy.col, enemy.row, pc, pr) <= enemy.attack_range:
                     self.grid.draw_vector_arrow(temp, enemy.col, enemy.row,
-                                               pc, pr, settings.GOLD, 1)
+                                                pc, pr, settings.GOLD, 1)
+
+        if self.state in ("PLAYER_INPUT", "PLAYER_ACTION_SELECT", "LOCK_INDICATORS", "ENEMY_TURN"):
+            self.grid.draw_danger_indicators(temp, pulse_timer=self.cursor_timer)
+            self.grid.draw_intent_arrows(temp, self.enemy_intents, player_skills=self._get_player_skill_ids() if self.state in ("PLAYER_INPUT", "PLAYER_ACTION_SELECT") else None)
 
         for enemy in self.game.enemies:
             enemy.draw(temp)
@@ -1333,6 +1465,9 @@ class GameplayScene(Scene):
                     "strawman": "ARG",
                     "bayesian": "P(B|A)",
                     "boss": "BOSS",
+                    "ortogonal": "+",
+                    "atirador": "AIM",
+                    "granadeiro": "3x3",
                 }
                 symbol = type_symbols.get(enemy.type, "?")
                 label = font.render(symbol, True, settings.YELLOW)
@@ -1405,7 +1540,11 @@ class GameplayScene(Scene):
             phase_symbol = "f'(x)"
         elif self.state == "RESOLVE_MOVE":
             phase_text = "PLAYER MOVE"
-            phase_symbol = "dx"
+            phase_symbol = "\u0394x"
+        elif self.state == "LOCK_INDICATORS":
+            phase_text = "LOCK AIM"
+            phase_symbol = "!"
+            phase_color = settings.ORANGE
         elif self.state == "ENEMY_TURN":
             phase_color = settings.RED
             if self.enemy_phase == "ATTACK":
