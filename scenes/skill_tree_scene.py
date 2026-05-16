@@ -1,5 +1,7 @@
 import pygame
 
+import settings
+from i18n import t
 from scenes.scene import Scene
 
 
@@ -32,7 +34,8 @@ class SkillTreeScene(Scene):
         if current_hovered and current_hovered != self.last_hovered:
             skill = self.game.skill_tree.get_skill(current_hovered)
             if skill:
-                text = f"{t(skill['name'])}. {t(skill['desc'])}"
+                flavor_key = f"skill_{current_hovered}_flavor"
+                text = f"{t(skill['name'])}. {t(skill['desc'])}. {t(flavor_key)}"
                 self.game.tts.speak(text, lang=settings.LANGUAGE)
         self.last_hovered = current_hovered
 

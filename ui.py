@@ -7,9 +7,39 @@ from utils import draw_text, distance
 from i18n import t
 
 
+class LoreToast:
+    def __init__(self, text, title="BERNOULLI_LOG"):
+        self.full_text = text
+        self.title = title
+        self.display_text = ""
+        self.char_idx = 0
+        self.timer = 0
+        self.speed = 0.04
+        self.life = 6.0 # Total duration
+        self.fade_timer = 0.5
+        self.state = "typing" # typing, waiting, fading
+
+    def update(self, dt):
+        self.life -= dt
+        if self.state == "typing":
+            self.timer += dt
+            if self.timer >= self.speed:
+                self.timer = 0
+                self.char_idx += 1
+                if self.char_idx >= len(self.full_text):
+                    self.state = "waiting"
+                    self.display_text = self.full_text
+                else:
+                    self.display_text = self.full_text[:self.char_idx]
+        elif self.life <= self.fade_timer:
+            self.state = "fading"
+
+    def is_dead(self):
+        return self.life <= 0
+
 class UI:
     def __init__(self):
-        pass
+        self.lore_toast = None
 
     def draw_hud(self, screen, player, wave, skill_points, entropy, wave_count, game=None):
         bar_y = settings.WINDOW_HEIGHT - settings.UI_BAR_HEIGHT
@@ -119,6 +149,46 @@ class UI:
         for c in controls:
             draw_text(screen, c, (x, y), settings.GRAY, 10, center=False)
             y += 11
+
+    def draw_lore_toast(self, screen, toast):
+        if not toast:
+            return
+
+        w, h = 280, 80
+        x, y = settings.WINDOW_WIDTH - w - 20, 20
+        
+        alpha = 255
+        if toast.state == "fading":
+            alpha = int(255 * (toast.life / toast.fade_timer))
+        
+        # Background
+        bg_surf = pygame.Surface((w, h), pygame.SRCALPHA)
+        pygame.draw.rect(bg_surf, (10, 15, 30, int(200 * (alpha/255))), (0, 0, w, h), border_radius=8)
+        pygame.draw.rect(bg_surf, (settings.CYAN[0], settings.CYAN[1], settings.CYAN[2], int(150 * (alpha/255))), (0, 0, w, h), 1, border_radius=8)
+        screen.blit(bg_surf, (x, y))
+
+        # Title
+        font_title = pygame.font.Font(None, 14)
+        title_surf = font_title.render(f"[{toast.title}]", True, settings.GOLD)
+        title_surf.set_alpha(alpha)
+        screen.blit(title_surf, (x + 10, y + 8))
+
+        # Content
+        font_text = pygame.font.Font(None, 18)
+        lines = self._wrap_text(toast.display_text, font_text, w - 20)
+        curr_y = y + 25
+        for line in lines[:3]: # Limit to 3 lines
+            txt_surf = font_text.render(line, True, settings.WHITE)
+            txt_surf.set_alpha(alpha)
+            screen.blit(txt_surf, (x + 10, curr_y))
+            curr_y += 16
+
+        # Glitch effect if typing
+        if toast.state == "typing" and random.random() < 0.1:
+            glitch_w = random.randint(10, 50)
+            glitch_surf = pygame.Surface((glitch_w, 2), pygame.SRCALPHA)
+            glitch_surf.fill((settings.CYAN[0], settings.CYAN[1], settings.CYAN[2], 100))
+            screen.blit(glitch_surf, (x + random.randint(0, w-glitch_w), y + random.randint(0, h)))
 
     def draw_main_menu(self, screen, menu_items, selected_item):
         screen.fill(settings.DARK_BLUE)

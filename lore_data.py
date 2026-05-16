@@ -304,3 +304,111 @@ LORE_CATEGORIES = [
     ("lore_sec_narrative", "lore_content_narrative"),
     ("lore_sec_tone", "lore_content_tone"),
 ]
+
+SHORT_LORE_SNIPPETS = [
+    {
+        "title": "BERNOULLI_LOG",
+        "text": {
+            LANG_EN: "Mathematics is the only language the Regime cannot silence.",
+            LANG_PT: "A matemática é a única linguagem que o Regime não pode silenciar."
+        }
+    },
+    {
+        "title": "REBELLION_INTERCEPT",
+        "text": {
+            LANG_EN: "They say the world is simple. They are lying to preserve control.",
+            LANG_PT: "Eles dizem que o mundo é simples. Eles mentem para manter o controle."
+        }
+    },
+    {
+        "title": "MINISTRY_CENSOR",
+        "text": {
+            LANG_EN: "Complexity detected. Cognitive re-education required.",
+            LANG_PT: "Complexidade detectada. Reeducação cognitiva necessária."
+        }
+    },
+    {
+        "title": "BERNOULLI_LOG",
+        "text": {
+            LANG_EN: "Every equation solved is a crack in their reality.",
+            LANG_PT: "Cada equação resolvida é uma rachadura na realidade deles."
+        }
+    },
+    {
+        "title": "HISTORICAL_FRAGMENT",
+        "text": {
+            LANG_EN: "Universities were once places of light. Now they are prisons of silence.",
+            LANG_PT: "Universidades já foram lugares de luz. Agora são prisões de silêncio."
+        }
+    },
+    {
+        "title": "REBELLION_INTERCEPT",
+        "text": {
+            LANG_EN: "Doubt is the first step towards a proof.",
+            LANG_PT: "A dúvida é o primeiro passo para uma prova."
+        }
+    },
+    {
+        "title": "BERNOULLI_LOG",
+        "text": {
+            LANG_EN: "The solar system is entering chaotic resonance. We are the only ones who see it.",
+            LANG_PT: "O sistema solar está entrando em ressonância caótica. Somos os únicos que vemos."
+        }
+    },
+    {
+        "title": "MINISTRY_CENSOR",
+        "text": {
+            LANG_EN: "Thinking too much is treason. Stay simple. Stay safe.",
+            LANG_PT: "Pensar demais é traição. Seja simples. Esteja seguro."
+        }
+    },
+    {
+        "title": "BERNOULLI_LOG",
+        "text": {
+            LANG_EN: "I see trajectories where they see only fate.",
+            LANG_PT: "Eu vejo trajetórias onde eles veem apenas o destino."
+        }
+    },
+    {
+        "title": "REBELLION_INTERCEPT",
+        "text": {
+            LANG_EN: "Freedom is the ability to choose an unpredictable path.",
+            LANG_PT: "Liberdade é a habilidade de escolher um caminho imprevisível."
+        }
+    },
+    {
+        "title": "BERNOULLI_LOG",
+        "text": {
+            LANG_EN: "Entropy rises with every second we try to steal from the past.",
+            LANG_PT: "A entropia aumenta com cada segundo que tentamos roubar do passado."
+        }
+    },
+    {
+        "title": "MINISTRY_CENSOR",
+        "text": {
+            LANG_EN: "Right triangles are a threat to public order.",
+            LANG_PT: "Triângulos retângulos são uma ameaça à ordem pública."
+        }
+    },
+    {
+        "title": "BERNOULLI_LOG",
+        "text": {
+            LANG_EN: "Knowledge is resistance. Learning is an act of war.",
+            LANG_PT: "Conhecimento é resistência. Aprender é um ato de guerra."
+        }
+    },
+    {
+        "title": "REBELLION_INTERCEPT",
+        "text": {
+            LANG_EN: "The Great Simplifier wants to reduce us to a single variable.",
+            LANG_PT: "O Grande Simplificador quer nos reduzir a uma única variável."
+        }
+    },
+    {
+        "title": "BERNOULLI_LOG",
+        "text": {
+            LANG_EN: "The universe cannot be reduced to simple answers.",
+            LANG_PT: "O universo não pode ser reduzido a respostas simples."
+        }
+    }
+]

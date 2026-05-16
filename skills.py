@@ -106,9 +106,9 @@ class SkillTree:
                         length = max(1, math.sqrt(dx * dx + dy * dy))
                         steps = int(length / 8)
                         for i in range(steps):
-                            t = i / steps
-                            px = start[0] + dx * t
-                            py = start[1] + dy * t
+                            lerp_val = i / steps
+                            px = start[0] + dx * lerp_val
+                            py = start[1] + dy * lerp_val
                             pygame.draw.circle(screen, (30, 120, 30), (int(px), int(py)), 1)
 
         for sid, skill in self.skills.items():
@@ -162,6 +162,12 @@ class SkillTree:
                 draw_text(screen, line,
                           (settings.WINDOW_WIDTH // 2, y_offset + i * 22),
                           settings.LIGHT_GRAY, 16)
+            
+            # Draw Flavor Lore
+            flavor_key = f"skill_{self.hovered_id}_flavor"
+            draw_text(screen, f"\"{t(flavor_key)}\"",
+                      (settings.WINDOW_WIDTH // 2, settings.WINDOW_HEIGHT - 65),
+                      settings.CYAN, 14)
 
         draw_text(screen, t("skill_tree_footer"),
                   (settings.WINDOW_WIDTH // 2, settings.WINDOW_HEIGHT - 15),
