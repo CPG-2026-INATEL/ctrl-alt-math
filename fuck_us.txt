@@ -1,12 +1,6 @@
-[Discovery] Starting LAN scan...
-[Discovery] Broadcasting UDP discovery to ['255.255.255.255', '172.19.160.255', '10.42.31.255'] (reply to port 5557)
-[Client] Connecting to 10.42.31.181:5555...
-[Client] Async thread started for 10.42.31.181
-[Client] Socket error: InvalidMessage: did not receive a valid HTTP response
-[Client] Client connection closed.
-[Client] Failed to connect to 10.42.31.181:5555
-[Client] Connecting to 10.42.31.255:5555...
-[Client] Async thread started for 10.42.31.255
-[Client] Socket error: OSError: [WinError 1214] O formato do nome da rede especificado é inválido
-[Client] Client connection closed.
-[Client] Failed to connect to 10.42.31.255:5555
+[Client] Connecting to wss://sweet-guests-jam.loca.lt:5555
+[Client] Resolved WebSocket URL: wss://sweet-guests-jam.loca.lt
+[Client] Connection error: As of 3.10, the *loop* parameter was removed from Lock() since it is no longer necessary
+[Client] Connecting to wss://sweet-guests-jam.loca.lt:5555
+[Client] Resolved WebSocket URL: wss://sweet-guests-jam.loca.lt
+[Client] Connection error: As of 3.10, the *loop* parameter was removed from Lock() since it is no longer necessary
