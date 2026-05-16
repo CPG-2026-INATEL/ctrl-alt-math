@@ -28,6 +28,20 @@ class MapScene(Scene):
         if event.type != pygame.KEYDOWN:
             return
 
+        mods = pygame.key.get_mods()
+        if (mods & pygame.KMOD_CTRL) and (mods & pygame.KMOD_ALT):
+            self.game.player.toggle_skin()
+            skin_name = self.game.player.skin_names[self.game.player.skin_index]
+            # Use self.avatar_x/y from world_map for floating text position
+            self.game.floating_text.add_info(
+                self.game.world_map.avatar_x, 
+                self.game.world_map.avatar_y - 40,
+                t("class_label", name=skin_name), 
+                settings.CYAN
+            )
+            self.game.sfx.play("menu_select")
+            return
+
         if event.key == pygame.K_UP:
             if self.game.world_map.navigate("up"):
                 self.game.sfx.play("menu_select")
@@ -58,7 +72,9 @@ class MapScene(Scene):
             self.game.scene_manager.switch("menu")
 
     def update(self, dt):
-        self.game.world_map.update(dt)
+        self.game.world_map.update(dt, self.game.player)
+        self.game.floating_text.update(dt)
 
     def draw(self, screen):
-        self.game.world_map.draw(screen)
+        self.game.world_map.draw(screen, self.game.player)
+        self.game.floating_text.draw(screen)

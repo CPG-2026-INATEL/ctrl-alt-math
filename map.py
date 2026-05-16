@@ -47,11 +47,50 @@ class WorldMap:
 
         self.player_room = start
         self.anim_timer = 0
+        
+        # Smooth avatar movement
+        start_room = self.rooms[start]
+        self.avatar_x = start_room.rect.centerx
+        self.avatar_y = start_room.rect.bottom + 20
 
-    def update(self, dt):
+    def update(self, dt, player=None):
         self.anim_timer += dt
         for room in self.rooms.values():
             room.bob_phase += dt * 3
+            
+        # Update avatar position
+        target_room = self.rooms[self.player_room]
+        target_x = target_room.rect.centerx
+        target_y = target_room.rect.bottom + 20
+        
+        dx = target_x - self.avatar_x
+        dy = target_y - self.avatar_y
+        dist = math.sqrt(dx*dx + dy*dy)
+        
+        if dist > 2:
+            speed = 300
+            move_step = speed * dt
+            if dist < move_step:
+                self.avatar_x = target_x
+                self.avatar_y = target_y
+                if player:
+                    player.current_anim = "idle"
+            else:
+                self.avatar_x += (dx / dist) * move_step
+                self.avatar_y += (dy / dist) * move_step
+                if player:
+                    player.current_anim = "walk"
+                    # Only flip if moving significantly horizontally
+                    if abs(dx) > 1:
+                        player.dir_x = 1 if dx > 0 else -1
+        else:
+            self.avatar_x = target_x
+            self.avatar_y = target_y
+            if player:
+                player.current_anim = "idle"
+            
+        if player:
+            player.update_animation(dt)
 
     def navigate(self, direction):
         col, row = self.player_room
@@ -86,10 +125,13 @@ class WorldMap:
                     if conn_room.state == "locked":
                         conn_room.state = "available"
 
-    def draw(self, screen):
+    def draw(self, screen, player=None):
         screen.fill(settings.DARK_BLUE)
 
-        draw_text(screen, t("map_title"),
+        player_room = self.rooms[self.player_room]
+        title_text = t(player_room.name) if player_room.state != "locked" else t("unknown")
+        
+        draw_text(screen, title_text,
                  (settings.WINDOW_WIDTH // 2, 25),
                  settings.CYAN, 32)
 
@@ -110,14 +152,27 @@ class WorldMap:
         for room in self.rooms.values():
             self._draw_room(screen, room)
 
-        player_room = self.rooms[self.player_room]
-        bob_y = int(math.sin(player_room.bob_phase) * 4)
-        avatar_x = player_room.rect.centerx
-        avatar_y = player_room.rect.bottom + 20 + bob_y
-        pygame.draw.rect(screen, settings.CYAN,
-                        (avatar_x - 8, avatar_y - 8, 16, 16))
-        pygame.draw.rect(screen, settings.WHITE,
-                        (avatar_x - 8, avatar_y - 8, 16, 16), 1)
+        bob_y = int(math.sin(self.anim_timer * 4) * 4)
+        avatar_draw_y = self.avatar_y + bob_y
+        
+        if player:
+            # Draw player skin
+            sprite = player.get_current_sprite()
+            if sprite:
+                if player.dir_x < 0:
+                    sprite = pygame.transform.flip(sprite, True, False)
+                sprite = pygame.transform.scale(sprite, (48, 48))
+                screen.blit(sprite, (self.avatar_x - 24, avatar_draw_y - 24))
+            else:
+                pygame.draw.rect(screen, settings.CYAN,
+                                (self.avatar_x - 8, avatar_draw_y - 8, 16, 16))
+                pygame.draw.rect(screen, settings.WHITE,
+                                (self.avatar_x - 8, avatar_draw_y - 8, 16, 16), 1)
+        else:
+            pygame.draw.rect(screen, settings.CYAN,
+                            (self.avatar_x - 8, avatar_draw_y - 8, 16, 16))
+            pygame.draw.rect(screen, settings.WHITE,
+                            (self.avatar_x - 8, avatar_draw_y - 8, 16, 16), 1)
 
         if player_room.state != "locked":
             draw_text(screen, t(player_room.name),
