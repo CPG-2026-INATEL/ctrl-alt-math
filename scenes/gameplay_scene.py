@@ -150,7 +150,7 @@ class GameplayScene(Scene):
             stairs_per_area=1,
             seed=seed,
         )
-        map_data = gen.generate()
+        map_data, obstacle_data = gen.generate()
 
         ALL_STAIRS = {TILE_STAIRS_UP, TILE_STAIRS_DOWN, TILE_STAIRS_LEFT, TILE_STAIRS_RIGHT}
         HIGH_TILES = {TILE_HIGH, TILE_HIGH_EDGE}
