@@ -52,6 +52,9 @@ class GameplayScene(Scene):
         self.pending_player_col = None
         self.pending_player_row = None
         self.hovered_enemy = None
+        
+        self.lore_timer = 15.0 # Start after 15 seconds
+        self.lore_toast = None
 
     def enter(self, prev_scene=None):
         self.state = "WAVE_INTRO"
@@ -761,6 +764,25 @@ class GameplayScene(Scene):
             text = f"{t(self.hovered_enemy.info_title)}. {t(self.hovered_enemy.lore)}"
             self.game.tts.speak(text, lang=settings.LANGUAGE)
 
+        # Lore Toast Management
+        if self.lore_toast:
+            self.lore_toast.update(dt)
+            if self.lore_toast.is_dead():
+                self.lore_toast = None
+        else:
+            self.lore_timer -= dt
+            if self.lore_timer <= 0:
+                from lore_data import SHORT_LORE_SNIPPETS
+                snippet = random.choice(SHORT_LORE_SNIPPETS)
+                # Get localized text
+                text = snippet["text"].get(settings.LANGUAGE, snippet["text"].get("en", "Lore error"))
+                from ui import LoreToast
+                self.lore_toast = LoreToast(text, snippet["title"])
+                self.lore_timer = random.uniform(40, 90) # Next one in 40-90 seconds
+                
+                # TTS for lore toast
+                self.game.tts.speak(text, lang=settings.LANGUAGE)
+
         arena_rect = pygame.Rect(
             settings.ARENA_OFFSET_X, settings.ARENA_OFFSET_Y,
             settings.ARENA_WIDTH, settings.ARENA_HEIGHT
@@ -1214,6 +1236,9 @@ class GameplayScene(Scene):
             screen.blit(temp, (sx, sy))
         else:
             screen.blit(temp, (0, 0))
+
+        if self.lore_toast:
+            self.game.ui.draw_lore_toast(screen, self.lore_toast)
 
         if self.state == "WAVE_INTRO":
             room = self.game.current_room

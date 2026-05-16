@@ -7,9 +7,39 @@ from utils import draw_text, distance
 from i18n import t
 
 
+class LoreToast:
+    def __init__(self, text, title="BERNOULLI_LOG"):
+        self.full_text = text
+        self.title = title
+        self.display_text = ""
+        self.char_idx = 0
+        self.timer = 0
+        self.speed = 0.04
+        self.life = 6.0 # Total duration
+        self.fade_timer = 0.5
+        self.state = "typing" # typing, waiting, fading
+
+    def update(self, dt):
+        self.life -= dt
+        if self.state == "typing":
+            self.timer += dt
+            if self.timer >= self.speed:
+                self.timer = 0
+                self.char_idx += 1
+                if self.char_idx >= len(self.full_text):
+                    self.state = "waiting"
+                    self.display_text = self.full_text
+                else:
+                    self.display_text = self.full_text[:self.char_idx]
+        elif self.life <= self.fade_timer:
+            self.state = "fading"
+
+    def is_dead(self):
+        return self.life <= 0
+
 class UI:
     def __init__(self):
-        pass
+        self.lore_toast = None
 
     def draw_hud(self, screen, player, wave, skill_points, entropy, wave_count, game=None):
         bar_y = settings.WINDOW_HEIGHT - settings.UI_BAR_HEIGHT
@@ -120,15 +150,58 @@ class UI:
             draw_text(screen, c, (x, y), settings.GRAY, 10, center=False)
             y += 11
 
+    def draw_lore_toast(self, screen, toast):
+        if not toast:
+            return
+
+        w, h = 280, 80
+        x, y = settings.WINDOW_WIDTH - w - 20, 20
+        
+        alpha = 255
+        if toast.state == "fading":
+            alpha = int(255 * (toast.life / toast.fade_timer))
+        
+        # Background
+        bg_surf = pygame.Surface((w, h), pygame.SRCALPHA)
+        pygame.draw.rect(bg_surf, (10, 15, 30, int(200 * (alpha/255))), (0, 0, w, h), border_radius=8)
+        pygame.draw.rect(bg_surf, (settings.CYAN[0], settings.CYAN[1], settings.CYAN[2], int(150 * (alpha/255))), (0, 0, w, h), 1, border_radius=8)
+        screen.blit(bg_surf, (x, y))
+
+        # Title
+        font_title = pygame.font.Font(None, 14)
+        title_surf = font_title.render(f"[{toast.title}]", True, settings.GOLD)
+        title_surf.set_alpha(alpha)
+        screen.blit(title_surf, (x + 10, y + 8))
+
+        # Content
+        font_text = pygame.font.Font(None, 18)
+        lines = self._wrap_text(toast.display_text, font_text, w - 20)
+        curr_y = y + 25
+        for line in lines[:3]: # Limit to 3 lines
+            txt_surf = font_text.render(line, True, settings.WHITE)
+            txt_surf.set_alpha(alpha)
+            screen.blit(txt_surf, (x + 10, curr_y))
+            curr_y += 16
+
+        # Glitch effect if typing
+        if toast.state == "typing" and random.random() < 0.1:
+            glitch_w = random.randint(10, 50)
+            glitch_surf = pygame.Surface((glitch_w, 2), pygame.SRCALPHA)
+            glitch_surf.fill((settings.CYAN[0], settings.CYAN[1], settings.CYAN[2], 100))
+            screen.blit(glitch_surf, (x + random.randint(0, w-glitch_w), y + random.randint(0, h)))
+
     def draw_main_menu(self, screen, menu_items, selected_item):
         screen.fill(settings.DARK_BLUE)
 
         import math
         time_val = pygame.time.get_ticks() / 1000.0
+        cx = settings.WINDOW_WIDTH // 2
+        cy = settings.WINDOW_HEIGHT // 2
+        top_y = int(160 * settings.UI_SCALE)
 
         for i in range(40):
-            x = int(400 + math.sin(time_val * 0.5 + i * 0.8) * 350)
-            y = int(300 + math.cos(time_val * 0.3 + i * 1.2) * 250)
+            x = int(cx + math.sin(time_val * 0.5 + i * 0.8) * settings.WINDOW_WIDTH * 0.42)
+            y = int(cy + math.cos(time_val * 0.3 + i * 1.2) * settings.WINDOW_HEIGHT * 0.38)
             alpha = int(30 + math.sin(time_val + i) * 20)
             s = pygame.Surface((2, 2))
             s.set_alpha(alpha)
@@ -137,40 +210,40 @@ class UI:
 
         symbols = ["int", "sum", "sqrt", "pi", "inf", "dx", "grad", "sig"]
         for i, sym in enumerate(symbols):
-            x = 50 + i * 95
-            y = 80 + int(math.sin(time_val * 2 + i) * 10)
+            x = int(settings.WINDOW_WIDTH * 0.08 + i * settings.WINDOW_WIDTH * 0.1)
+            y = int(80 * settings.UI_SCALE + math.sin(time_val * 2 + i) * 10 * settings.UI_SCALE)
             alpha = int(40 + math.sin(time_val + i * 0.5) * 20)
-            font = pygame.font.Font(None, 28)
+            font = pygame.font.Font(None, max(16, int(28 * settings.UI_SCALE)))
             img = font.render(sym, True, settings.CYAN)
             img.set_alpha(alpha)
             screen.blit(img, (x, y))
 
         draw_text(screen, t("game_title"),
-                  (settings.WINDOW_WIDTH // 2, 160),
+                  (cx, top_y),
                   settings.CYAN, 52)
 
         draw_text(screen, t("game_subtitle"),
-                  (settings.WINDOW_WIDTH // 2, 205),
+                  (cx, top_y + int(45 * settings.UI_SCALE)),
                   settings.LIGHT_GRAY, 18)
 
         draw_text(screen, t("intro_1"),
-                  (settings.WINDOW_WIDTH // 2, 250),
+                  (cx, top_y + int(90 * settings.UI_SCALE)),
                   settings.GRAY, 16)
         draw_text(screen, t("intro_2"),
-                  (settings.WINDOW_WIDTH // 2, 272),
+                  (cx, top_y + int(112 * settings.UI_SCALE)),
                   settings.GRAY, 16)
         draw_text(screen, t("intro_3"),
-                  (settings.WINDOW_WIDTH // 2, 294),
+                  (cx, top_y + int(134 * settings.UI_SCALE)),
                   settings.GRAY, 16)
 
-        y_start = 360
+        y_start = top_y + int(200 * settings.UI_SCALE)
         for i, (text, desc) in enumerate(menu_items):
             color = settings.WHITE if i == selected_item else settings.GRAY
             if i == selected_item:
-                draw_text(screen, f"> {text} <", (settings.WINDOW_WIDTH // 2, y_start + i * 50),
+                draw_text(screen, f"> {text} <", (cx, y_start + i * int(50 * settings.UI_SCALE)),
                           color, 28)
             else:
-                draw_text(screen, text, (settings.WINDOW_WIDTH // 2, y_start + i * 50),
+                draw_text(screen, text, (cx, y_start + i * int(50 * settings.UI_SCALE)),
                           color, 28)
 
         draw_text(screen, t("menu_nav"),

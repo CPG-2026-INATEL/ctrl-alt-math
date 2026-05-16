@@ -170,6 +170,16 @@ STRINGS = {
         LANG_EN: "Reveal enemy targets.\nNash equilibrium:\nno regrets strategy.",
         LANG_PT: "Revele os alvos inimigos.\nEquilíbrio de Nash:\nestratégia sem arrependimento."
     },
+    
+    # Skill Flavor Lore
+    "skill_axioma_flavor": {LANG_EN: "The first thing they tried to erase was the equal sign.", LANG_PT: "A primeira coisa que tentaram apagar foi o sinal de igual."},
+    "skill_derivada_flavor": {LANG_EN: "Change is the only constant the Regime fears.", LANG_PT: "A mudança é a única constante que o Regime teme."},
+    "skill_pitagoras_flavor": {LANG_EN: "Triangles: the sharpest weapons in the archive.", LANG_PT: "Triângulos: as armas mais afiadas do arquivo."},
+    "skill_ctrlz_flavor": {LANG_EN: "Time is just another variable we can manipulate.", LANG_PT: "O tempo é apenas mais uma variável que podemos manipular."},
+    "skill_bayes_flavor": {LANG_EN: "Uncertainty is where rebellion grows.", LANG_PT: "A incerteza é onde a rebelião cresce."},
+    "skill_reflexao_flavor": {LANG_EN: "Your own hatred will be your downfall.", LANG_PT: "Seu próprio ódio será sua ruína."},
+    "skill_entropia_flavor": {LANG_EN: "Order is a fragile illusion.", LANG_PT: "A ordem é uma ilusão frágil."},
+    "skill_teoria_jogos_flavor": {LANG_EN: "We are playing a game they already lost.", LANG_PT: "Estamos jogando um jogo que eles já perderam."},
 
     # Waves Narrative
     "wave_1_narr": {LANG_EN: "Mathematics is forbidden.\nBut reality still obeys it.", LANG_PT: "A matemática é proibida.\nMas a realidade ainda a obedece."},

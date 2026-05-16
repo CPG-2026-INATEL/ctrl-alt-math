@@ -1,18 +1,21 @@
 import pygame
 import math
+import settings
 
 def draw_text(surf, text, pos, color, size=24, center=True):
-    font = pygame.font.Font(None, size)
+    scaled_size = max(12, int(size * settings.UI_SCALE))
+    font = pygame.font.Font(None, scaled_size)
     for i, line in enumerate(text.split('\n')):
         img = font.render(line, True, color)
         if center:
-            rect = img.get_rect(center=(pos[0], pos[1] + i * size * 1.3))
+            rect = img.get_rect(center=(pos[0], pos[1] + i * scaled_size * 1.3))
         else:
-            rect = img.get_rect(topleft=(pos[0], pos[1] + i * size * 1.3))
+            rect = img.get_rect(topleft=(pos[0], pos[1] + i * scaled_size * 1.3))
         surf.blit(img, rect)
 
 def draw_text_simple(surf, text, pos, color, size=24):
-    font = pygame.font.Font(None, size)
+    scaled_size = max(12, int(size * settings.UI_SCALE))
+    font = pygame.font.Font(None, scaled_size)
     img = font.render(text, True, color)
     surf.blit(img, pos)
 

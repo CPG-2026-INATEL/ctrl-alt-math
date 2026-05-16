@@ -162,6 +162,12 @@ class SkillTree:
                 draw_text(screen, line,
                           (settings.WINDOW_WIDTH // 2, y_offset + i * 22),
                           settings.LIGHT_GRAY, 16)
+            
+            # Draw Flavor Lore
+            flavor_key = f"skill_{self.hovered_id}_flavor"
+            draw_text(screen, f"\"{t(flavor_key)}\"",
+                      (settings.WINDOW_WIDTH // 2, settings.WINDOW_HEIGHT - 65),
+                      settings.CYAN, 14)
 
         draw_text(screen, t("skill_tree_footer"),
                   (settings.WINDOW_WIDTH // 2, settings.WINDOW_HEIGHT - 15),
