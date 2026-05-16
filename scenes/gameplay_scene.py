@@ -291,6 +291,18 @@ class GameplayScene(Scene):
             self.game.sfx.play("menu_select")
 
     def _confirm_action_cursor(self):
+        pc = self.game.player.col
+        pr = self.game.player.row
+        target = (self.cursor_col, self.cursor_row)
+        if self.selected_skill == "pitagoras":
+            if target not in self.grid.get_cells_in_radius(pc, pr, settings.PITAGORAS_RANGE):
+                return
+        elif self.selected_skill == "reflexao":
+            if target not in self.grid.get_cells_in_radius(pc, pr, settings.REFLEXAO_RANGE):
+                return
+        elif target not in self.grid.get_cells_in_range(pc, pr, settings.BASIC_ATTACK_RANGE):
+            return
+
         if self.selected_skill:
             self._execute_skill()
         else:
@@ -1108,8 +1120,6 @@ class GameplayScene(Scene):
         self.game.floating_text.draw(temp)
 
         self._draw_cursor_info(temp)
-        self._draw_enemy_info(temp)
-
         self._draw_turn_hud(temp)
 
         if self.hovered_enemy:
