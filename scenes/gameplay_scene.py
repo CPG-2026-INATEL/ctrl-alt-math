@@ -375,6 +375,14 @@ class GameplayScene(Scene):
                 pc, pr, self.cursor_col, self.cursor_row, self.grid, path=anim_path
             )
             self.game.sfx.play("menu_select")
+        else:
+            # Feedback for invalid move target
+            self.game.floating_text.add_info(
+                self.grid.to_pixel(self.cursor_col, self.cursor_row)[0],
+                self.grid.to_pixel(self.cursor_col, self.cursor_row)[1] - 30,
+                t("out_of_reach"),
+                settings.GRAY
+            )
 
     def _get_enemy_at_cursor(self):
         for enemy in self.game.enemies:
@@ -407,28 +415,36 @@ class GameplayScene(Scene):
         return self._get_enemy_at_cursor() is not None
 
     def _confirm_action_cursor(self):
-        if (self.cursor_col, self.cursor_row) == (self.game.player.col, self.game.player.row):
+        # Click on self or empty space to Wait
+        is_self = (self.cursor_col, self.cursor_row) == (self.game.player.col, self.game.player.row)
+        target_enemy = self._get_enemy_at_cursor()
+        
+        if is_self or (target_enemy is None and self.selected_skill is None):
             self.turn_manager.player_acted = True
             self.show_action_range = False
             self.selected_skill = None
             self.turn_log.append("Wait")
             self._start_enemy_turn()
             self.game.sfx.play("menu_select")
+            self.game.floating_text.add_info(self.game.player.x, self.game.player.y - 40, t("wait"), settings.LIGHT_GRAY)
             return
 
         if not self._can_execute_cursor_action():
             self.game.floating_text.add_info(
                 self.game.player.x,
                 self.game.player.y - 30,
-                "OUT OF RANGE",
+                t("out_of_range"),
                 settings.GRAY,
             )
             return
 
         if self.selected_skill:
-            self._execute_skill()
+            success = self._execute_skill()
+            if not success:
+                self.game.floating_text.add_info(self.game.player.x, self.game.player.y - 40, t("not_enough_rigor"), settings.RED)
+                self.game.sfx.play("error")
         else:
-            self._execute_basic_attack(target_enemy=self._get_enemy_at_cursor())
+            self._execute_basic_attack(target_enemy=target_enemy)
 
     def handle_event(self, event):
         if event.type == pygame.MOUSEMOTION:
@@ -552,6 +568,10 @@ class GameplayScene(Scene):
 
         if k in (pygame.K_SPACE, pygame.K_RETURN):
             self._confirm_action_cursor()
+        elif k == pygame.K_x:
+            # Dedicated Wait key
+            self.cursor_col, self.cursor_row = self.game.player.col, self.game.player.row
+            self._confirm_action_cursor()
         elif k == pygame.K_1:
             if self.game.skill_tree.is_unlocked("pitagoras"):
                 self._toggle_skill("pitagoras")
@@ -620,9 +640,9 @@ class GameplayScene(Scene):
         if skill == "pitagoras":
             target_enemy = self._get_enemy_at_cursor()
             if target_enemy is None:
-                return
+                return False
             if not self.game.player.pitagoras_attack():
-                return
+                return False
             hit = False
             dx = abs(self.cursor_col - pc)
             dy = abs(self.cursor_row - pr)
@@ -650,7 +670,7 @@ class GameplayScene(Scene):
 
         elif skill == "reflexao":
             if not self.game.player.reflexao_attack():
-                return
+                return False
             barrier_cells = self.grid.get_cells_in_radius(pc, pr, settings.REFLEXAO_RANGE)
             for col, row in barrier_cells:
                 self.grid.mark_barrier(col, row, True)
@@ -668,6 +688,7 @@ class GameplayScene(Scene):
         self.show_action_range = False
         self.selected_skill = None
         self._start_enemy_turn()
+        return True
 
     def _try_rewind(self):
         if not self.turn_manager.can_undo():
@@ -1780,7 +1801,7 @@ class GameplayScene(Scene):
         screen.blit(log_title, (log_x, bar_y + 10))
         self._draw_combat_log(screen, log_x, bar_y + 22)
 
-        controls = "Mouse/WASD cursor  Enter confirm  Space confirm  1/2 toggle  R undo  Esc pause"
+        controls = "Mouse/WASD cursor  Enter/Space confirm  X wait  1/2 toggle  R undo  Esc pause"
         controls_img = pygame.font.Font(None, 11).render(controls, True, settings.GRAY)
         screen.blit(controls_img, (settings.UI_PADDING, settings.WINDOW_HEIGHT - 14))
 
