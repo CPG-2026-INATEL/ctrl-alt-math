@@ -198,6 +198,12 @@ class WorldMap:
                     if conn_room.state == "locked":
                         conn_room.state = "available"
 
+    def all_required_rooms_completed(self):
+        for room in self.rooms.values():
+            if room.type in ("normal", "challenge", "boss") and room.state != "completed":
+                return False
+        return True
+
     def draw(self, screen, player=None):
         screen.fill(settings.DARK_BLUE)
 

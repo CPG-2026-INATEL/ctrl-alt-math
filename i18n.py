@@ -74,7 +74,7 @@ STRINGS = {
     "complexity_survives": {LANG_EN: "You proved that complexity survives.", LANG_PT: "Você provou que a complexidade sobrevive."},
     "math_never_forgotten": {LANG_EN: "Mathematics will never be forgotten.", LANG_PT: "A matemática nunca será esquecida."},
     "victory_quote": {LANG_EN: "\"The universe cannot be reduced to simple answers.\"", LANG_PT: "\"O universo não pode ser reduzido a respostas simples.\""},
-    "press_enter_play_again": {LANG_EN: "Press ENTER to play again, Esc to quit to menu", LANG_PT: "Pressione ENTER para jogar novamente, Esc p/ sair"},
+    "press_enter_play_again": {LANG_EN: "Press ENTER to continue, Esc for new game", LANG_PT: "Pressione ENTER para continuar, Esc p/ novo jogo"},
 
     # Waves
     "wave_count": {LANG_EN: "Wave {wave}", LANG_PT: "Onda {wave}"},

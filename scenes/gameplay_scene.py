@@ -283,6 +283,13 @@ class GameplayScene(Scene):
         return skills
 
     def _leave_no_combat_room(self):
+        if self.game.current_room:
+            self.game.world_map.complete_room(
+                (self.game.current_room.col, self.game.current_room.row)
+            )
+            if self.game.current_room.type == "victory" and self.game.world_map.all_required_rooms_completed():
+                self.game.scene_manager.switch("victory")
+                return
         self.game.scene_manager.switch("map")
 
     def _set_cursor_from_mouse(self, pos):
@@ -1033,8 +1040,9 @@ class GameplayScene(Scene):
                     self.game.world_map.complete_room(
                         (self.game.current_room.col, self.game.current_room.row)
                     )
-                    # If victory room OR final boss gate completed, go to victory screen
-                    if self.game.current_room.type == "victory" or getattr(self.game.current_room, "is_final_gate", False):
+                    # If victory room (and all requirements met) OR final boss gate completed, go to victory screen
+                    if (self.game.current_room.type == "victory" and self.game.world_map.all_required_rooms_completed()) or \
+                       getattr(self.game.current_room, "is_final_gate", False):
                         self.game.scene_manager.switch("victory")
                     else:
                         self.game.scene_manager.switch("map")
