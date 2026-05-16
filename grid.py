@@ -217,7 +217,7 @@ class Grid:
         return math.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2)
 
     def draw(self, screen, highlight_cells=None, highlight_color=None,
-             show_grid=False, grid_color=None):
+             show_grid=False, grid_color=None, highlight_outline=False):
         if show_grid:
             gc = grid_color or (30, 30, 60, 40)
             for col in range(self.cols + 1):
@@ -236,7 +236,8 @@ class Grid:
                 s.set_alpha(60)
                 s.fill(highlight_color or settings.BLUE)
                 screen.blit(s, rect)
-                pygame.draw.rect(screen, highlight_color or settings.BLUE, rect, 1)
+                if highlight_outline:
+                    pygame.draw.rect(screen, highlight_color or settings.BLUE, rect, 1)
 
     def draw_barriers(self, screen):
         for col, row in self.barrier_cells:

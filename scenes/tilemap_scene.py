@@ -3,22 +3,23 @@ import pygame
 import settings
 from scenes.scene import Scene
 from tilemap import TileMap, MapGenerator, TILE_STAIRS_UP, TILE_STAIRS_DOWN, TILE_STAIRS_LEFT, TILE_STAIRS_RIGHT
+from tilesets import TILESET_WORLD, TILESET_OBSTACLES
 
 
 
 class TilemapScene(Scene):
-    # Configuração do mapa - edite estas variáveis1)
-    MAP_WIDTH = 40
-    MAP_HEIGHT = 30
+    MAP_WIDTH = 100
+    MAP_HEIGHT = 100
     HOLE_DENSITY = 0.01
-    HIGH_TERRAIN_RATIO = 0.30
-    HIGH_TERRAIN_COUNT = 3
-    STAIRS_PER_AREA = 2
+    HIGH_TERRAIN_RATIO = 0.45
+    HIGH_TERRAIN_COUNT = 25
+    STAIRS_PER_AREA = 5
+    OBSTACLE_DENSITY = 0.01
     SEED = 42
 
     def __init__(self, game):
         super().__init__(game)
-        self.tilemap = TileMap("assets/Tileset/tileset_arranged.png", tile_size=16)
+        self.tilemap = TileMap(TILESET_WORLD, tile_size=16)
 
         gen = MapGenerator(
             width=self.MAP_WIDTH,
@@ -27,10 +28,12 @@ class TilemapScene(Scene):
             high_terrain_ratio=self.HIGH_TERRAIN_RATIO,
             high_terrain_count=self.HIGH_TERRAIN_COUNT,
             stairs_per_area=self.STAIRS_PER_AREA,
+            obstacle_density=self.OBSTACLE_DENSITY,
             seed=self.SEED,
         )
-        map_data = gen.generate()
+        map_data, obstacle_data = gen.generate()
         self.tilemap.load_from_list(map_data)
+        self.tilemap.load_obstacles(obstacle_data, TILESET_OBSTACLES)
 
         self.cam_x = 0
         self.cam_y = 0
@@ -64,10 +67,12 @@ class TilemapScene(Scene):
             high_terrain_ratio=self.HIGH_TERRAIN_RATIO,
             high_terrain_count=self.HIGH_TERRAIN_COUNT,
             stairs_per_area=self.STAIRS_PER_AREA,
+            obstacle_density=self.OBSTACLE_DENSITY,
             seed=self.SEED,
         )
-        map_data = gen.generate()
+        map_data, obstacle_data = gen.generate()
         self.tilemap.load_from_list(map_data)
+        self.tilemap.load_obstacles(obstacle_data, TILESET_OBSTACLES)
         self.cam_x = 0
         self.cam_y = 0
 
@@ -86,6 +91,7 @@ class TilemapScene(Scene):
         screen.fill(settings.COLOR_BG)
         ts = self.tilemap.tile_size
         scaled = int(ts * self.zoom)
+        obs_per_row = self.tilemap.obstacle_tileset.get_width() // ts if self.tilemap.obstacle_tileset else 1
         for row in range(self.tilemap.map_height):
             for col in range(len(self.tilemap.map_data[row])):
                 tile_id = self.tilemap.map_data[row][col]
@@ -99,12 +105,20 @@ class TilemapScene(Scene):
                 dx = int(-self.cam_x + col * scaled)
                 dy = int(-self.cam_y + row * scaled)
                 screen.blit(tile_surf, (dx, dy))
+                obs_id = self.tilemap.obstacle_data[row][col] if row < len(self.tilemap.obstacle_data) and col < len(self.tilemap.obstacle_data[row]) else None
+                if obs_id is not None and self.tilemap.obstacle_tileset:
+                    osx = (obs_id % obs_per_row) * ts
+                    osy = (obs_id // obs_per_row) * ts
+                    obs_surf = self.tilemap.obstacle_tileset.subsurface(osx, osy, ts, ts)
+                    if self.zoom != 1.0:
+                        obs_surf = pygame.transform.scale(obs_surf, (scaled, scaled))
+                    screen.blit(obs_surf, (dx, dy))
         font = pygame.font.Font(None, 20)
         lines = [
             "WASD: scroll | Scroll: zoom | ESC: menu | R: regenerate",
             f"Map: {self.MAP_WIDTH}x{self.MAP_HEIGHT} | Seed: {self.SEED} | Zoom: {self.zoom:.1f}x",
             f"Holes: {self.HOLE_DENSITY:.0%} | High: {self.HIGH_TERRAIN_RATIO:.0%} ({self.HIGH_TERRAIN_COUNT} areas)",
-            f"Stairs/area: {self.STAIRS_PER_AREA}",
+            f"Stairs/area: {self.STAIRS_PER_AREA} | Obstacles: {self.OBSTACLE_DENSITY:.0%}",
         ]
         for i, line in enumerate(lines):
             txt = font.render(line, True, settings.WHITE)

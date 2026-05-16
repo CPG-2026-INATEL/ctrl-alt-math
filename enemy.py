@@ -7,6 +7,27 @@ from utils import distance, angle_between, clamp
 
 
 class Enemy:
+    def get_current_sprite(self):
+        if not self.spritesheet:
+            return None
+
+        row = self.anim_map.get(self.current_anim, 0)
+        col = int(self.anim_frame) % self.anim_frames.get(self.current_anim, 1)
+
+        rect = pygame.Rect(col * self.sprite_size, row * self.sprite_size,
+                           self.sprite_size, self.sprite_size)
+        try:
+            return self.spritesheet.subsurface(rect)
+        except:
+            return None
+
+    def load_spritesheet(self):
+        try:
+            path = f"assets/Robots/{self.robot_type}.png"
+            self.spritesheet = pygame.image.load(path).convert_alpha()
+        except Exception as e:
+            print(f"Error loading robot {self.robot_type}: {e}")
+
     def __init__(self, x, y, enemy_type):
         self.x = x
         self.y = y
@@ -17,6 +38,37 @@ class Enemy:
         self.size = settings.ENEMY_SIZE
         self.flash_timer = 0
         self.dead = False
+
+        self.robot_type = {
+            "censor": "Spider",
+            "strawman": "Scarab",
+            "bayesian": "Hornet",
+            "boss": "Centipede"
+        }.get(enemy_type, "Spider")
+
+        self.spritesheet = None
+        self.load_spritesheet()
+
+        self.current_anim = "idle"
+        self.anim_frame = 0
+        self.anim_timer = 0
+        self.anim_speed = 0.2
+        self.sprite_size = 16 if self.robot_type != "Hornet" else 24
+        self.display_size = self.size * 2.5
+
+        self.anim_map = {
+            "Spider": {"idle": 0, "walk": 1, "fire": 2, "melee": 3, "destroyed": 4},
+            "Scarab": {"idle": 0, "walk": 1, "fire": 2, "melee": 3, "destroyed": 4},
+            "Hornet": {"idle": 0, "walk": 0, "fire": 1},
+            "Centipede": {"idle": 0, "walk": 1, "fire": 2, "melee": 3}
+        }.get(self.robot_type, {"idle": 0})
+
+        self.anim_frames = {
+            "Spider": {"idle": 2, "walk": 4, "fire": 2, "melee": 5, "destroyed": 1},
+            "Scarab": {"idle": 2, "walk": 4, "fire": 2, "melee": 5, "destroyed": 1},
+            "Hornet": {"idle": 8, "walk": 8, "fire": 8},
+            "Centipede": {"idle": 4, "walk": 4, "fire": 4, "melee": 4}
+        }.get(self.robot_type, {"idle": 1})
 
         self.spawn_timer = 0.5
         self.spawn_duration = 0.5
@@ -71,6 +123,20 @@ class Enemy:
             self.pulse_timer = 0
             self.area_attack_telegraph = 0
 
+        self.info_title = {
+            "censor": "Censor Linear",
+            "strawman": "Falacia Espantalho",
+            "bayesian": "Inquisidor Bayesiano",
+            "boss": "O Grande Simplificador"
+        }.get(enemy_type, "Unknown Entity")
+
+        self.lore = {
+            "censor": "A relentless enforcer of mathematical purity. It seeks to eliminate any equation that doesn't fit the regime's narrow logic.",
+            "strawman": "Distorts reality by creating false targets. It avoids direct confrontation by manipulating the observer's perception.",
+            "bayesian": "Calculates every possibility. It doesn't just attack where you are, but where you are most likely to be.",
+            "boss": "The ultimate authority of the regime. It reduces the infinite complexity of the universe into a single, suffocating truth."
+        }.get(enemy_type, "A mysterious figure lurking in the mathematical shadows.")
+
         self.decoy_lifetime = 0
         self.is_decoy = False
         self.intended_action = None
@@ -101,12 +167,19 @@ class Enemy:
         self.anim_from_px, self.anim_from_py = grid.to_pixel(from_col, from_row)
         self.anim_to_px, self.anim_to_py = grid.to_pixel(to_col, to_row)
         self.anim_progress = 0.0
+        self.current_anim = "walk"
 
     def is_animating(self):
         return len(self.anim_cells) > 1
 
     def update_animation(self, dt, grid=None):
+        self.anim_timer += dt
+        if self.anim_timer >= self.anim_speed:
+            self.anim_timer = 0
+            self.anim_frame = (self.anim_frame + 1) % self.anim_frames.get(self.current_anim, 1)
+
         if self.is_animating():
+            self.current_anim = "walk"
             self.anim_progress = min(1.0, self.anim_progress + dt * 8)
             t = self.anim_progress
             t = t * t * (3 - 2 * t)
@@ -122,8 +195,11 @@ class Enemy:
                     self.anim_progress = 1.0
                     if grid is not None:
                         self.x, self.y = grid.to_pixel(self.col, self.row)
+                    self.current_anim = "idle"
                 elif grid is not None:
                     self._begin_anim_step(grid)
+        else:
+            self.current_anim = "idle"
 
     def start_move_anim(self, from_col, from_row, to_col, to_row, grid, path=None):
         if path is None:
@@ -262,14 +338,25 @@ class Enemy:
         if size < 1:
             size = 1
 
-        if self.type == "censor":
-            self._draw_censor(screen, self.x, draw_y, size, color, spawn_alpha)
-        elif self.type == "strawman":
-            self._draw_strawman(screen, self.x, draw_y, size, color, spawn_alpha)
-        elif self.type == "bayesian":
-            self._draw_bayesian(screen, self.x, draw_y, size, color, spawn_alpha)
-        elif self.type == "boss":
-            self._draw_boss(screen, self.x, draw_y, size, color, spawn_alpha)
+        sprite = self.get_current_sprite()
+        if sprite:
+            sprite = pygame.transform.scale(sprite, (int(self.display_size * spawn_scale),
+                                                     int(self.display_size * spawn_scale)))
+            if self.flash_timer > 0:
+                flash_surf = sprite.copy()
+                flash_surf.fill((255, 255, 255, 255), special_flags=pygame.BLEND_RGBA_MULT)
+                screen.blit(flash_surf, (self.x - self.display_size // 2, draw_y - self.display_size // 2))
+            else:
+                screen.blit(sprite, (self.x - self.display_size // 2, draw_y - self.display_size // 2))
+        else:
+            if self.type == "censor":
+                self._draw_censor(screen, self.x, draw_y, size, color, spawn_alpha)
+            elif self.type == "strawman":
+                self._draw_strawman(screen, self.x, draw_y, size, color, spawn_alpha)
+            elif self.type == "bayesian":
+                self._draw_bayesian(screen, self.x, draw_y, size, color, spawn_alpha)
+            elif self.type == "boss":
+                self._draw_boss(screen, self.x, draw_y, size, color, spawn_alpha)
 
         if self.type != "boss" and self.hp < self.max_hp:
             self._draw_hp_bar(screen, self.x, draw_y - size - 6, size)

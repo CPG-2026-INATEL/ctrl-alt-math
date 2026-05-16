@@ -42,6 +42,76 @@ class Player:
 
         self.last_crit = False
 
+        self.skin_index = 0
+        self.skin_names = [
+            "Assault", "SquadLeader", "AntiTank", "Grenadier",
+            "MachineGunner", "RadioOperator", "Sniper"
+        ]
+        self.skin_paths = {
+            "Assault": "assets/Soldiers/Assault-Class.png",
+            "SquadLeader": "assets/Soldiers/SquadLeader.png",
+            "AntiTank": "assets/Soldiers/AntiTank-Class.png",
+            "Grenadier": "assets/Soldiers/Grenadier-Class.png",
+            "MachineGunner": "assets/Soldiers/MachineGunner-Class.png",
+            "RadioOperator": "assets/Soldiers/RadioOperator-Class.png",
+            "Sniper": "assets/Soldiers/Sniper-Class.png"
+        }
+        self.spritesheets = {}
+        self.load_skins()
+
+        self.current_anim = "idle"
+        self.anim_frame = 0
+        self.anim_timer = 0
+        self.anim_speed = 0.2
+        self.sprite_size = 16
+        self.display_size = 32
+
+        self.anim_map = {
+            "idle": 0, "walk": 1, "crawl": 2, "fire": 3,
+            "hit": 4, "death": 5, "throw": 6
+        }
+        self.anim_frames = {
+            "idle": 2, "walk": 2, "crawl": 2, "fire": 2,
+            "hit": 3, "death": 5, "throw": 3
+        }
+
+        self.effects = {}
+        self.load_effects()
+
+    def load_effects(self):
+        try:
+            self.effects["blood"] = pygame.image.load("assets/Effects/hit-spatters.png").convert_alpha()
+            self.effects["muzzle"] = pygame.image.load("assets/Effects/muzzle-flashes.png").convert_alpha()
+        except Exception as e:
+            print(f"Error loading effects: {e}")
+
+    def load_skins(self):
+        for name, path in self.skin_paths.items():
+            try:
+                sheet = pygame.image.load(path).convert_alpha()
+                self.spritesheets[name] = sheet
+            except Exception as e:
+                print(f"Error loading skin {name}: {e}")
+
+    def toggle_skin(self):
+        self.skin_index = (self.skin_index + 1) % len(self.skin_names)
+
+    def get_current_sprite(self):
+        skin_name = self.skin_names[self.skin_index]
+        sheet = self.spritesheets.get(skin_name)
+        if not sheet:
+            return None
+
+        row = self.anim_map.get(self.current_anim, 0)
+        col = int(self.anim_frame) % self.anim_frames.get(self.current_anim, 1)
+
+        rect = pygame.Rect(col * self.sprite_size, row * self.sprite_size,
+                           self.sprite_size, self.sprite_size)
+        try:
+            return sheet.subsurface(rect)
+        except:
+            return None
+
     def check_crit(self):
         self.last_crit = random.random() < settings.PLAYER_CRIT_CHANCE
         return self.last_crit
@@ -61,6 +131,7 @@ class Player:
         self.anim_from_px, self.anim_from_py = grid.to_pixel(from_col, from_row)
         self.anim_to_px, self.anim_to_py = grid.to_pixel(to_col, to_row)
         self.anim_progress = 0.0
+        self.current_anim = "walk"
         self.dir_x = to_col - from_col
         self.dir_y = to_row - from_row
         length = math.sqrt(self.dir_x ** 2 + self.dir_y ** 2)
@@ -79,7 +150,13 @@ class Player:
         return len(self.anim_cells) > 1
 
     def update_animation(self, dt, grid=None):
+        self.anim_timer += dt
+        if self.anim_timer >= self.anim_speed:
+            self.anim_timer = 0
+            self.anim_frame = (self.anim_frame + 1) % self.anim_frames.get(self.current_anim, 1)
+
         if self.is_animating():
+            self.current_anim = "walk"
             self.anim_progress = min(1.0, self.anim_progress + dt * 10)
             t = self.anim_progress
             t = t * t * (3 - 2 * t)
@@ -95,8 +172,11 @@ class Player:
                     self.anim_progress = 1.0
                     if grid is not None:
                         self.x, self.y = grid.to_pixel(self.col, self.row)
+                    self.current_anim = "idle"
                 elif grid is not None:
                     self._begin_anim_step(grid)
+        else:
+            self.current_anim = "idle"
 
     def update(self, dt, keys):
         self.attack_cooldown = max(0, getattr(self, 'attack_cooldown', 0) - dt)
@@ -149,21 +229,31 @@ class Player:
 
     def draw(self, screen):
         for tx, ty, t in self.trail:
-            alpha = int((t / 0.3) * 80)
-            trail_size = int(self.size * (t / 0.3))
+            alpha = int((t / 0.3) * 100)
+            trail_size = int(self.display_size * (t / 0.3))
             if trail_size > 0:
-                s = pygame.Surface((trail_size * 2, trail_size * 2))
-                s.set_alpha(alpha)
-                s.fill(settings.CYAN)
-                screen.blit(s, (tx - trail_size, ty - trail_size))
+                sprite = self.get_current_sprite()
+                if sprite:
+                    if self.dir_x < 0:
+                        sprite = pygame.transform.flip(sprite, True, False)
+                    s = pygame.transform.scale(sprite, (trail_size, trail_size))
+                    s.set_alpha(alpha)
+                    screen.blit(s, (tx - trail_size // 2, ty - trail_size // 2))
 
-        glow_size = int(3 + math.sin(self.glow_phase) * 2)
-        glow_surf = pygame.Surface((self.size * 2 + glow_size * 2,
-                                     self.size * 2 + glow_size * 2))
-        glow_surf.set_alpha(40)
-        glow_surf.fill(settings.CYAN)
-        screen.blit(glow_surf, (self.x - self.size - glow_size,
-                                 self.y - self.size - glow_size))
+        # Subtle shadow
+        shadow_size = int(self.size * 0.8)
+        shadow_surf = pygame.Surface((shadow_size * 2, shadow_size // 2), pygame.SRCALPHA)
+        pygame.draw.ellipse(shadow_surf, (0, 0, 0, 100), (0, 0, shadow_size * 2, shadow_size // 2))
+        screen.blit(shadow_surf, (self.x - shadow_size, self.y + self.size - 4))
+
+        glow_size = int(5 + math.sin(self.glow_phase) * 3)
+        glow_surf = pygame.Surface((self.display_size + glow_size * 2,
+                                     self.display_size + glow_size * 2), pygame.SRCALPHA)
+        pygame.draw.circle(glow_surf, (settings.CYAN[0], settings.CYAN[1], settings.CYAN[2], 30),
+                           (self.display_size // 2 + glow_size, self.display_size // 2 + glow_size),
+                           self.display_size // 2 + glow_size)
+        screen.blit(glow_surf, (self.x - self.display_size // 2 - glow_size,
+                                 self.y - self.display_size // 2 - glow_size))
 
         color = settings.COLOR_PLAYER
         if self.flash_timer > 0:
@@ -172,10 +262,48 @@ class Player:
             if int(self.invulnerable * 10) % 2 == 0:
                 color = (100, 200, 200)
 
-        rect = pygame.Rect(self.x - self.size, self.y - self.size,
-                           self.size * 2, self.size * 2)
-        pygame.draw.rect(screen, color, rect)
-        pygame.draw.rect(screen, settings.WHITE, rect, 1)
+        sprite = self.get_current_sprite()
+        if sprite:
+            if self.dir_x < 0:
+                sprite = pygame.transform.flip(sprite, True, False)
+
+            # Scale up for better visibility
+            sprite = pygame.transform.scale(sprite, (self.display_size, self.display_size))
+
+            if color == settings.WHITE:
+                # Flash effect for damage
+                flash_surf = sprite.copy()
+                flash_surf.fill((255, 255, 255, 255), special_flags=pygame.BLEND_RGBA_MULT)
+                screen.blit(flash_surf, (self.x - self.display_size // 2, self.y - self.display_size // 2))
+            else:
+                screen.blit(sprite, (self.x - self.display_size // 2, self.y - self.display_size // 2))
+
+            # Overlay effects
+            if self.current_anim == "fire" and self.anim_frame == 0:
+                muzzle = self.effects.get("muzzle")
+                if muzzle:
+                    try:
+                        m_surf = muzzle.subsurface(pygame.Rect(0, 0, 16, 8))
+                        m_surf = pygame.transform.scale(m_surf, (self.display_size, self.display_size // 2))
+                        if self.dir_x < 0:
+                            m_surf = pygame.transform.flip(m_surf, True, False)
+                        screen.blit(m_surf, (self.x - self.display_size // 2, self.y - self.display_size // 2))
+                    except: pass
+            elif self.current_anim in ("hit", "death") and self.anim_frame == 0:
+                blood = self.effects.get("blood")
+                if blood:
+                    try:
+                        b_surf = blood.subsurface(pygame.Rect(0, 0, 16, 8))
+                        b_surf = pygame.transform.scale(b_surf, (self.display_size, self.display_size // 2))
+                        if self.dir_x < 0:
+                            b_surf = pygame.transform.flip(b_surf, True, False)
+                        screen.blit(b_surf, (self.x - self.display_size // 2, self.y - self.display_size // 2))
+                    except: pass
+        else:
+            rect = pygame.Rect(self.x - self.size, self.y - self.size,
+                               self.size * 2, self.size * 2)
+            pygame.draw.rect(screen, color, rect)
+            pygame.draw.rect(screen, settings.WHITE, rect, 1)
 
         tip_x = self.x + self.dir_x * self.size * 1.8
         tip_y = self.y + self.dir_y * self.size * 1.8
