@@ -71,6 +71,12 @@ class GameplayScene(Scene):
         return bool(self.game.mp_is_multiplayer)
 
     def _refresh_players(self):
+        if not self._is_true_coop():
+            self.players = [self.game.player]
+            self.game.players = self.players
+            self.game.player2 = self.game.player
+            return
+
         self.players = getattr(self.game, "players", [self.game.player])
         if not self.players:
             self.players = [self.game.player]
@@ -81,6 +87,8 @@ class GameplayScene(Scene):
         return [player for player in self.players if player.hp > 0]
 
     def _player_label(self, idx):
+        if not self._is_true_coop():
+            return "Player"
         return "HOST" if idx == 0 else "P2"
 
     def _restore_primary_player(self):
@@ -2258,10 +2266,11 @@ class GameplayScene(Scene):
             if player.hp <= 0:
                 continue
             player.draw(temp, offset=world_offset)
-            px = int(player.x + world_offset[0])
-            py = int(player.y + world_offset[1] - player.size - 28)
-            label_color = settings.CYAN if idx == 0 else settings.PURPLE
-            draw_text(temp, self._player_label(idx), (px, py), label_color, 14)
+            if self._is_true_coop():
+                px = int(player.x + world_offset[0])
+                py = int(player.y + world_offset[1] - player.size - 28)
+                label_color = settings.CYAN if idx == 0 else settings.PURPLE
+                draw_text(temp, self._player_label(idx), (px, py), label_color, 14)
 
         cursor_rect = self.grid.cell_rect(self.cursor_col, self.cursor_row)
         cursor_rect.x += world_offset[0]
