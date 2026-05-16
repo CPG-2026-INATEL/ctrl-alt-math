@@ -110,14 +110,22 @@ class LobbyScene(Scene):
 
     def _parse_endpoint(self, text):
         raw = text.strip()
-        if raw.startswith("tcp://"):
-            raw = raw[len("tcp://"):]
+        scheme = ""
+        if "://" in raw:
+            scheme, raw = raw.split("://", 1)
+
         host = raw
         port = settings.LAN_PORT
         if ":" in raw:
             host, port_str = raw.rsplit(":", 1)
             if port_str.isdigit():
                 port = int(port_str)
+            else:
+                host = raw
+
+        if scheme:
+            host = f"{scheme}://{host}"
+
         return host.strip(), port
 
     def _connect_to(self, ip):
