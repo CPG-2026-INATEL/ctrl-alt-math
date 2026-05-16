@@ -1050,6 +1050,11 @@ class GameplayScene(Scene):
         return True
 
     def _on_enemy_death(self, enemy):
+        if getattr(enemy, "death_processed", False):
+            return
+        enemy.death_processed = True
+        self.last_enemy_death_pos = (enemy.x, enemy.y)
+
         self.game.floating_text.add_formula(
             enemy.x, enemy.y,
             t("eliminated"), settings.GREEN
@@ -1059,6 +1064,23 @@ class GameplayScene(Scene):
         self.game.screen_shake = 0.1
         self.game.shake_intensity = 4
         self.game.sfx.play("enemy_die")
+
+        # Award EXP
+        exp_reward = 0
+        if enemy.type == "censor": exp_reward = settings.ENEMY_EXP_CENSOR
+        elif enemy.type == "strawman": exp_reward = settings.ENEMY_EXP_STRAWMAN
+        elif enemy.type == "bayesian": exp_reward = settings.ENEMY_EXP_BAYESIAN
+        elif enemy.type == "boss": exp_reward = settings.ENEMY_EXP_BOSS
+        elif enemy.type == "ortogonal": exp_reward = settings.ENEMY_EXP_ORTOGONAL
+        elif enemy.type == "atirador": exp_reward = settings.ENEMY_EXP_ATIRADOR
+        elif enemy.type == "granadeiro": exp_reward = settings.ENEMY_EXP_GRANADEIRO
+
+        if exp_reward > 0:
+            if self.game.player.add_exp(exp_reward):
+                self.game.floating_text.add_info(self.game.player.x, self.game.player.y - 60,
+                                                f"LEVEL UP! ({self.game.player.level})", settings.GOLD)
+                self.game.sfx.play("victory")
+                self.game.particles.emit_burst(self.game.player.x, self.game.player.y, settings.GOLD, 20, 100, 0.5)
 
     def _apply_weapon_effect(self, enemy):
         if enemy.dead:
@@ -1127,20 +1149,6 @@ class GameplayScene(Scene):
                 enemy.status_effects.pop(i)
             if enemy.dead:
                 self._on_enemy_death(enemy)
-        self.last_enemy_death_pos = (enemy.x, enemy.y)
-        
-        # Award EXP
-        exp_reward = 0
-        if enemy.type == "censor": exp_reward = settings.ENEMY_EXP_CENSOR
-        elif enemy.type == "strawman": exp_reward = settings.ENEMY_EXP_STRAWMAN
-        elif enemy.type == "bayesian": exp_reward = settings.ENEMY_EXP_BAYESIAN
-        elif enemy.type == "boss": exp_reward = settings.ENEMY_EXP_BOSS
-
-        if self.game.player.add_exp(exp_reward):
-            self.game.floating_text.add_info(self.game.player.x, self.game.player.y - 60,
-                                            f"LEVEL UP! ({self.game.player.level})", settings.GOLD)
-            self.game.sfx.play("victory")
-            self.game.particles.emit_burst(self.game.player.x, self.game.player.y, settings.GOLD, 20, 100, 0.5)
 
         self._check_victory()
 
