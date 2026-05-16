@@ -822,7 +822,7 @@ class GameplayScene(Scene):
             return
 
         if event.key == pygame.K_i and self.state in ("PLAYER_INPUT", "PLAYER_ACTION_SELECT"):
-            self.game.scene_manager.push("player_panel")
+            self.game.scene_manager.push("inventory_dock")
             return
 
         if event.key == pygame.K_r and self.state in ("PLAYER_INPUT", "PLAYER_ACTION_SELECT"):
