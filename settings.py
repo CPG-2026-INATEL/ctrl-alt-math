@@ -467,5 +467,11 @@ MAP_ROOMS = {
             {"col": 9, "row": 3, "w": 1, "h": 1},
             {"col": 12, "row": 8, "w": 1, "h": 1},
         ],
-    },
+},
 }
+
+LAN_PORT = 5555
+LAN_BUFFER_SIZE = 8192
+LAN_TICK_RATE = 20
+LAN_TIMEOUT = 5.0
+LAN_MAX_PLAYERS = 2

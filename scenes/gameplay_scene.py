@@ -1429,6 +1429,7 @@ class GameplayScene(Scene):
         self.game.player.row = snapshot["player"]["row"]
         self.game.player.hp = snapshot["player"]["hp"]
         self.game.player.max_hp = snapshot["player"]["max_hp"]
+        self.game.player.hp = min(self.game.player.hp + 10, self.game.player.max_hp)
         self.game.player.rigor = snapshot["player"]["rigor"]
         self.game.player.x, self.game.player.y = self.grid.to_pixel(
             self.game.player.col, self.game.player.row
@@ -1469,6 +1470,7 @@ class GameplayScene(Scene):
         self.danger_locked = False
 
         self.game.floating_text.add_info(self.game.player.x, self.game.player.y - 40, "<< REWIND >>", settings.GREEN)
+        self.game.floating_text.add_info(self.game.player.x, self.game.player.y - 60, "+10 HP", settings.GREEN)
 
     def _draw_derivada_preview(self, screen):
         pc = self.game.player.col

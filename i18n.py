@@ -244,6 +244,27 @@ STRINGS = {
     "tip_player_move_desc": {LANG_EN: "Tiles you can move to this turn.", LANG_PT: "Blocos para os quais você pode se mover este turno."},
     "tip_player_attack": {LANG_EN: "TARGET AREA", LANG_PT: "ÁREA DE ALVO"},
     "tip_player_attack_desc": {LANG_EN: "Tiles currently within your strike range.", LANG_PT: "Blocos atualmente dentro do seu alcance de ataque."},
+
+    # Lobby / Multiplayer
+    "lobby_title": {LANG_EN: "LAN MULTIPLAYER", LANG_PT: "MULTIPLAYER LAN"},
+    "lobby_host": {LANG_EN: "Host Game", LANG_PT: "Hospedar Jogo"},
+    "lobby_join": {LANG_EN: "Join Game", LANG_PT: "Entrar no Jogo"},
+    "lobby_back": {LANG_EN: "Back", LANG_PT: "Voltar"},
+    "lobby_hosting": {LANG_EN: "Hosting Game...", LANG_PT: "Hospedando Jogo..."},
+    "lobby_waiting": {LANG_EN: "Waiting for player... IP: {ip}", LANG_PT: "Aguardando jogador... IP: {ip}"},
+    "lobby_player_joined": {LANG_EN: "Player 2 connected!", LANG_PT: "Jogador 2 conectado!"},
+    "lobby_start_prompt": {LANG_EN: "Press ENTER to start game", LANG_PT: "Pressione ENTER para comecar"},
+    "lobby_esc_cancel": {LANG_EN: "ESC to cancel", LANG_PT: "ESC para cancelar"},
+    "lobby_joining": {LANG_EN: "Join Game", LANG_PT: "Entrar no Jogo"},
+    "lobby_enter_ip": {LANG_EN: "Enter host IP address:", LANG_PT: "Digite o IP do host:"},
+    "lobby_scan_hint": {LANG_EN: "Ctrl+S to scan LAN", LANG_PT: "Ctrl+S para escanear LAN"},
+    "lobby_scanning": {LANG_EN: "Scanning LAN...", LANG_PT: "Escaneando LAN..."},
+    "lobby_found": {LANG_EN: "Found {n} host(s)", LANG_PT: "{n} host(s) encontrado(s)"},
+    "lobby_no_hosts": {LANG_EN: "No hosts found", LANG_PT: "Nenhum host encontrado"},
+    "lobby_select_host": {LANG_EN: "Select a host:", LANG_PT: "Selecione um host:"},
+    "lobby_connected": {LANG_EN: "Connected!", LANG_PT: "Conectado!"},
+    "lobby_press_start": {LANG_EN: "Press ENTER to ready up", LANG_PT: "Pressione ENTER para pronto"},
+    "menu_multiplayer": {LANG_EN: "LAN Co-op", LANG_PT: "Co-op LAN"},
 }
 
 # Merge Lore Strings
