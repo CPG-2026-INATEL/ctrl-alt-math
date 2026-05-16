@@ -329,7 +329,25 @@ class Enemy:
         elif self.type == "granadeiro":
             self._granadeiro_intent(intent, player_col, player_row, grid)
 
-        return intent
+        intents = [intent]
+        
+        # Strawman decoy logic: 40% chance to create a false indicator
+        if self.type == "strawman" and random.random() < 0.4:
+            fake_origin = (self.col + random.randint(-2, 2), self.row + random.randint(-2, 2))
+            fake_intent = EnemyIntent(
+                enemy=self,
+                move_target=None,
+                attack_type="attack",
+                attack_origin=fake_origin,
+                target_tile=(player_col, player_row),
+                danger_tiles=self._get_cross_cells(fake_origin[0], fake_origin[1], distance=1),
+                damage=0,
+                is_fake=True,
+                telegraph_type="cross"
+            )
+            intents.append(fake_intent)
+
+        return intents
 
     def _get_line_cells(self, from_col, from_row, to_col, to_row, max_range=8, grid=None):
         cells = set()
@@ -389,14 +407,14 @@ class Enemy:
     def _strawman_intent(self, intent, player_col, player_row, grid):
         origin = intent.attack_origin
         dist = grid.grid_distance(origin[0], origin[1], player_col, player_row)
-        if dist <= 1:
+        if dist <= self.attack_range:
             intent.danger_tiles = self._get_cross_cells(origin[0], origin[1], distance=1)
             intent.telegraph_type = "cross"
             intent.lock_mode = "fixed"
         elif intent.move_target:
             tc, tr = intent.move_target
             dist2 = grid.grid_distance(tc, tr, player_col, player_row)
-            if dist2 <= 1:
+            if dist2 <= self.attack_range:
                 intent.danger_tiles = self._get_cross_cells(tc, tr, distance=1)
                 intent.telegraph_type = "cross"
                 intent.lock_mode = "fixed"

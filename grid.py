@@ -317,23 +317,39 @@ class Grid:
         for intent in intents:
             if intent is None or intent.enemy.dead:
                 continue
+            
+            # 1. Draw Movement Vector (from enemy to move_target or attack_origin)
+            start_node = (intent.enemy.col, intent.enemy.row)
+            target_node = intent.move_target or (intent.attack_origin if not intent.is_fake else None)
+            
+            if target_node and target_node != start_node:
+                fx, fy = self.to_pixel(start_node[0], start_node[1])
+                tx, ty = self.to_pixel(target_node[0], target_node[1])
+                fx += ox; fy += oy; tx += ox; ty += oy
+                
+                arrow_color = (255, 140, 30) if intent.is_fake else (255, 180, 50)
+                self.draw_vector_arrow(screen, start_node[0], start_node[1], 
+                                       target_node[0], target_node[1], arrow_color, 2, offset=offset)
+
+            # 2. Draw Attack Direction (from attack_origin to danger area)
             if not intent.danger_tiles:
                 continue
+                
             origin = intent.attack_origin
             if origin is None:
                 origin = (intent.enemy.col, intent.enemy.row)
+            
             fx, fy = self.to_pixel(origin[0], origin[1])
-            fx += ox
-            fy += oy
-
+            fx += ox; fy += oy
+            
             target_list = list(intent.danger_tiles)
             if not target_list:
                 continue
+                
             mid_tile = target_list[len(target_list) // 2]
             tx, ty = self.to_pixel(mid_tile[0], mid_tile[1])
-            tx += ox
-            ty += oy
-
+            tx += ox; ty += oy
+            
             if self.danger_locked:
                 arrow_color = (255, 80, 80)
             elif intent.is_fake:
@@ -341,7 +357,9 @@ class Grid:
             else:
                 arrow_color = (255, 200, 50)
 
-            pygame.draw.line(screen, arrow_color, (int(fx), int(fy)), (int(tx), int(ty)), 2)
+            # Only draw attack line if it's not redundant with move arrow
+            if math.hypot(tx - fx, ty - fy) > 5:
+                pygame.draw.line(screen, arrow_color, (int(fx), int(fy)), (int(tx), int(ty)), 1)
 
             angle = math.atan2(ty - fy, tx - fx)
             arrow_len = 10

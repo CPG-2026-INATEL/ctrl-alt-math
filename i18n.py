@@ -225,8 +225,19 @@ STRINGS = {
     "room_sanctuary_narr": {LANG_EN: "Accumulated knowledge flows here.", LANG_PT: "Conhecimento acumulado flui aqui."},
     "room_vault_name": {LANG_EN: "Matrix Vault", LANG_PT: "Cofre de Matrizes"},
     "room_vault_narr": {LANG_EN: "Linear transformations guard this room.", LANG_PT: "Transformações lineares guardam esta sala."},
-    "room_lab_name": {LANG_EN: "Chaos Theory Lab", LANG_PT: "Laboratório de Teoria do Caos"},
     "room_lab_narr": {LANG_EN: "Small changes have massive consequences.", LANG_PT: "Pequenas mudanças têm consequências massivas."},
+    
+    # Intent Tooltips
+    "tip_attack_area": {LANG_EN: "ATTACK AREA", LANG_PT: "ÁREA DE ATAQUE"},
+    "tip_attack_desc": {LANG_EN: "Enemy will hit this tile next turn.", LANG_PT: "Inimigo atingirá este bloco no próximo turno."},
+    "tip_move_vector": {LANG_EN: "MOVEMENT VECTOR", LANG_PT: "VETOR DE MOVIMENTO"},
+    "tip_move_desc": {LANG_EN: "Enemy plans to relocate to this position.", LANG_PT: "Inimigo planeja se realocar para esta posição."},
+    "tip_decoy_area": {LANG_EN: "DECOY INDICATOR", LANG_PT: "INDICADOR DE DECOY"},
+    "tip_decoy_desc": {LANG_EN: "A false threat created to confuse you.", LANG_PT: "Uma ameaça falsa criada para te confundir."},
+    "tip_player_move": {LANG_EN: "REACHABLE AREA", LANG_PT: "ÁREA ALCANÇÁVEL"},
+    "tip_player_move_desc": {LANG_EN: "Tiles you can move to this turn.", LANG_PT: "Blocos para os quais você pode se mover este turno."},
+    "tip_player_attack": {LANG_EN: "TARGET AREA", LANG_PT: "ÁREA DE ALVO"},
+    "tip_player_attack_desc": {LANG_EN: "Tiles currently within your strike range.", LANG_PT: "Blocos atualmente dentro do seu alcance de ataque."},
 }
 
 # Merge Lore Strings

@@ -585,6 +585,60 @@ class UI:
         curr_y += 5
         screen.blit(hp_surf, (x + padding, curr_y))
 
+    def draw_intent_tooltip(self, screen, intent_type, is_fake, pos):
+        padding = 10
+        max_width = 200
+        title_font = pygame.font.Font(None, 20)
+        desc_font = pygame.font.Font(None, 16)
+
+        if is_fake:
+            title_key = "tip_decoy_area"
+            desc_key = "tip_decoy_desc"
+            title_color = settings.ORANGE
+        elif intent_type == "move":
+            title_key = "tip_move_vector"
+            desc_key = "tip_move_desc"
+            title_color = settings.GREEN
+        elif intent_type == "player_move":
+            title_key = "tip_player_move"
+            desc_key = "tip_player_move_desc"
+            title_color = settings.BLUE
+        elif intent_type == "player_attack":
+            title_key = "tip_player_attack"
+            desc_key = "tip_player_attack_desc"
+            title_color = settings.RED
+        else:
+            title_key = "tip_attack_area"
+            desc_key = "tip_attack_desc"
+            title_color = settings.YELLOW
+
+        title_surf = title_font.render(t(title_key), True, title_color)
+        lines = self._wrap_text(t(desc_key), desc_font, max_width - padding * 2)
+        desc_surfs = [desc_font.render(line, True, settings.LIGHT_GRAY) for line in lines]
+
+        width = max(title_surf.get_width(), max([s.get_width() for s in desc_surfs])) + padding * 2
+        height = title_surf.get_height() + sum([s.get_height() for s in desc_surfs]) + padding * 2 + 5
+
+        x, y = pos
+        x += 15
+        y += 15
+        if x + width > settings.WINDOW_WIDTH: x -= width + 30
+        if y + height > settings.WINDOW_HEIGHT: y -= height + 30
+
+        bg_rect = pygame.Rect(x, y, width, height)
+        s = pygame.Surface((width, height), pygame.SRCALPHA)
+        pygame.draw.rect(s, (15, 15, 25, 230), (0, 0, width, height), border_radius=8)
+        screen.blit(s, (x, y))
+        pygame.draw.rect(screen, settings.GRAY, bg_rect, 1, border_radius=8)
+        pygame.draw.rect(screen, title_color, bg_rect, 2, border_radius=8)
+
+        curr_y = y + padding
+        screen.blit(title_surf, (x + padding, curr_y))
+        curr_y += title_surf.get_height() + 5
+        for surf in desc_surfs:
+            screen.blit(surf, (x + padding, curr_y))
+            curr_y += surf.get_height()
+
     def _wrap_text(self, text, font, max_width):
         paragraphs = text.split('\n')
         lines = []

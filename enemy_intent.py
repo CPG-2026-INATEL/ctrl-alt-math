@@ -31,6 +31,8 @@ class EnemyIntent:
         return self.danger_tiles, False
 
     def to_action(self):
+        if self.is_fake:
+            return {"type": "wait"}
         if self.attack_type in ("move_then_attack",):
             tc, tr = self.move_target or self.attack_origin or (self.enemy.col, self.enemy.row)
             return {"type": "move_then_attack", "target_col": tc, "target_row": tr, "attack_after": True}

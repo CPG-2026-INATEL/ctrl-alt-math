@@ -56,6 +56,7 @@ class GameplayScene(Scene):
         self.pending_player_col = None
         self.pending_player_row = None
         self.hovered_enemy = None
+        self.hovered_intent_data = None
         
         self.lore_timer = 15.0 # Start after 15 seconds
         self.lore_toast = None
@@ -265,8 +266,8 @@ class GameplayScene(Scene):
         alive_enemies = [e for e in self.game.enemies if not e.dead]
         self.enemy_intents = []
         for enemy in alive_enemies:
-            intent = enemy.decide_intent(pc, pr, self.grid, self.game.enemies)
-            self.enemy_intents.append(intent)
+            new_intents = enemy.decide_intent(pc, pr, self.grid, self.game.enemies)
+            self.enemy_intents.extend(new_intents)
         player_skills = self._get_player_skill_ids()
         self.grid.set_danger_tiles(self.enemy_intents, player_skills)
 
@@ -808,6 +809,12 @@ class GameplayScene(Scene):
                 # TTS for lore toast
                 self.game.tts.speak(text, lang=settings.LANGUAGE)
 
+        # Hover detection for enemies and intents
+        mx, my = pygame.mouse.get_pos()
+        world_mx = mx + self.camera_x
+        world_my = my + self.camera_y
+        grid_mx, grid_my = self.grid.to_grid(world_mx, world_my)
+        
         arena_rect = pygame.Rect(
             settings.ARENA_OFFSET_X, settings.ARENA_OFFSET_Y,
             self.grid.width, self.grid.height
@@ -817,6 +824,46 @@ class GameplayScene(Scene):
         self.game.screen_shake = max(0, self.game.screen_shake - dt)
         if self.game.screen_shake > 0:
             self.game.shake_intensity = max(1, self.game.shake_intensity * 0.9)
+
+        self.hovered_enemy = None
+        for enemy in self.game.enemies:
+            if not enemy.dead and enemy.get_hitbox().collidepoint(world_mx, world_my):
+                self.hovered_enemy = enemy
+                break
+        
+        self.hovered_intent_data = None
+        if self.state in ("PLAYER_INPUT", "PLAYER_ACTION_SELECT"):
+            # Check danger tiles
+            for col, row, ttype, is_fake, lmode in self.grid.danger_tiles:
+                if (col, row) == (grid_mx, grid_my):
+                    self.hovered_intent_data = ("attack", is_fake)
+                    break
+            
+            # Check movement arrows
+            if not self.hovered_intent_data:
+                for intent in self.enemy_intents:
+                    if intent and not intent.enemy.dead and intent.move_target:
+                        tx, ty = self.grid.to_pixel(intent.move_target[0], intent.move_target[1])
+                        if math.hypot(world_mx - tx, world_my - ty) < 15:
+                            self.hovered_intent_data = ("move", False)
+                            break
+            
+            # Check player reachable/targetable tiles
+            if not self.hovered_intent_data:
+                pc, pr = self.game.player.col, self.game.player.row
+                if self.state == "PLAYER_INPUT":
+                    reachable = self.grid.get_reachable_cells(pc, pr, self.game.player.move_range)
+                    if (grid_mx, grid_my) in reachable:
+                        self.hovered_intent_data = ("player_move", False)
+                elif self.state == "PLAYER_ACTION_SELECT":
+                    # Determine range based on selected skill or basic attack
+                    range_val = settings.BASIC_ATTACK_RANGE
+                    if self.selected_skill == "pitagoras": range_val = settings.PITAGORAS_RANGE
+                    elif self.selected_skill == "reflexao": range_val = settings.REFLEXAO_RANGE
+                    
+                    targetable = self.grid.get_cells_in_range(pc, pr, range_val)
+                    if (grid_mx, grid_my) in targetable:
+                        self.hovered_intent_data = ("player_attack", False)
 
         if self.state == "RESOLVE_MOVE":
             if self.pending_player_col is not None and not self.game.player.is_animating():
@@ -1420,6 +1467,9 @@ class GameplayScene(Scene):
 
         if self.hovered_enemy:
             self.game.ui.draw_enemy_tooltip(temp, self.hovered_enemy, pygame.mouse.get_pos())
+        elif self.hovered_intent_data:
+            itype, is_fake = self.hovered_intent_data
+            self.game.ui.draw_intent_tooltip(temp, itype, is_fake, pygame.mouse.get_pos())
 
         if self.game.screen_shake > 0:
             sx = random.randint(-int(self.game.shake_intensity),
