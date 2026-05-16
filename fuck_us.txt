@@ -1,2 +1,5 @@
-[Discovery] Starting LAN scan...
-[Discovery] Broadcasting UDP discovery to ['255.255.255.255'] (reply to port 5557)
+[Client] Connecting to 10.42.31.204:5555...
+[Client] Async thread started for 10.42.31.204
+[Client] Failed to connect to 10.42.31.204:5555
+[Client] Connection TIMEOUT: Host at 10.42.31.204:5555 is unreachable.
+[Client] Client connection closed.
