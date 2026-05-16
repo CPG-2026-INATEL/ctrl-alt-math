@@ -386,6 +386,16 @@ class LobbyScene(Scene):
                 draw_text(screen, ip,
                           (settings.WINDOW_WIDTH // 2, 215 + idx * 24), color, 20)
             status_y = 215 + len(ips) * 24 + 10
+
+            # Show localtunnel public URL if generated
+            public_url = getattr(self.host, "public_url", None)
+            if public_url:
+                draw_text(screen, "Public URL (Localtunnel):",
+                          (settings.WINDOW_WIDTH // 2, status_y), settings.GOLD, 16)
+                draw_text(screen, public_url,
+                          (settings.WINDOW_WIDTH // 2, status_y + 20), settings.CYAN, 18)
+                status_y += 45
+
             draw_text(screen, self.status,
                       (settings.WINDOW_WIDTH // 2, status_y), self.status_color, 18)
 
