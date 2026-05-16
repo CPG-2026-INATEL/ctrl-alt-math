@@ -240,6 +240,10 @@ class Grid:
 
     def set_danger_tiles(self, intents, player_skills=None):
         self.danger_tiles.clear()
+        # Only show danger tiles if player has Derivada
+        if not player_skills or "derivada" not in player_skills:
+            return
+            
         for intent in intents:
             if intent is None or intent.enemy.dead:
                 continue
@@ -313,6 +317,8 @@ class Grid:
                 pygame.draw.line(screen, border_color, (cx, cy - sz), (cx, cy + sz), 2)
 
     def draw_intent_arrows(self, screen, intents, player_skills=None, offset=(0, 0)):
+        if not player_skills or "derivada" not in player_skills:
+            return
         ox, oy = offset
         for intent in intents:
             if intent is None or intent.enemy.dead:

@@ -11,23 +11,33 @@ class SkillTree:
         self.skills = {}
         for s in settings.SKILL_TREE_DATA:
             entry = dict(s)
-            entry["unlocked"] = False
+            entry["level"] = 0
+            entry["max_level"] = 10  # Reasonable cap for linear scaling
             self.skills[s["id"]] = entry
 
         self.skill_points = settings.PLAYER_START_SKILL_POINTS
         self.hovered_id = None
         self.unlock_animations = {}
-        self.unlock("axioma")
+        # Start with axioma level 1 (free)
+        self.skills["axioma"]["level"] = 1
+        
+    def get_upgrade_cost(self, skill_id):
+        skill = self.skills.get(skill_id)
+        if not skill: return 999
+        # unlocking (L0->L1) costs 1, lvl up 2 (L1->L2) costs 2, etc.
+        return skill["level"] + 1
 
     def unlock(self, skill_id):
+        # This is now effectively "upgrade"
         skill = self.skills.get(skill_id)
-        if skill and not skill["unlocked"] and self.can_unlock(skill_id):
-            skill["unlocked"] = True
-            self.skill_points -= skill["cost"]
+        if skill and self.can_unlock(skill_id):
+            cost = self.get_upgrade_cost(skill_id)
+            skill["level"] += 1
+            self.skill_points -= cost
             self.unlock_animations[skill_id] = 0.5
             
             # Check for skill_master achievement
-            unlocked_count = sum(1 for s in self.skills.values() if s["unlocked"])
+            unlocked_count = sum(1 for s in self.skills.values() if s["level"] > 0)
             if unlocked_count >= 5:
                 from achievement_manager import AchievementManager
                 AchievementManager().unlock("skill_master", settings.DIFFICULTY)
@@ -37,22 +47,77 @@ class SkillTree:
 
     def can_unlock(self, skill_id):
         skill = self.skills.get(skill_id)
-        if not skill or skill["unlocked"]:
+        if not skill or skill["level"] >= skill["max_level"]:
             return False
-        if self.skill_points < skill["cost"]:
+        
+        cost = self.get_upgrade_cost(skill_id)
+        if self.skill_points < cost:
             return False
-        for prereq in skill["prereqs"]:
-            p = self.skills.get(prereq)
-            if not p or not p["unlocked"]:
-                return False
+            
+        # For initial unlock (level 0 -> 1), check prereqs
+        if skill["level"] == 0:
+            for prereq in skill["prereqs"]:
+                p = self.skills.get(prereq)
+                if not p or p["level"] == 0:
+                    return False
         return True
 
     def is_unlocked(self, skill_id):
         skill = self.skills.get(skill_id)
-        return skill is not None and skill["unlocked"]
+        return skill is not None and skill["level"] > 0
+
+    def get_level(self, skill_id):
+        skill = self.skills.get(skill_id)
+        return skill["level"] if skill else 0
 
     def is_available(self, skill_id):
         return self.can_unlock(skill_id)
+
+    def get_skill_value(self, skill_id, key, base_val=None):
+        level = self.get_level(skill_id)
+        if level == 0: return base_val
+        
+        if skill_id == "axioma":
+            # Buffs base damage: +3 per level above 1
+            if key == "damage_bonus": return (level - 1) * 3
+            
+        if skill_id == "pitagoras":
+            # Buffs damage: +5 per level; Range: +1 every 2 levels
+            if key == "damage": return settings.PITAGORAS_DAMAGE + (level - 1) * 5
+            if key == "range": return settings.PITAGORAS_RANGE + (level - 1) // 2
+            
+        if skill_id == "reflexao":
+            # Buffs damage: +4 per level; Range: +1 every 3 levels
+            if key == "damage": return settings.REFLEXAO_DAMAGE + (level - 1) * 4
+            if key == "range": return settings.REFLEXAO_RANGE + (level - 1) // 3
+            
+        if skill_id == "ctrlz":
+            # Buffs undo turns: +1 every 2 levels; Heal: +5 per level
+            if key == "undo_turns": return settings.REWIND_UNDO_TURNS + (level - 1) // 2
+            if key == "heal": return settings.REWIND_HEAL_AMOUNT + (level - 1) * 5
+            
+        if skill_id == "entropia":
+            # Buffs entropy reduction: -10% per level
+            if key == "reduction": return 0.5 + (level - 1) * 0.1
+            
+        if skill_id == "derivada":
+            # Buffs damage per tile moved: +5% per level
+            if key == "move_damage_mult": return 1.0 + (level * 0.05)
+            if key == "show_arrows": return level >= 1
+            if key == "show_damage_pred": return level >= 3
+            if key == "show_crit_pred": return level >= 5
+
+        if skill_id == "bayes":
+            # Reveal more info
+            if key == "reveal_fake": return level >= 1
+            if key == "reveal_target": return level >= 2
+            if key == "reveal_next_move": return level >= 4
+
+        if skill_id == "teoria_jogos":
+            # Tactical bonuses
+            if key == "crit_bonus": return (level) * 0.05 # +5% crit per level
+            
+        return base_val
 
     def add_points(self, n):
         self.skill_points += n
@@ -71,7 +136,7 @@ class SkillTree:
         for sid, skill in self.skills.items():
             if self.get_node_rect(skill).collidepoint(pos):
                 self.hovered_id = sid
-                return
+                break # Found it
 
         for sid in list(self.unlock_animations.keys()):
             self.unlock_animations[sid] -= 0.016
@@ -104,7 +169,7 @@ class SkillTree:
 
         offset_x = (settings.WINDOW_WIDTH - 800) // 2
         
-        # Draw Connections First (to keep them behind nodes)
+        # Draw Connections First
         for sid, skill in self.skills.items():
             for prereq in skill["prereqs"]:
                 if prereq in self.skills:
@@ -112,7 +177,7 @@ class SkillTree:
                     start = (p["x"] + offset_x, p["y"])
                     end = (skill["x"] + offset_x, skill["y"])
 
-                    if skill["unlocked"]:
+                    if skill["level"] > 0:
                         color = settings.GREEN
                         width = 3
                     elif self.can_unlock(sid):
@@ -124,8 +189,7 @@ class SkillTree:
 
                     pygame.draw.line(screen, color, start, end, width)
                     
-                    # Add small flow particles for unlocked paths
-                    if skill["unlocked"]:
+                    if skill["level"] > 0:
                         time_mod = (pygame.time.get_ticks() / 1000.0) % 1.0
                         px = start[0] + (end[0] - start[0]) * time_mod
                         py = start[1] + (end[1] - start[1]) * time_mod
@@ -135,9 +199,9 @@ class SkillTree:
         for sid, skill in self.skills.items():
             rect = self.get_node_rect(skill)
             is_hovered = (self.hovered_id == sid)
+            level = skill["level"]
             
-            # Better colors and contrast
-            if skill["unlocked"]:
+            if level > 0:
                 bg_color = (20, 80, 20)
                 border_color = settings.GREEN
                 text_color = settings.WHITE
@@ -151,59 +215,78 @@ class SkillTree:
                 text_color = (130, 130, 150)
 
             if is_hovered:
-                # Hover effect: Glow and brighter color
                 pygame.draw.rect(screen, settings.WHITE, rect.inflate(10, 10), 2, border_radius=8)
                 bg_color = tuple(min(255, c + 40) for c in bg_color)
                 border_color = settings.WHITE
 
-            # Draw Node Box
             pygame.draw.rect(screen, bg_color, rect, border_radius=6)
             pygame.draw.rect(screen, border_color, rect, 2, border_radius=6)
 
             # Skill Name
-            name_size = 20 if len(t(skill["name"])) < 12 else 18
-            draw_text(screen, t(skill["name"]), rect.center, text_color, name_size)
+            name_text = t(skill["name"])
+            if level > 0:
+                name_text += f" (Lv.{level})"
+            name_size = 20 if len(name_text) < 15 else 16
+            draw_text(screen, name_text, rect.center, text_color, name_size)
 
-            # Cost Badge (if not unlocked)
-            if not skill["unlocked"] and skill["cost"] > 0:
-                cost_color = settings.GOLD if self.skill_points >= skill["cost"] else settings.RED
-                cost_label = str(skill["cost"])
+            # Cost Badge
+            cost = self.get_upgrade_cost(sid)
+            if level < skill["max_level"]:
+                cost_color = settings.GOLD if self.skill_points >= cost else settings.RED
+                cost_label = str(cost)
                 badge_rect = pygame.Rect(rect.right - 25, rect.bottom - 20, 20, 18)
                 pygame.draw.rect(screen, (20, 20, 30), badge_rect, border_radius=4)
                 pygame.draw.rect(screen, cost_color, badge_rect, 1, border_radius=4)
                 draw_text(screen, cost_label, badge_rect.center, cost_color, 14)
 
-            # Status Indicator
-            if skill["unlocked"]:
+            if level > 0:
                 pygame.draw.circle(screen, settings.GREEN, (rect.right - 10, rect.top + 10), 4)
 
-        # Detailed Info Panel for Hovered Skill
+        # Detailed Info Panel
         if self.hovered_id:
             skill = self.skills[self.hovered_id]
-            panel_w, panel_h = 500, 220
-            # Position panel with some margin from the bottom
+            panel_w, panel_h = 500, 260
             panel_rect = pygame.Rect((settings.WINDOW_WIDTH - panel_w) // 2, 
-                                     settings.WINDOW_HEIGHT - panel_h - 70, 
+                                     settings.WINDOW_HEIGHT - panel_h - 60, 
                                      panel_w, panel_h)
             
-            # Panel Background with glow
             pygame.draw.rect(screen, (15, 15, 30, 250), panel_rect, border_radius=15)
             pygame.draw.rect(screen, settings.CYAN, panel_rect, 2, border_radius=15)
             
-            # Skill Title
             title_y = panel_rect.top + 30
-            draw_text(screen, t(skill["name"]).upper(), (panel_rect.centerx, title_y), settings.CYAN, 28)
+            title_text = t(skill["name"]).upper()
+            if skill["level"] > 0:
+                title_text += f" - LV.{skill['level']}"
+            draw_text(screen, title_text, (panel_rect.centerx, title_y), settings.CYAN, 28)
             
-            # Description (Handling multiple lines with better spacing)
             desc_y = title_y + 45
             draw_text(screen, t(skill["desc"]), (panel_rect.centerx, desc_y), settings.WHITE, 18)
             
-            # Flavor Text (Always at the bottom of the panel)
+            # Show Stat Summary
+            stats_y = desc_y + 50
+            txt = ""
+            if self.hovered_id == "axioma":
+                txt = f"Base Damage: {settings.PLAYER_ATTACK_DAMAGE + (max(0, skill['level']-1)*3)}"
+            elif self.hovered_id == "pitagoras":
+                dmg = self.get_skill_value(self.hovered_id, 'damage', settings.PITAGORAS_DAMAGE)
+                rng = self.get_skill_value(self.hovered_id, 'range', settings.PITAGORAS_RANGE)
+                txt = f"Dmg: {dmg}, Range: {rng}"
+            elif self.hovered_id == "derivada":
+                mult = self.get_skill_value(self.hovered_id, 'move_damage_mult', 1.0)
+                txt = f"Dmg Multiplier: x{mult:.2f} per tile"
+            
+            if txt:
+                draw_text(screen, txt, (panel_rect.centerx, stats_y), settings.GREEN, 16)
+
+            # Show Next Level Buff
+            if skill["level"] < skill["max_level"]:
+                buff_text = f"Next Level: +Buff (Cost: {self.get_upgrade_cost(self.hovered_id)} SP)"
+                draw_text(screen, buff_text, (panel_rect.centerx, stats_y + 30), settings.GOLD, 16)
+
             flavor_key = f"skill_{self.hovered_id}_flavor"
             draw_text(screen, f"\"{t(flavor_key)}\"", (panel_rect.centerx, panel_rect.bottom - 35), 
                       (100, 200, 200), 15)
 
-        # Footer (Pushed slightly lower)
         draw_text(screen, t("skill_tree_footer"),
                   (settings.WINDOW_WIDTH // 2, settings.WINDOW_HEIGHT - 20),
                   settings.GRAY, 14)

@@ -62,6 +62,7 @@ class GameplayScene(Scene):
         self.lore_toast = None
         self.player_took_damage_this_room = False
         self.crits_this_room = 0
+        self.tiles_moved_this_turn = 0
 
     def enter(self, prev_scene=None):
         self.state = "WAVE_INTRO"
@@ -263,6 +264,7 @@ class GameplayScene(Scene):
         self._generate_enemy_intents()
         self.danger_locked = False
         self._save_rewind_state()
+        self.tiles_moved_this_turn = 0
         self.game.sfx.play("wave_start")
         self.game.tts.speak(t("wave_count", wave=self.turn_manager.turn_number), lang=settings.LANGUAGE)
 
@@ -279,12 +281,10 @@ class GameplayScene(Scene):
 
     def _get_player_skill_ids(self):
         skills = []
-        if self.game.skill_tree.is_unlocked("derivada"):
-            skills.append("derivada")
-        if self.game.skill_tree.is_unlocked("bayes"):
-            skills.append("bayes")
-        if self.game.skill_tree.is_unlocked("teoria_jogos"):
-            skills.append("teoria_jogos")
+        st = self.game.skill_tree
+        for sid in ["derivada", "bayes", "teoria_jogos"]:
+            if st.is_unlocked(sid):
+                skills.append(sid)
         return skills
 
     def _leave_no_combat_room(self):
@@ -383,6 +383,7 @@ class GameplayScene(Scene):
             self.state = "RESOLVE_MOVE"
             self.turn_manager.resolve_timer = 0
             anim_path = self._build_anim_path(pc, pr, self.cursor_col, self.cursor_row)
+            self.tiles_moved_this_turn = len(anim_path)
             self.game.player.start_move_anim(
                 pc, pr, self.cursor_col, self.cursor_row, self.grid, path=anim_path
             )
@@ -417,10 +418,13 @@ class GameplayScene(Scene):
     def _get_action_cells(self):
         pc = self.game.player.col
         pr = self.game.player.row
+        st = self.game.skill_tree
         if self.selected_skill == "pitagoras":
-            return self.grid.get_cells_in_radius(pc, pr, settings.PITAGORAS_RANGE)
+            radius = st.get_skill_value("pitagoras", "range", settings.PITAGORAS_RANGE)
+            return self.grid.get_cells_in_radius(pc, pr, radius)
         if self.selected_skill == "reflexao":
-            return self.grid.get_cells_in_radius(pc, pr, settings.REFLEXAO_RANGE)
+            radius = st.get_skill_value("reflexao", "range", settings.REFLEXAO_RANGE)
+            return self.grid.get_cells_in_radius(pc, pr, radius)
         return [
             cell for cell in self.grid.get_cells_in_range(pc, pr, settings.BASIC_ATTACK_RANGE)
             if cell != (pc, pr)
@@ -443,7 +447,7 @@ class GameplayScene(Scene):
         if is_self or (not target_enemies and self.selected_skill is None):
             self.turn_manager.player_acted = True
             self.show_action_range = False
-            self.selected_skill = None
+            self.tiles_moved_this_turn = 0
             self.turn_log.append("Wait")
             self._start_enemy_turn()
             self.game.sfx.play("menu_select")
@@ -630,15 +634,23 @@ class GameplayScene(Scene):
 
         if hit_enemies:
             is_crit = self.game.player.check_crit()
+            st = self.game.skill_tree
+            axioma_bonus = st.get_skill_value("axioma", "damage_bonus", 0)
+            derivada_mult = st.get_skill_value("derivada", "move_damage_mult", 1.0)
+            move_bonus = 1.0 + (derivada_mult - 1.0) * self.tiles_moved_this_turn
+
             for enemy in hit_enemies:
-                base_dmg = self.game.player.base_damage
+                base_dmg = (self.game.player.base_damage + axioma_bonus) * move_bonus
                 if is_crit:
                     dmg = int(base_dmg * settings.PLAYER_CRIT_MULTIPLIER)
                 else:
-                    dmg = base_dmg
+                    dmg = int(base_dmg)
+                
                 dx = abs(enemy.col - pc)
                 dy = abs(enemy.row - pr)
                 dist_formula = f"d={dx}+{dy}={dx+dy}" if dx + dy < 5 else f"|v|={dx+dy}"
+                if self.tiles_moved_this_turn > 0:
+                    dist_formula = f"f'={self.tiles_moved_this_turn} -> " + dist_formula
                 self.game.floating_text.add_formula(
                     enemy.x, enemy.y - 30,
                     dist_formula, settings.YELLOW if not is_crit else settings.GOLD
@@ -683,13 +695,19 @@ class GameplayScene(Scene):
             dx = abs(self.cursor_col - pc)
             dy = abs(self.cursor_row - pr)
             is_crit = self.game.player.check_crit()
+            st = self.game.skill_tree
+            dmg_base = st.get_skill_value("pitagoras", "damage", settings.PITAGORAS_DAMAGE)
+            derivada_mult = st.get_skill_value("derivada", "move_damage_mult", 1.0)
+            move_bonus = 1.0 + (derivada_mult - 1.0) * self.tiles_moved_this_turn
+            
             self.game.floating_text.add_formula(
                 self.game.player.x, self.game.player.y - 30,
                 f"a^2+b^2=c^2  ({dx}^2+{dy}^2={dx*dx+dy*dy})",
                 settings.GOLD if is_crit else settings.YELLOW
             )
             if not self.grid.is_level_change(pc, pr, target_enemy.col, target_enemy.row):
-                dmg = int(settings.PITAGORAS_DAMAGE * settings.PLAYER_CRIT_MULTIPLIER) if is_crit else settings.PITAGORAS_DAMAGE
+                dmg = int(dmg_base * move_bonus)
+                if is_crit: dmg = int(dmg * settings.PLAYER_CRIT_MULTIPLIER)
                 target_enemy.take_damage(dmg)
                 self.game.floating_text.add_enemy_damage(target_enemy.x, target_enemy.y, dmg, is_crit)
                 self.game.particles.emit_burst(target_enemy.x, target_enemy.y, settings.YELLOW, 12, 80, 0.4)
@@ -716,10 +734,16 @@ class GameplayScene(Scene):
                 return False
             
             # Area damage
-            target_cells = self.grid.get_cells_in_radius(pc, pr, settings.REFLEXAO_RANGE)
+            st = self.game.skill_tree
+            radius = st.get_skill_value("reflexao", "range", settings.REFLEXAO_RANGE)
+            target_cells = self.grid.get_cells_in_radius(pc, pr, radius)
             hit_count = 0
-            dmg = settings.REFLEXAO_DAMAGE
+            dmg_base = st.get_skill_value("reflexao", "damage", settings.REFLEXAO_DAMAGE)
+            derivada_mult = st.get_skill_value("derivada", "move_damage_mult", 1.0)
+            move_bonus = 1.0 + (derivada_mult - 1.0) * self.tiles_moved_this_turn
+            
             is_crit = self.game.player.check_crit()
+            dmg = int(dmg_base * move_bonus)
             if is_crit: 
                 dmg = int(dmg * settings.PLAYER_CRIT_MULTIPLIER)
             
@@ -767,7 +791,10 @@ class GameplayScene(Scene):
             self.game.floating_text.add_info(self.game.player.x, self.game.player.y - 40, "CAN'T UNDO", settings.RED)
             return
 
-        snapshot = self.turn_manager.undo()
+        st = self.game.skill_tree
+        steps = st.get_skill_value("ctrlz", "undo_turns", settings.REWIND_UNDO_TURNS)
+        
+        snapshot = self.turn_manager.undo(steps=steps)
         if snapshot:
             # Restore Player
             self.game.player.col = snapshot["player"]["col"]
@@ -799,22 +826,28 @@ class GameplayScene(Scene):
                 self.grid.mark_barrier(bc[0], bc[1], True)
 
             # Apply penalty: Increase entropy
-            # If "entropia" skill is unlocked, reduce penalty
-            penalty = settings.REWIND_ENTROPY_INCREASE
-            if self.game.skill_tree.is_unlocked("entropia"):
-                penalty //= 2
+            st = self.game.skill_tree
+            reduction = st.get_skill_value("entropia", "reduction", 0)
+            penalty = int(settings.REWIND_ENTROPY_INCREASE * (1.0 - reduction))
             
             self.game.entropy = min(settings.MAX_ENTROPY, self.game.entropy + penalty)
             self.turn_manager.rewind_cooldown_turns = settings.REWIND_COOLDOWN_TURNS
             
-            # HP Regeneration
-            heal = settings.REWIND_HEAL_AMOUNT
+            # Bonus HP Regeneration
+            heal_bonus = st.get_skill_value("ctrlz", "heal", settings.REWIND_HEAL_AMOUNT)
             old_hp = self.game.player.hp
-            self.game.player.hp = min(self.game.player.max_hp, self.game.player.hp + heal)
+            self.game.player.hp = min(self.game.player.max_hp, self.game.player.hp + heal_bonus)
             actual_heal = self.game.player.hp - old_hp
             
             # Visuals and feedback
             self.game.sfx.play("reflexao") # Glitchy sound
+            self.game.screen_shake = 0.2
+            self.game.shake_intensity = 8
+            self.game.floating_text.add_formula(
+                self.game.player.x, self.game.player.y - 40,
+                f"S = S_0 + {penalty}", settings.PURPLE
+            )
+            self.turn_log.append("Rewind")
             self.game.floating_text.add_info(self.game.player.x, self.game.player.y - 60, "CTRL+Z REWIND", settings.CYAN)
             if actual_heal > 0:
                 self.game.floating_text.add_info(self.game.player.x, self.game.player.y - 80, f"+{actual_heal} HP", settings.GREEN)
@@ -1443,6 +1476,7 @@ class GameplayScene(Scene):
             "enemies": self.game.enemies,
             "entropy": self.game.entropy,
             "barrier_cells": self.grid.barrier_cells.copy(),
+            "player_obj": self.game.player,
         }
 
     def _save_rewind_state(self):

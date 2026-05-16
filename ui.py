@@ -115,7 +115,9 @@ class UI:
                   (settings.WINDOW_WIDTH // 2, bar_y + 38),
                   settings.GOLD, 16)
 
-        draw_text(screen, f"Dmg: {player.base_damage}",
+        st = game.skill_tree if game else None
+        axioma_bonus = st.get_skill_value("axioma", "damage_bonus", 0) if st else 0
+        draw_text(screen, f"Dmg: {player.base_damage + axioma_bonus}",
                   (settings.WINDOW_WIDTH // 2 + 100, bar_y + 38),
                   settings.CYAN, 14)
 
@@ -132,14 +134,14 @@ class UI:
         if has_pitagoras:
             ready = player.pitagoras_cooldown <= 0 and player.rigor >= settings.PITAGORAS_RIGOR_COST
             self._draw_cooldown_icon(screen, x, y, "1", ready,
-                                     player.pitagoras_cooldown, 1.0,
+                                     player.pitagoras_cooldown, 1,
                                      player.rigor >= settings.PITAGORAS_RIGOR_COST)
         x += 30
 
         if has_reflexao:
             ready = player.reflexao_cooldown <= 0 and player.rigor >= settings.REFLEXAO_RIGOR_COST
             self._draw_cooldown_icon(screen, x, y, "2", ready,
-                                     player.reflexao_cooldown, 2.0,
+                                     player.reflexao_cooldown, 3,
                                      player.rigor >= settings.REFLEXAO_RIGOR_COST)
         x += 30
 
@@ -158,9 +160,12 @@ class UI:
         elif not ready:
             pygame.draw.rect(screen, (80, 80, 80), rect, border_radius=3)
             pygame.draw.rect(screen, (120, 120, 120), rect, 1, border_radius=3)
-            pct = 1.0 - (cooldown / max_cooldown)
-            pygame.draw.rect(screen, (100, 100, 100),
-                             (x + 1, y + 1, int((size - 2) * pct), size - 2))
+            if max_cooldown > 0:
+                pct = 1.0 - (cooldown / max_cooldown)
+                pygame.draw.rect(screen, (100, 100, 100),
+                                 (x + 1, y + 1, int((size - 2) * pct), size - 2))
+            if cooldown > 0:
+                draw_text(screen, str(int(cooldown)), rect.center, settings.WHITE, 14)
         else:
             pygame.draw.rect(screen, (60, 60, 40), rect, border_radius=3)
             pygame.draw.rect(screen, (100, 100, 60), rect, 1, border_radius=3)

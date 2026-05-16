@@ -122,4 +122,10 @@ class TurnManager:
         self.turn_number += 1
         if self.rewind_cooldown_turns > 0:
             self.rewind_cooldown_turns -= 1
+            
+        # Decrement player skill cooldowns
+        player = game_state.get("player_obj")
+        if player:
+            player.decrement_cooldowns()
+            
         self.start_turn()

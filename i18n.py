@@ -147,8 +147,8 @@ STRINGS = {
     },
     "skill_derivada_name": {LANG_EN: "Derivada", LANG_PT: "Derivada"},
     "skill_derivada_desc": {
-        LANG_EN: "Predict enemy movement.\ndf/dx shows the\ndirection of change.",
-        LANG_PT: "Preveja o movimento inimigo.\ndf/dx mostra a\ndireção da mudança."
+        LANG_EN: "Predict enemy movement.\n+5% Dmg per tile moved\nthis turn. df/dx.",
+        LANG_PT: "Preveja o movimento.\n+5% Dano por bloco movido\nneste turno. df/dx."
     },
     "skill_pitagoras_name": {LANG_EN: "Pitágoras", LANG_PT: "Pitágoras"},
     "skill_pitagoras_desc": {
