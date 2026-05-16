@@ -25,6 +25,9 @@ from scenes.map_scene import MapScene
 from scenes.lore_scene import LoreScene
 from scenes.lobby_scene import LobbyScene
 from scenes.achievement_scene import AchievementScene
+from scenes.player_panel_scene import PlayerPanelScene
+from scenes.shop_scene import ShopScene
+from scenes.inventory_dock_scene import InventoryDockScene
 
 
 class Game:
@@ -57,6 +60,9 @@ class Game:
         self.scene_manager.add("lore", LoreScene)
         self.scene_manager.add("lobby", LobbyScene)
         self.scene_manager.add("achievements", AchievementScene)
+        self.scene_manager.add("player_panel", PlayerPanelScene)
+        self.scene_manager.add("shop", ShopScene)
+        self.scene_manager.add("inventory_dock", InventoryDockScene)
         self.scene_manager.switch("menu")
 
     def _configure_display(self):
@@ -142,6 +148,9 @@ class Game:
         self.mp_player_index = 1
         self.mp_host = None
         self.mp_client = None
+        self.player.gold = 0
+        self.player.equipment = {"weapon": "basic_sword", "shield": "wooden_shield"}
+        self.player.inventory = [{"id": "hp_potion_small", "count": 2}, {"id": "atk_tonic", "count": 1}]
 
         self.screen_shake = 0.0
         self.shake_intensity = 0
@@ -177,6 +186,9 @@ class Game:
         self.rewind_cooldown = 0
         self.rewind_fx_timer = 0
         self.gold = 0
+        self.player.gold = 0
+        self.player.equipment = {"weapon": "basic_sword", "shield": "wooden_shield"}
+        self.player.inventory = [{"id": "hp_potion_small", "count": 2}, {"id": "atk_tonic", "count": 1}]
 
         self.screen_shake = 0.0
         self.shake_intensity = 0

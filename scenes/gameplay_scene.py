@@ -163,14 +163,24 @@ class GameplayScene(Scene):
     def _apply_enemy_damage_to_player(self, enemy, player, dmg, reason):
         if not player:
             return False
-        if player.take_damage(dmg):
+        defense = player.get_defense()
+        actual_dmg = max(1, dmg - defense)
+        if player.take_damage(actual_dmg):
             self.player_took_damage_this_room = True
-            self.game.floating_text.add_damage(player.x, player.y, dmg, enemy.last_crit)
+            self.game.floating_text.add_damage(player.x, player.y, actual_dmg, enemy.last_crit)
             self.game.particles.emit_burst(player.x, player.y, settings.RED, 10, 60, 0.3)
             self.game.screen_shake = 0.15 if enemy.last_crit else 0.1
             self.game.shake_intensity = 8 if enemy.last_crit else 6
             self.game.sfx.play("player_hit")
             self.turn_log.append(reason)
+            shield_data = settings.EQUIPMENT_DATA["shields"].get(player.equipment.get("shield"), {})
+            if shield_data.get("effect") == "reflect" and not enemy.dead:
+                reflect_dmg = max(1, int(actual_dmg * 0.25))
+                enemy.take_damage(reflect_dmg)
+                self.game.floating_text.add_enemy_damage(enemy.x, enemy.y, reflect_dmg, False)
+                self.game.particles.emit_burst(enemy.x, enemy.y, settings.YELLOW, 5, 40, 0.2)
+                if enemy.dead:
+                    self._on_enemy_death(enemy)
             return True
         self.game.floating_text.add_blocked(player.x, player.y)
         self.turn_log.append(f"{reason} (blocked)")
@@ -423,6 +433,8 @@ class GameplayScene(Scene):
         alive_enemies = [e for e in self.game.enemies if not e.dead]
         self.enemy_intents = []
         for enemy in alive_enemies:
+            if any(se["effect"] == "stun" for se in enemy.status_effects):
+                continue
             target_player = self._target_player_for_enemy(enemy)
             if target_player is None:
                 continue
@@ -451,6 +463,7 @@ class GameplayScene(Scene):
                 return
         self._broadcast_scene_switch("map")
         self._restore_primary_player()
+        self.game.player.clear_room_buffs()
         self.game.scene_manager.switch("map")
 
     def _set_cursor_from_mouse(self, pos):
@@ -674,8 +687,12 @@ class GameplayScene(Scene):
                 self.game.scene_manager.push("pause")
                 return
 
-            if event.key == pygame.K_TAB and self.state in ("PLAYER_INPUT", "PLAYER_ACTION_SELECT"):
-                self.game.scene_manager.push("skill_tree")
+            if event.key == pygame.K_TAB and self.state not in ("VICTORY_TRANSITION", "GAME_OVER_TRANSITION"):
+                self.game.scene_manager.push("player_panel")
+                return
+
+            if event.key == pygame.K_i and self.state in ("PLAYER_INPUT", "PLAYER_ACTION_SELECT"):
+                self.game.scene_manager.push("inventory_dock")
                 return
 
             if event.key == pygame.K_r and self.state in ("PLAYER_INPUT", "PLAYER_ACTION_SELECT"):
@@ -792,8 +809,12 @@ class GameplayScene(Scene):
             self.game.scene_manager.push("pause")
             return
 
-        if event.key == pygame.K_TAB and self.state in ("PLAYER_INPUT", "PLAYER_ACTION_SELECT"):
-            self.game.scene_manager.push("skill_tree")
+        if event.key == pygame.K_TAB and self.state not in ("VICTORY_TRANSITION", "GAME_OVER_TRANSITION"):
+            self.game.scene_manager.push("player_panel")
+            return
+
+        if event.key == pygame.K_i and self.state in ("PLAYER_INPUT", "PLAYER_ACTION_SELECT"):
+            self.game.scene_manager.push("player_panel")
             return
 
         if event.key == pygame.K_r and self.state in ("PLAYER_INPUT", "PLAYER_ACTION_SELECT"):
@@ -877,7 +898,7 @@ class GameplayScene(Scene):
             move_bonus = 1.0 + (derivada_mult - 1.0) * self.tiles_moved_this_turn
 
             for enemy in hit_enemies:
-                base_dmg = (self.game.player.base_damage + axioma_bonus) * move_bonus
+                base_dmg = (self.game.player.get_attack_damage() + axioma_bonus) * move_bonus
                 if is_crit:
                     dmg = int(base_dmg * settings.PLAYER_CRIT_MULTIPLIER)
                 else:
@@ -898,6 +919,7 @@ class GameplayScene(Scene):
                 self.game.screen_shake = 0.1 if is_crit else 0.05
                 self.game.shake_intensity = 6 if is_crit else 3
                 self.game.sfx.play("hit")
+                self._apply_weapon_effect(enemy)
                 if enemy.dead:
                     self._on_enemy_death(enemy)
             
@@ -1029,6 +1051,74 @@ class GameplayScene(Scene):
         self.game.screen_shake = 0.1
         self.game.shake_intensity = 4
         self.game.sfx.play("enemy_die")
+
+    def _apply_weapon_effect(self, enemy):
+        if enemy.dead:
+            return
+        weapon_effect = self.game.player.get_weapon_effect()
+        if not weapon_effect:
+            return
+        if weapon_effect == "burn":
+            enemy.status_effects.append({"effect": "burn", "damage": 3, "turns": 2})
+            self.game.floating_text.add_info(enemy.x, enemy.y - 20, "BURN", settings.ORANGE)
+        elif weapon_effect == "poison":
+            enemy.status_effects.append({"effect": "poison", "damage": 2, "turns": 3})
+            self.game.floating_text.add_info(enemy.x, enemy.y - 20, "POISON", (100, 200, 50))
+        elif weapon_effect == "slow":
+            enemy.status_effects.append({"effect": "slow", "turns": 1})
+            self.game.floating_text.add_info(enemy.x, enemy.y - 20, "SLOW", settings.CYAN)
+        elif weapon_effect == "stun":
+            if random.random() < 0.35:
+                enemy.status_effects.append({"effect": "stun", "turns": 1})
+                self.game.floating_text.add_info(enemy.x, enemy.y - 20, "STUN", settings.GOLD)
+        elif weapon_effect == "aoe":
+            pc = self.game.player.col
+            pr = self.game.player.row
+            for other in self.game.enemies:
+                if other is enemy or other.dead:
+                    continue
+                dx = abs(other.col - enemy.col)
+                dy = abs(other.row - enemy.row)
+                if dx + dy <= 1:
+                    aoe_dmg = max(1, int(self.game.player.get_attack_damage() * 0.5))
+                    other.take_damage(aoe_dmg)
+                    self.game.floating_text.add_enemy_damage(other.x, other.y, aoe_dmg, False)
+                    self.game.particles.emit_burst(other.x, other.y, settings.YELLOW, 5, 40, 0.2)
+                    if other.dead:
+                        self._on_enemy_death(other)
+
+    def _tick_enemy_status_effects(self):
+        for enemy in self.game.enemies:
+            if enemy.dead:
+                continue
+            expired = []
+            for i, se in enumerate(enemy.status_effects):
+                if se["effect"] == "burn":
+                    enemy.take_damage(se["damage"])
+                    self.game.floating_text.add_enemy_damage(enemy.x, enemy.y, se["damage"], False)
+                    self.game.particles.emit_burst(enemy.x, enemy.y, settings.ORANGE, 4, 30, 0.2)
+                    se["turns"] -= 1
+                    if se["turns"] <= 0:
+                        expired.append(i)
+                elif se["effect"] == "poison":
+                    enemy.take_damage(se["damage"])
+                    self.game.floating_text.add_enemy_damage(enemy.x, enemy.y, se["damage"], False)
+                    self.game.particles.emit_burst(enemy.x, enemy.y, (100, 200, 50), 4, 30, 0.2)
+                    se["turns"] -= 1
+                    if se["turns"] <= 0:
+                        expired.append(i)
+                elif se["effect"] == "slow":
+                    se["turns"] -= 1
+                    if se["turns"] <= 0:
+                        expired.append(i)
+                elif se["effect"] == "stun":
+                    se["turns"] -= 1
+                    if se["turns"] <= 0:
+                        expired.append(i)
+            for i in reversed(expired):
+                enemy.status_effects.pop(i)
+            if enemy.dead:
+                self._on_enemy_death(enemy)
         self.last_enemy_death_pos = (enemy.x, enemy.y)
         
         # Award EXP
@@ -1297,6 +1387,7 @@ class GameplayScene(Scene):
                     else:
                         self._broadcast_scene_switch("map")
                         self._restore_primary_player()
+                        self.game.player.clear_room_buffs()
                         self.game.scene_manager.switch("map")
                 else:
                     self._broadcast_scene_switch("victory")
@@ -1610,6 +1701,9 @@ class GameplayScene(Scene):
                 settings.RIGOR_REGEN_RATE
             )
         self.grid.clear_barriers()
+
+        self.game.player.tick_buffs()
+        self._tick_enemy_status_effects()
 
         # Check for room completion or death before taking snapshot for next turn
         alive = [e for e in self.game.enemies if not e.dead]
@@ -2385,14 +2479,14 @@ class GameplayScene(Scene):
                          (settings.WINDOW_WIDTH, bar_y), 1)
 
         current_player = self.game.player
-        hp_pct = current_player.hp / current_player.max_hp
+        hp_pct = current_player.hp / current_player.get_max_hp()
         rigor_pct = current_player.rigor / current_player.max_rigor
         entropy_pct = self.game.entropy / settings.MAX_ENTROPY
 
         hp_color = settings.GREEN if hp_pct > 0.5 else settings.ORANGE if hp_pct > 0.25 else settings.RED
         self._draw_bar(screen, settings.UI_PADDING, bar_y + 10, 160, 14,
                        hp_pct, hp_color, (60, 20, 20))
-        draw_text(screen, f"{self._player_label(self.active_player_idx)} HP: {current_player.hp}/{current_player.max_hp}",
+        draw_text(screen, f"{self._player_label(self.active_player_idx)} HP: {current_player.hp}/{current_player.get_max_hp()}",
                   (settings.UI_PADDING + 80, bar_y + 17),
                   settings.WHITE, 14)
 
@@ -2420,7 +2514,7 @@ class GameplayScene(Scene):
         draw_text(screen, f"Crit: {int(settings.PLAYER_CRIT_CHANCE * 100)}% x{settings.PLAYER_CRIT_MULTIPLIER:.0f}",
                   (settings.UI_PADDING + 340, bar_y + 17),
                   settings.GOLD, 12)
-        draw_text(screen, f"Dmg: {current_player.base_damage}",
+        draw_text(screen, f"ATK:{current_player.get_attack_damage()} DEF:{current_player.get_defense()}",
                   (settings.UI_PADDING + 340, bar_y + 38),
                   settings.CYAN, 12)
 

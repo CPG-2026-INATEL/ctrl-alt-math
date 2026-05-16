@@ -18,12 +18,6 @@ DIFFICULTY_MEDIUM = "medium"
 DIFFICULTY_HARD = "hard"
 DIFFICULTY = DIFFICULTY_HARD
 
-DIFFICULTY_SCALING = {
-    DIFFICULTY_EASY: {"enemy_amount": 0.5, "map_max_col": 2, "arena_size_min": 1.0, "arena_size_max": 1.2},
-    DIFFICULTY_MEDIUM: {"enemy_amount": 0.75, "map_max_col": 3, "arena_size_min": 1.2, "arena_size_max": 1.6},
-    DIFFICULTY_HARD: {"enemy_amount": 1.0, "map_max_col": 5, "arena_size_min": 1.4, "arena_size_max": 2.0},
-}
-
 BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
 RED = (255, 50, 50)
@@ -63,7 +57,50 @@ PLAYER_HP_PER_LEVEL = 0
 PLAYER_DMG_PER_LEVEL = 0
 PLAYER_SKILL_POINTS_PER_LEVEL = 1
 
+UPGRADE_COSTS = {
+    "atk":   {"base_cost": 30, "cost_scale": 1.5},
+    "def":   {"base_cost": 25, "cost_scale": 1.4},
+    "hp":    {"base_cost": 20, "cost_scale": 1.3},
+    "range": {"base_cost": 40, "cost_scale": 1.6},
+}
+UPGRADE_PER_LEVEL = {"atk": 3, "def": 2, "hp": 15, "range": 1}
+
+EQUIPMENT_DATA = {
+    "weapons": {
+        "basic_sword":   {"name": "Espada Basica",      "multiplier": 1.0,  "effect": None,      "desc": "Uma espada simples",       "cost": 0,   "sp_cost": 0},
+        "fire_blade":    {"name": "Lamina de Fogo",      "multiplier": 1.12, "effect": "burn",   "desc": "Causa queimadura (3 dmg/2 turnos)",  "cost": 80,  "sp_cost": 0},
+        "ice_rapier":    {"name": "Florete de Gelo",     "multiplier": 1.08, "effect": "slow",   "desc": "Reduz movimento do inimigo por 1 turno", "cost": 70,  "sp_cost": 0},
+        "thunder_axe":   {"name": "Machado do Trovao",   "multiplier": 1.18, "effect": "stun",   "desc": "Chance de atordoar inimigo",  "cost": 100, "sp_cost": 0},
+        "arcane_staff":  {"name": "Cajado Arcano",       "multiplier": 1.05, "effect": "aoe",    "desc": "Ataca inimigos adjacentes ao alvo", "cost": 60,  "sp_cost": 0},
+        "shadow_dagger": {"name": "Adaga das Sombras",   "multiplier": 1.10, "effect": "poison", "desc": "2 dmg por 3 turnos (veneno)",  "cost": 85,  "sp_cost": 0},
+        "heavy_axe":     {"name": "Machado Pesado",      "multiplier": 1.15, "effect": None,     "desc": "Dano alto sem efeito especial", "cost": 75,  "sp_cost": 0},
+    },
+    "shields": {
+        "wooden_shield":  {"name": "Escudo de Madeira",   "defense": 3,  "effect": None,      "desc": "Protecao basica",           "cost": 0,   "sp_cost": 0},
+        "iron_shield":    {"name": "Escudo de Ferro",     "defense": 6,  "effect": None,      "desc": "Protecao resistente",       "cost": 50,  "sp_cost": 0},
+        "mirror_shield":  {"name": "Escudo Espelhado",    "defense": 4,  "effect": "reflect", "desc": "Reflete 25% do dano recebido", "cost": 65,  "sp_cost": 0},
+        "steel_shield":   {"name": "Escudo de Aco",      "defense": 8,  "effect": None,      "desc": "Protecao maxima",           "cost": 90,  "sp_cost": 0},
+    },
+}
+
+CONSUMABLE_DATA = {
+    "hp_potion_small":  {"name": "Pocao de Vida",        "desc": "Restaura 30 HP",                     "effect": "heal",       "value": 30, "cost": 15, "sp_cost": 0, "scope": "instant",  "duration": 0, "color": (200, 50, 50)},
+    "hp_potion_large":  {"name": "Pocao de Vida Grande",  "desc": "Restaura 60 HP",                     "effect": "heal",       "value": 60, "cost": 35, "sp_cost": 0, "scope": "instant",  "duration": 0, "color": (220, 30, 30)},
+    "atk_tonic":        {"name": "Tonico de Forca",       "desc": "+10 ATK por 1 sala",                 "effect": "atk_buff",  "value": 10, "cost": 20, "sp_cost": 0, "scope": "room",    "duration": 0, "color": (255, 150, 50)},
+    "def_tonic":        {"name": "Tonico de Escudo",      "desc": "+5 DEF por 3 turnos",                "effect": "def_buff",  "value": 5,  "cost": 18, "sp_cost": 0, "scope": "turns",   "duration": 3, "color": (50, 150, 255)},
+    "speed_tonic":      {"name": "Tonico de Velocidade",  "desc": "+2 alcance de movimento por 1 sala", "effect": "range_buff","value": 2,  "cost": 25, "sp_cost": 0, "scope": "room",    "duration": 0, "color": (50, 255, 150)},
+    "vitality_elixir":   {"name": "Elixir de Vitalidade", "desc": "+15 vida maxima pela sala",          "effect": "max_hp_buff","value": 15, "cost": 50, "sp_cost": 1, "scope": "room",    "duration": 0, "color": (255, 215, 0)},
+}
+
+SHOP_ITEMS = {
+    "weapons": ["fire_blade", "ice_rapier", "thunder_axe", "arcane_staff", "shadow_dagger", "heavy_axe"],
+    "shields": ["iron_shield", "mirror_shield", "steel_shield"],
+    "consumables": ["hp_potion_small", "hp_potion_large", "atk_tonic", "def_tonic", "speed_tonic", "vitality_elixir"],
+}
+
 GOLD_PER_STAR = {1: 20, 2: 35, 3: 55, 4: 80}
+GOLD_PER_ENEMY = {1: 5, 2: 8, 3: 12, 4: 18}
+GOLD_BOSS_REWARD = 200
 
 ENEMY_EXP_ORTOGONAL = 25
 ENEMY_EXP_ATIRADOR = 20
@@ -308,13 +345,14 @@ MAP_ROOM_HEIGHT = 80
 MAP_ROOM_GAP = 30
 MAP_OFFSET_X = 80
 MAP_OFFSET_Y = 80
+MAP_HEADER_H = 70
 
 MAP_GEN_DEPTH_EASY = 5
 MAP_GEN_DEPTH_MEDIUM = 7
 MAP_GEN_DEPTH_HARD = 9
-MAP_GEN_MAX_BRANCHES_EASY = 2
-MAP_GEN_MAX_BRANCHES_MEDIUM = 3
-MAP_GEN_MAX_BRANCHES_HARD = 3
+MAP_GEN_MAX_BRANCHES_EASY = 3
+MAP_GEN_MAX_BRANCHES_MEDIUM = 4
+MAP_GEN_MAX_BRANCHES_HARD = 5
 
 DIFFICULTY = "medium"
 DIFFICULTY_SCALING = {

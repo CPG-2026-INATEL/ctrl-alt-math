@@ -24,6 +24,13 @@ class Player:
         self.next_level_exp = settings.PLAYER_EXP_BASE
         self.move_range = settings.PLAYER_MOVE_RANGE
 
+        self.defense = 0
+        self.upgrades = {"atk": 0, "def": 0, "hp": 0, "range": 0}
+        self.gold = 0
+        self.inventory = []
+        self.equipment = {"weapon": "basic_sword", "shield": "wooden_shield"}
+        self.buffs = []
+
         self.dir_x = 0
         self.dir_y = -1
 
@@ -214,6 +221,87 @@ class Player:
         self.next_level_exp = int(self.next_level_exp * settings.PLAYER_EXP_GROWTH)
         if self.level % 2 == 0:
             self.move_range += 1
+
+    def get_attack_damage(self):
+        base = settings.PLAYER_ATTACK_DAMAGE + self.upgrades["atk"] * settings.UPGRADE_PER_LEVEL["atk"]
+        weapon_data = settings.EQUIPMENT_DATA["weapons"].get(self.equipment.get("weapon"), {})
+        multiplier = weapon_data.get("multiplier", 1.0)
+        return int(base * multiplier) + self._buff_sum("atk_buff")
+
+    def get_attack_multiplier(self):
+        weapon_data = settings.EQUIPMENT_DATA["weapons"].get(self.equipment.get("weapon"), {})
+        return weapon_data.get("multiplier", 1.0)
+
+    def get_weapon_effect(self):
+        weapon_data = settings.EQUIPMENT_DATA["weapons"].get(self.equipment.get("weapon"), {})
+        return weapon_data.get("effect")
+
+    def get_defense(self):
+        shield_data = settings.EQUIPMENT_DATA["shields"].get(self.equipment.get("shield"), {})
+        return self.upgrades["def"] * settings.UPGRADE_PER_LEVEL["def"] + shield_data.get("defense", 0) + self._buff_sum("def_buff")
+
+    def get_max_hp(self):
+        return settings.PLAYER_MAX_HP + self.upgrades["hp"] * settings.UPGRADE_PER_LEVEL["hp"] + self._buff_sum("max_hp_buff")
+
+    def get_move_range(self):
+        return settings.PLAYER_MOVE_RANGE + self.upgrades["range"] + self._buff_sum("range_buff")
+
+    def get_upgrade_cost(self, upgrade_type):
+        data = settings.UPGRADE_COSTS[upgrade_type]
+        return int(data["base_cost"] * (data["cost_scale"] ** self.upgrades[upgrade_type]))
+
+    def buy_upgrade(self, upgrade_type):
+        cost = self.get_upgrade_cost(upgrade_type)
+        if self.gold >= cost:
+            self.gold -= cost
+            self.upgrades[upgrade_type] += 1
+            if upgrade_type == "hp":
+                old_max = self.max_hp
+                self.max_hp = self.get_max_hp()
+                self.hp += (self.max_hp - old_max)
+            return True
+        return False
+
+    def add_buff(self, effect, value, scope="room", turns=0):
+        self.buffs.append({"effect": effect, "value": value, "scope": scope, "turns_left": turns})
+
+    def tick_buffs(self):
+        expired = []
+        for i, buff in enumerate(self.buffs):
+            if buff["scope"] == "turns":
+                buff["turns_left"] -= 1
+                if buff["turns_left"] <= 0:
+                    expired.append(i)
+        for i in reversed(expired):
+            self.buffs.pop(i)
+
+    def clear_room_buffs(self):
+        self.buffs = [b for b in self.buffs if b["scope"] != "room"]
+
+    def _buff_sum(self, effect_key):
+        return sum(b["value"] for b in self.buffs if b["effect"] == effect_key)
+
+    def use_consumable(self, item_id):
+        for i, item in enumerate(self.inventory):
+            if item.get("id") == item_id:
+                data = settings.CONSUMABLE_DATA.get(item_id, {})
+                if not data:
+                    return False
+                effect = data["effect"]
+                value = data["value"]
+                scope = data.get("scope", "instant")
+                duration = data.get("duration", 0)
+                if effect == "heal":
+                    self.hp = min(self.hp + value, self.get_max_hp())
+                elif effect in ("atk_buff", "def_buff", "range_buff", "max_hp_buff"):
+                    turns = duration if scope == "turns" else 0
+                    self.add_buff(effect, value, scope=scope, turns=turns)
+                    if effect == "max_hp_buff":
+                        new_max = self.get_max_hp()
+                        self.hp = min(self.hp + value, new_max)
+                self.inventory.pop(i)
+                return True
+        return False
 
     def basic_attack(self):
         return True

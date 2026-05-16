@@ -1,18 +1,18 @@
 {
     "first_room": {
         "easy": true,
-        "medium": false,
+        "medium": true,
         "hard": true
     },
     "no_damage": {
         "easy": false,
-        "medium": false,
-        "hard": false
+        "medium": true,
+        "hard": true
     },
     "fast_win": {
         "easy": true,
-        "medium": false,
-        "hard": false
+        "medium": true,
+        "hard": true
     },
     "skill_master": {
         "easy": false,

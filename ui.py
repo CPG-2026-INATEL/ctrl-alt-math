@@ -77,13 +77,13 @@ class UI:
         pygame.draw.line(screen, settings.GRAY, (0, bar_y),
                          (settings.WINDOW_WIDTH, bar_y), 1)
 
-        hp_pct = player.hp / player.max_hp
+        hp_pct = player.hp / player.get_max_hp()
         rigor_pct = player.rigor / player.max_rigor
         entropy_pct = entropy / settings.MAX_ENTROPY
 
         self._draw_bar(screen, settings.UI_PADDING, bar_y + 8, 160, 14,
                        hp_pct, settings.RED, (60, 20, 20))
-        draw_text(screen, f"{t('hp')}: {player.hp}/{player.max_hp}",
+        draw_text(screen, f"{t('hp')}: {player.hp}/{player.get_max_hp()}",
                   (settings.UI_PADDING + 80, bar_y + 15),
                   settings.WHITE, 14)
 
@@ -117,7 +117,7 @@ class UI:
 
         st = game.skill_tree if game else None
         axioma_bonus = st.get_skill_value("axioma", "damage_bonus", 0) if st else 0
-        draw_text(screen, f"Dmg: {player.base_damage + axioma_bonus}",
+        draw_text(screen, f"ATK:{player.get_attack_damage()} DEF:{player.get_defense()}",
                   (settings.WINDOW_WIDTH // 2 + 100, bar_y + 38),
                   settings.CYAN, 14)
 

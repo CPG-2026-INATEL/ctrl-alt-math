@@ -39,6 +39,7 @@ class Enemy:
         self.size = settings.ENEMY_SIZE
         self.flash_timer = 0
         self.dead = False
+        self.status_effects = []
 
         self.robot_type = {
             "censor": "Spider",
