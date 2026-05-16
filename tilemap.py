@@ -12,6 +12,7 @@ ROW_SIZE = 16
 TILE_HOLE = -1       # buraco (sem tile)
 TILE_LOW = ROW_SIZE * 1         # terreno baixo
 TILE_HIGH = 1        # terreno alto
+TILE_HIGH_EDGE = 6   # borda inferior do terreno alto (profundidade)
 TILE_STAIRS_UP = 11+ROW_SIZE  # escada subindo (norte)
 TILE_STAIRS_DOWN = 11 # escada descendo (sul)
 TILE_STAIRS_LEFT = 9 # escada esquerda (oeste)
@@ -103,8 +104,20 @@ class MapGenerator:
         self._enforce_low_connectivity(grid)
         self._prune_small_high_areas(grid)
         self._place_stairs(grid)
+        self._apply_high_edge(grid)
 
         return grid
+
+    def _apply_high_edge(self, grid):
+        ALL_STAIRS = {TILE_STAIRS_UP, TILE_STAIRS_DOWN, TILE_STAIRS_LEFT, TILE_STAIRS_RIGHT}
+        BELOW = {TILE_LOW, TILE_HOLE} | ALL_STAIRS
+        changes = []
+        for r in range(self.height - 1):
+            for c in range(self.width):
+                if grid[r][c] == TILE_HIGH and grid[r + 1][c] in BELOW:
+                    changes.append((r, c))
+        for r, c in changes:
+            grid[r][c] = TILE_HIGH_EDGE
 
     def _scatter_holes(self, grid):
         total = self.width * self.height
