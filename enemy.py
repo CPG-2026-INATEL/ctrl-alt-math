@@ -225,10 +225,10 @@ class Enemy:
         if self.is_animating():
             self.current_anim = "walk"
             self.anim_progress = min(1.0, self.anim_progress + dt * 8)
-            t = self.anim_progress
-            t = t * t * (3 - 2 * t)
-            self.x = self.anim_from_px + (self.anim_to_px - self.anim_from_px) * t
-            self.y = self.anim_from_py + (self.anim_to_py - self.anim_from_py) * t
+            frac = self.anim_progress
+            frac = frac * frac * (3 - 2 * frac)
+            self.x = self.anim_from_px + (self.anim_to_px - self.anim_from_px) * frac
+            self.y = self.anim_from_py + (self.anim_to_py - self.anim_from_py) * frac
             if self.anim_progress >= 1.0:
                 self.anim_step_idx += 1
                 self.col = int(self.anim_to_col)
@@ -237,13 +237,17 @@ class Enemy:
                     self.anim_cells = []
                     self.anim_step_idx = 0
                     self.anim_progress = 1.0
-                    if grid is not None:
-                        self.x, self.y = grid.to_pixel(self.col, self.row)
                     self.current_anim = "idle"
-                elif grid is not None:
+                if grid is not None:
+                    self.x, self.y = grid.to_pixel(self.col, self.row)
+                elif self.anim_step_idx < len(self.anim_cells):
                     self._begin_anim_step(grid)
         else:
             self.current_anim = "idle"
+
+    def snap_to_grid(self, grid):
+        if not self.is_animating() and grid is not None:
+            self.x, self.y = grid.to_pixel(self.col, self.row)
 
     def start_move_anim(self, from_col, from_row, to_col, to_row, grid, path=None):
         if path is None:

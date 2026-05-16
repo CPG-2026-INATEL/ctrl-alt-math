@@ -558,9 +558,6 @@ class GameplayScene(Scene):
         elif k == pygame.K_2:
             if self.game.skill_tree.is_unlocked("reflexao"):
                 self._toggle_skill("reflexao")
-        elif k == pygame.K_r:
-            if self.game.skill_tree.is_unlocked("ctrlz"):
-                self._try_rewind()
 
     def _execute_basic_attack(self, target_enemy=None):
         pc = self.game.player.col
@@ -669,61 +666,6 @@ class GameplayScene(Scene):
         self.selected_skill = None
         self._start_enemy_turn()
 
-    def _try_rewind(self):
-        if not self.turn_manager.can_undo():
-            return
-        target = self.turn_manager.undo()
-        if target is None:
-            return
-
-        p = target["player"]
-        self.game.player.col = int(p["col"])
-        self.game.player.row = int(p["row"])
-        self.game.player.hp = p["hp"]
-        self.game.player.max_hp = p["max_hp"]
-        self.game.player.rigor = p["rigor"]
-        self.game.player.set_grid_position(p["col"], p["row"], self.grid)
-
-        self.game.enemies = []
-        for e_data in target["enemies"]:
-            enemy = Enemy(0, 0, e_data["type"])
-            enemy.col = int(e_data["col"])
-            enemy.row = int(e_data["row"])
-            enemy.hp = e_data["hp"]
-            enemy.max_hp = e_data["max_hp"]
-            enemy.alive = e_data["alive"]
-            enemy.dead = e_data["dead"]
-            enemy.size = e_data["size"]
-            enemy.color = e_data["color"]
-            enemy.set_grid_position(e_data["col"], e_data["row"], self.grid)
-            self.game.enemies.append(enemy)
-
-        if "barrier_cells" in target:
-            self.grid.barrier_cells = set(
-                (int(c), int(r)) for c, r in target["barrier_cells"]
-            )
-
-        # Apply Bonus Regeneration (15% of Max HP)
-        heal_amount = int(self.game.player.max_hp * 0.15)
-        self.game.player.hp = min(self.game.player.max_hp, self.game.player.hp + heal_amount)
-        self.game.floating_text.add_info(self.game.player.x, self.game.player.y - 40, 
-                                        f"+{heal_amount} HP (OPTIMIZED)", settings.GREEN)
-
-        # Correctly increase Entropy cost
-        self.game.entropy = target["entropy"] + settings.REWIND_ENTROPY_INCREASE
-        self.game.entropy = min(self.game.entropy, settings.MAX_ENTROPY)
-        self.game.particles.emit_burst(
-            self.game.player.x, self.game.player.y, settings.CYAN, 30, 100, 0.6
-        )
-        self.game.sfx.play("rewind")
-        self.state = "PLAYER_INPUT"
-        self.turn_manager.start_turn()
-        self.show_move_range = True
-        self.show_action_range = False
-        self.selected_skill = None
-        self.cursor_col = int(p["col"])
-        self.cursor_row = int(p["row"])
-
     def _on_enemy_death(self, enemy):
         self.game.floating_text.add_formula(
             enemy.x, enemy.y,
@@ -792,54 +734,12 @@ class GameplayScene(Scene):
 
         for enemy in self.game.enemies:
             enemy.update_animation(dt, self.grid)
+            enemy.snap_to_grid(self.grid)
             enemy.bob_phase += dt * 3
             enemy.spawn_timer = max(0, enemy.spawn_timer - dt)
             enemy.flash_timer = max(0, enemy.flash_timer - dt)
             if enemy.type == "boss":
                 enemy.pulse_timer += dt * 2
-
-        # ── Separation physics ──────────────────────────────────────────
-        # Enemies should not pile on the same pixel. Apply a soft repulsion
-        # force between any two living enemies that are closer than the sum
-        # of their radii.  Force is only on visual x/y; grid col/row stays
-        # untouched so pathfinding and attack-range logic are unaffected.
-        alive_enemies = [e for e in self.game.enemies if not e.dead]
-        SEP_STRENGTH = 220.0   # push force (px / s²)
-        SEP_DAMP     = 0.75    # velocity damping per frame
-
-        for e in alive_enemies:
-            if not hasattr(e, '_vx'):
-                e._vx = 0.0
-                e._vy = 0.0
-
-        for i, a in enumerate(alive_enemies):
-            for b in alive_enemies[i + 1:]:
-                dx = a.x - b.x
-                dy = a.y - b.y
-                dist_sq = dx * dx + dy * dy
-                # minimum separation = sum of display radii + small gap
-                min_sep = (a.size + b.size) * 1.1
-                min_sep_sq = min_sep * min_sep
-                if 0 < dist_sq < min_sep_sq:
-                    dist = math.sqrt(dist_sq)
-                    # normalised direction from b → a
-                    nx, ny = dx / dist, dy / dist
-                    overlap = min_sep - dist
-                    # force magnitude proportional to overlap
-                    force = SEP_STRENGTH * overlap
-                    # apply equal-and-opposite impulses
-                    a._vx += nx * force * dt
-                    a._vy += ny * force * dt
-                    b._vx -= nx * force * dt
-                    b._vy -= ny * force * dt
-
-        # Integrate velocities and damp
-        for e in alive_enemies:
-            if not hasattr(e, '_vx'):
-                continue
-            e.x += e._vx * dt
-            e.y += e._vy * dt
-            e._vx *= SEP_DAMP
             e._vy *= SEP_DAMP
         # ────────────────────────────────────────────────────────────────
 
@@ -1780,7 +1680,7 @@ class GameplayScene(Scene):
         screen.blit(log_title, (log_x, bar_y + 10))
         self._draw_combat_log(screen, log_x, bar_y + 22)
 
-        controls = "Mouse/WASD cursor  Enter confirm  Space confirm  1/2 toggle  R undo  Esc pause"
+        controls = "WASD/click move + confirm  1/2 skills  Esc pause"
         controls_img = pygame.font.Font(None, 11).render(controls, True, settings.GRAY)
         screen.blit(controls_img, (settings.UI_PADDING, settings.WINDOW_HEIGHT - 14))
 
