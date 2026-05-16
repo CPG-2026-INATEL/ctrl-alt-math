@@ -308,6 +308,8 @@ class PlayerPanelScene(Scene):
 
         sp = self.game.skill_tree.skill_points if self.game.skill_tree else 0
         draw_text(screen, f"SP: {sp}", (lx, y), settings.CYAN, 16, center=False)
+        tickets = getattr(player, "upgrade_tickets", 0)
+        draw_text(screen, f"Tickets: {tickets}", (lx + col_w, y), settings.GOLD, 16, center=False)
         y += 24
 
         pygame.draw.line(screen, (50, 50, 70), (lx, y), (content_right, y), 1)
@@ -318,6 +320,9 @@ class PlayerPanelScene(Scene):
         content_w = settings.WINDOW_WIDTH // 2 - 40
 
         draw_text(screen, "UPGRADES", (content_x + 10, 55), settings.WHITE, 22, center=False)
+        tickets = getattr(player, "upgrade_tickets", 0)
+        if tickets > 0:
+            draw_text(screen, f"Tickets: {tickets}", (content_x + content_w - 120, 55), settings.GOLD, 14, center=False)
 
         upgrade_info = [
             ("atk", "ATK", "+3 per level", settings.RED),
@@ -349,11 +354,19 @@ class PlayerPanelScene(Scene):
             bonus_map = {"atk": 3 * level, "def": 2 * level, "hp": 15 * level, "range": level}
             draw_text(screen, f"+{bonus_map[utype]}", (content_x + 15, row_y + 48), settings.GOLD, 13, center=False)
 
-            buy_color = settings.GREEN if can_afford else settings.DARK_GRAY
-            buy_text_color = settings.WHITE if can_afford else settings.GRAY
+            tickets = getattr(player, "upgrade_tickets", 0)
+            if tickets > 0:
+                buy_color = settings.GOLD
+                buy_text_color = settings.BLACK
+                button_label = "FREE"
+            else:
+                buy_color = settings.GREEN if can_afford else settings.DARK_GRAY
+                buy_text_color = settings.WHITE if can_afford else settings.GRAY
+                button_label = f"{cost}g"
+
             buy_rect = pygame.Rect(content_x + content_w - 80, row_y + 30, 70, 28)
             pygame.draw.rect(screen, buy_color, buy_rect, border_radius=4)
-            draw_text(screen, f"{cost}g", (buy_rect.centerx, buy_rect.centery + 2), buy_text_color, 14)
+            draw_text(screen, button_label, (buy_rect.centerx, buy_rect.centery + 2), buy_text_color, 14)
 
     def _draw_skills(self, screen):
         skill_tree = self.game.skill_tree

@@ -23,6 +23,7 @@ class Player:
         self.exp = 0
         self.next_level_exp = settings.PLAYER_EXP_BASE
         self.move_range = settings.PLAYER_MOVE_RANGE
+        self.upgrade_tickets = 0
 
         self.defense = 0
         self.upgrades = {"atk": 0, "def": 0, "hp": 0, "range": 0}
@@ -221,6 +222,7 @@ class Player:
         self.next_level_exp = int(self.next_level_exp * settings.PLAYER_EXP_GROWTH)
         if self.level % 2 == 0:
             self.move_range += 1
+        self.upgrade_tickets += 1
 
     def get_attack_damage(self):
         base = settings.PLAYER_ATTACK_DAMAGE + self.upgrades["atk"] * settings.UPGRADE_PER_LEVEL["atk"]
@@ -251,6 +253,15 @@ class Player:
         return int(data["base_cost"] * (data["cost_scale"] ** self.upgrades[upgrade_type]))
 
     def buy_upgrade(self, upgrade_type):
+        if getattr(self, "upgrade_tickets", 0) > 0:
+            self.upgrade_tickets -= 1
+            self.upgrades[upgrade_type] += 1
+            if upgrade_type == "hp":
+                old_max = self.max_hp
+                self.max_hp = self.get_max_hp()
+                self.hp += (self.max_hp - old_max)
+            return True
+
         cost = self.get_upgrade_cost(upgrade_type)
         if self.gold >= cost:
             self.gold -= cost
