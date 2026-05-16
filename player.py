@@ -299,7 +299,10 @@ class Player:
                     if effect == "max_hp_buff":
                         new_max = self.get_max_hp()
                         self.hp = min(self.hp + value, new_max)
-                self.inventory.pop(i)
+                if item.get("count", 1) > 1:
+                    item["count"] -= 1
+                else:
+                    self.inventory.pop(i)
                 return True
         return False
 
