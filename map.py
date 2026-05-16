@@ -16,6 +16,18 @@ class Room:
         self.enemies = data["enemies"]
         self.obstacles = data["obstacles"]
         self.boss_hp = data.get("boss_hp", settings.BOSS_HP)
+        
+        # Scale enemies based on difficulty
+        scale = settings.DIFFICULTY_SCALING[settings.DIFFICULTY]["enemy_amount"]
+        scaled_enemies = []
+        for e_type, count in self.enemies:
+            new_count = max(1, int(count * scale)) if count > 0 else 0
+            # Special case: don't scale bosses to 0 or multiple
+            if e_type == "boss":
+                new_count = count
+            scaled_enemies.append((e_type, new_count))
+        self.enemies = scaled_enemies
+        
         self.state = "locked"
         self.bob_phase = 0
 
@@ -36,8 +48,52 @@ class Room:
 class WorldMap:
     def __init__(self):
         self.rooms = {}
+        max_col = settings.DIFFICULTY_SCALING[settings.DIFFICULTY]["map_max_col"]
+        
+        # Filter rooms and adjust connections
         for (col, row), data in settings.MAP_ROOMS.items():
-            self.rooms[(col, row)] = Room(col, row, data)
+            if col <= max_col:
+                # Special case: If this room connects to something outside max_col, 
+                # and it's a boss room, make it connect to victory if victory is outside.
+                # Actually, simpler: if victory is outside, find the 'highest' reachable boss 
+                # and make it the victory room or connect to a moved victory room.
+                
+                # Let's just filter the connections list to only include valid rooms
+                valid_connections = [conn for conn in data["connections"] if conn[0] <= max_col]
+                
+                # If we filtered out the victory room, we need a way to win.
+                # Find if any removed connection was to a 'victory' type room.
+                for conn in data["connections"]:
+                    if conn[0] > max_col:
+                        target_data = settings.MAP_ROOMS.get(conn)
+                        if target_data and target_data["type"] == "victory":
+                            # Make a "phantom" victory room at the edge?
+                            # Or just change this room to victory? 
+                            # Better: if we are at the edge, and this room is completed, you win?
+                            pass
+
+                room_data = data.copy()
+                room_data["connections"] = valid_connections
+                self.rooms[(col, row)] = Room(col, row, room_data)
+
+        # Ensure at least one victory room or boss that leads to end
+        has_victory = any(r.type == "victory" for r in self.rooms.values())
+        if not has_victory:
+            # Prioritize boss rooms as the new victory point
+            boss_rooms = [pos for pos, r in self.rooms.items() if r.type == "boss"]
+            if boss_rooms:
+                target_pos = max(boss_rooms, key=lambda k: k[0])
+            else:
+                # Fallback to furthest non-hub room
+                non_hub_rooms = [pos for pos, r in self.rooms.items() if r.type != "hub"]
+                if non_hub_rooms:
+                    target_pos = max(non_hub_rooms, key=lambda k: k[0])
+                else:
+                    target_pos = max(self.rooms.keys(), key=lambda k: k[0])
+            
+            self.rooms[target_pos].type = "victory"
+            self.rooms[target_pos].name = "room_victory_name"
+            self.rooms[target_pos].narrative = "room_victory_narr"
 
         start = settings.MAP_START_ROOM
         self.rooms[start].state = "available"

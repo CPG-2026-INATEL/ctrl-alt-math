@@ -12,6 +12,17 @@ BASE_WIDTH = 800
 BASE_HEIGHT = 600
 UI_SCALE = 1.0
 
+DIFFICULTY_EASY = "easy"
+DIFFICULTY_MEDIUM = "medium"
+DIFFICULTY_HARD = "hard"
+DIFFICULTY = DIFFICULTY_HARD
+
+DIFFICULTY_SCALING = {
+    DIFFICULTY_EASY: {"enemy_amount": 0.5, "map_max_col": 2, "arena_size_min": 1.0, "arena_size_max": 1.2},
+    DIFFICULTY_MEDIUM: {"enemy_amount": 0.75, "map_max_col": 3, "arena_size_min": 1.2, "arena_size_max": 1.6},
+    DIFFICULTY_HARD: {"enemy_amount": 1.0, "map_max_col": 5, "arena_size_min": 1.4, "arena_size_max": 2.0},
+}
+
 BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
 RED = (255, 50, 50)

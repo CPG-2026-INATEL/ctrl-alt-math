@@ -15,11 +15,13 @@ class MenuScene(Scene):
     def _update_menu_items(self):
         lang_str = "EN" if settings.LANGUAGE == LANG_EN else "PT"
         tts_str = "ON" if settings.TTS_ENABLED else "OFF"
+        diff_str = t(f"difficulty_{settings.DIFFICULTY}")
         self.menu_items = [
             (t("menu_start"), ""),
             (t("menu_how_to"), ""),
             (t("menu_lore"), ""),
             (f"{t('menu_language')}: {lang_str}", ""),
+            (f"{t('menu_difficulty')}: {diff_str}", ""),
             (f"TTS: {tts_str}", ""),
             (t("menu_quit"), "")
         ]
@@ -70,12 +72,19 @@ class MenuScene(Scene):
                 self._update_menu_items()
                 self._speak_selection()
             elif self.selected == 4:
+                # Cycle Difficulty
+                diffs = [settings.DIFFICULTY_EASY, settings.DIFFICULTY_MEDIUM, settings.DIFFICULTY_HARD]
+                curr_idx = diffs.index(settings.DIFFICULTY)
+                settings.DIFFICULTY = diffs[(curr_idx + 1) % len(diffs)]
+                self._update_menu_items()
+                self._speak_selection()
+            elif self.selected == 5:
                 # Toggle TTS
                 settings.TTS_ENABLED = not settings.TTS_ENABLED
                 self.game.tts.enabled = settings.TTS_ENABLED
                 self._update_menu_items()
                 self._speak_selection()
-            elif self.selected == 5:
+            elif self.selected == 6:
                 self.game.running = False
 
     def update(self, dt):

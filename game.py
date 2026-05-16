@@ -98,8 +98,12 @@ class Game:
         settings.MAP_ROOM_WIDTH = int(120 * settings.UI_SCALE)
         settings.MAP_ROOM_HEIGHT = int(80 * settings.UI_SCALE)
         settings.MAP_ROOM_GAP = int(30 * settings.UI_SCALE)
-        map_cols = 5
+        
+        # Dynamic map dimensions based on difficulty
+        scaling = settings.DIFFICULTY_SCALING.get(settings.DIFFICULTY, {"map_max_col": 5})
+        map_cols = scaling["map_max_col"] + 1
         map_rows = 3
+        
         map_width = map_cols * settings.MAP_ROOM_WIDTH + (map_cols - 1) * settings.MAP_ROOM_GAP
         map_height = map_rows * settings.MAP_ROOM_HEIGHT + (map_rows - 1) * settings.MAP_ROOM_GAP
         settings.MAP_OFFSET_X = max(40, (settings.WINDOW_WIDTH - map_width) // 2)
@@ -134,6 +138,7 @@ class Game:
         self.obstacles = Grid().obstacle_rects(settings.ARENA_OBSTACLES)
 
     def reset_game_state(self):
+        self._configure_display()
         self.player = Player()
         self.skill_tree = SkillTree()
         self.particles = ParticleSystem()
