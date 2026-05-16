@@ -94,20 +94,29 @@ class MapGenerator:
         self.stairs_per_area = stairs_per_area
         self.seed = seed
 
+    MIN_WALKABLE_RATIO = 0.5
+
     def generate(self):
-        random.seed(self.seed)
-        grid = [[TILE_LOW] * self.width for _ in range(self.height)]
+        WALKABLE = {TILE_LOW, TILE_HIGH, TILE_STAIRS_UP, TILE_STAIRS_DOWN, TILE_STAIRS_LEFT, TILE_STAIRS_RIGHT}
+        total = self.width * self.height
+        min_walkable = int(total * self.MIN_WALKABLE_RATIO)
+        for attempt in range(20):
+            random.seed(self.seed + attempt)
+            grid = [[TILE_LOW] * self.width for _ in range(self.height)]
 
-        self._scatter_holes(grid)
-        self._grow_high_terrain_islands(grid)
-        self._smooth(grid, iterations=3)
-        self._enforce_low_connectivity(grid)
-        self._prune_small_high_areas(grid)
-        self._place_stairs(grid)
-        self._enforce_full_connectivity(grid)
-        self._apply_high_edge(grid)
-        self._fix_stair_edges(grid)
+            self._scatter_holes(grid)
+            self._grow_high_terrain_islands(grid)
+            self._smooth(grid, iterations=3)
+            self._enforce_low_connectivity(grid)
+            self._prune_small_high_areas(grid)
+            self._place_stairs(grid)
+            self._enforce_full_connectivity(grid)
+            self._apply_high_edge(grid)
+            self._fix_stair_edges(grid)
 
+            walkable = sum(1 for r in grid for c in r if c in WALKABLE)
+            if walkable >= min_walkable:
+                return grid
         return grid
 
     def _apply_high_edge(self, grid):
@@ -251,30 +260,32 @@ class MapGenerator:
 
     def _enforce_full_connectivity(self, grid):
         WALKABLE = {TILE_LOW, TILE_HIGH, TILE_STAIRS_UP, TILE_STAIRS_DOWN, TILE_STAIRS_LEFT, TILE_STAIRS_RIGHT}
-        start = None
+        CARDINAL = [(-1, 0), (1, 0), (0, -1), (0, 1)]
+        visited_all = set()
+        components = []
         for r in range(self.height):
             for c in range(self.width):
-                if grid[r][c] in WALKABLE:
-                    start = (r, c)
-                    break
-            if start:
-                break
-        if not start:
+                if grid[r][c] in WALKABLE and (r, c) not in visited_all:
+                    component = set()
+                    queue = [(r, c)]
+                    component.add((r, c))
+                    visited_all.add((r, c))
+                    while queue:
+                        cr, cc = queue.pop(0)
+                        for dr, dc in CARDINAL:
+                            nr, nc = cr + dr, cc + dc
+                            if 0 <= nr < self.height and 0 <= nc < self.width:
+                                if (nr, nc) not in component and grid[nr][nc] in WALKABLE:
+                                    component.add((nr, nc))
+                                    visited_all.add((nr, nc))
+                                    queue.append((nr, nc))
+                    components.append(component)
+        if not components:
             return
-        visited = set()
-        queue = [start]
-        visited.add(start)
-        while queue:
-            r, c = queue.pop(0)
-            for dr, dc in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
-                nr, nc = r + dr, c + dc
-                if 0 <= nr < self.height and 0 <= nc < self.width:
-                    if (nr, nc) not in visited and grid[nr][nc] in WALKABLE:
-                        visited.add((nr, nc))
-                        queue.append((nr, nc))
+        largest = max(components, key=len)
         for r in range(self.height):
             for c in range(self.width):
-                if grid[r][c] in WALKABLE and (r, c) not in visited:
+                if grid[r][c] in WALKABLE and (r, c) not in largest:
                     grid[r][c] = TILE_HOLE
 
     def _prune_small_high_areas(self, grid):
