@@ -56,8 +56,7 @@ class MapScene(Scene):
             self.game.mp_client.send(msg)
 
     def _broadcast_position(self):
-        col, row = self.game.world_map.player_room
-        self._net_send({"type": "map_position", "room": [col, row]})
+        self._net_send({"type": "map_position", "room": self.game.world_map.player_room})
 
     def _broadcast_vote(self, room_pos):
         self._net_send({"type": "map_vote", "room": list(room_pos)})
@@ -73,12 +72,12 @@ class MapScene(Scene):
             mtype = msg.get("type")
             if mtype == "map_position":
                 pos = msg.get("room")
-                if pos and len(pos) == 2:
-                    self._remote_room = tuple(pos)
+                if pos:
+                    self._remote_room = pos
             elif mtype == "map_vote":
                 pos = msg.get("room")
-                if pos and len(pos) == 2:
-                    self._remote_voted_room = tuple(pos)
+                if pos:
+                    self._remote_voted_room = pos
                     self._check_votes()
             elif mtype == "map_vote_cancel":
                 self._remote_voted_room = None

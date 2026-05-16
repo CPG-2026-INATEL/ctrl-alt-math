@@ -107,9 +107,10 @@ class Game:
         settings.MAP_ROOM_GAP = int(30 * settings.UI_SCALE)
         
         # Dynamic map dimensions based on difficulty
-        scaling = settings.DIFFICULTY_SCALING.get(settings.DIFFICULTY, {"map_max_col": 5})
-        map_cols = scaling["map_max_col"] + 1
-        map_rows = 3
+        scaling = settings.DIFFICULTY_SCALING.get(settings.DIFFICULTY, settings.DIFFICULTY_SCALING["medium"])
+        map_depth = scaling.get("depth", 7)
+        map_cols = map_depth + 1
+        map_rows = 4
         
         map_width = map_cols * settings.MAP_ROOM_WIDTH + (map_cols - 1) * settings.MAP_ROOM_GAP
         map_height = map_rows * settings.MAP_ROOM_HEIGHT + (map_rows - 1) * settings.MAP_ROOM_GAP
