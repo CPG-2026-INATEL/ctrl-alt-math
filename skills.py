@@ -106,9 +106,9 @@ class SkillTree:
                         length = max(1, math.sqrt(dx * dx + dy * dy))
                         steps = int(length / 8)
                         for i in range(steps):
-                            t = i / steps
-                            px = start[0] + dx * t
-                            py = start[1] + dy * t
+                            frac = i / steps
+                            px = start[0] + dx * frac
+                            py = start[1] + dy * frac
                             pygame.draw.circle(screen, (30, 120, 30), (int(px), int(py)), 1)
 
         for sid, skill in self.skills.items():

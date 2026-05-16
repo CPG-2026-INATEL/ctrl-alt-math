@@ -1,5 +1,7 @@
 import pygame
 
+import settings
+from i18n import t
 from scenes.scene import Scene
 
 

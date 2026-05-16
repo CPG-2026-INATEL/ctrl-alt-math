@@ -293,16 +293,28 @@ class GameplayScene(Scene):
 
         return try_axes(True) or try_axes(False) or [(to_col, to_row)]
 
+    def _enter_action_select(self):
+        self.turn_manager.player_moved = True
+        self.state = "PLAYER_ACTION_SELECT"
+        self.show_move_range = False
+        self.show_action_range = True
+        if not self._has_valid_action():
+            self.turn_manager.player_acted = True
+            self.show_action_range = False
+            self.selected_skill = None
+            self.turn_log.append("No targets - Wait")
+            self.game.floating_text.add_info(
+                self.game.player.x, self.game.player.y - 30,
+                "No targets in range", settings.GRAY)
+            self._start_enemy_turn()
+
     def _confirm_player_cursor(self):
         pc = self.game.player.col
         pr = self.game.player.row
         reachable = self.grid.get_reachable_cells(pc, pr, settings.PLAYER_MOVE_RANGE)
 
         if (self.cursor_col, self.cursor_row) == (pc, pr):
-            self.turn_manager.player_moved = True
-            self.state = "PLAYER_ACTION_SELECT"
-            self.show_move_range = False
-            self.show_action_range = True
+            self._enter_action_select()
             self.game.sfx.play("menu_select")
             return
 
@@ -336,6 +348,21 @@ class GameplayScene(Scene):
             cell for cell in self.grid.get_cells_in_range(pc, pr, settings.BASIC_ATTACK_RANGE)
             if cell != (pc, pr)
         ]
+
+    def _has_valid_action(self):
+        for enemy in self.game.enemies:
+            if enemy.dead:
+                continue
+            d = self.grid.grid_distance(self.game.player.col, self.game.player.row,
+                                        enemy.col, enemy.row)
+            if d <= settings.BASIC_ATTACK_RANGE:
+                return True
+            if self.game.skill_tree.is_unlocked("pitagoras") and d <= settings.PITAGORAS_RANGE:
+                return True
+        if self.game.skill_tree.is_unlocked("reflexao") and \
+                self.game.player.rigor >= settings.REFLEXAO_RIGOR_COST:
+            return True
+        return False
 
     def _can_execute_cursor_action(self):
         action_cells = self._get_action_cells()
@@ -436,6 +463,14 @@ class GameplayScene(Scene):
                 self._leave_no_combat_room()
             return
 
+        if event.key == pygame.K_ESCAPE:
+            self.game.scene_manager.push("pause")
+            return
+
+        if event.key == pygame.K_TAB and self.state in ("PLAYER_INPUT", "PLAYER_ACTION_SELECT"):
+            self.game.scene_manager.push("skill_tree")
+            return
+
         if self.state == "PLAYER_INPUT":
             self._handle_player_input(event)
         elif self.state == "PLAYER_ACTION_SELECT":
@@ -445,13 +480,6 @@ class GameplayScene(Scene):
 
     def _handle_player_input(self, event):
         k = event.key
-
-        if k == pygame.K_TAB:
-            self.game.scene_manager.push("skill_tree")
-            return
-        elif k == pygame.K_ESCAPE:
-            self.game.scene_manager.push("pause")
-            return
 
         if k in (pygame.K_w, pygame.K_UP):
             self.cursor_row = max(0, self.cursor_row - 1)
@@ -476,13 +504,6 @@ class GameplayScene(Scene):
 
     def _handle_action_input(self, event):
         k = event.key
-
-        if k == pygame.K_TAB:
-            self.game.scene_manager.push("skill_tree")
-            return
-        elif k == pygame.K_ESCAPE:
-            self.game.scene_manager.push("pause")
-            return
 
         if k in (pygame.K_w, pygame.K_UP):
             self.cursor_row = max(0, self.cursor_row - 1)
@@ -760,10 +781,7 @@ class GameplayScene(Scene):
                     )
                     self.pending_player_col = None
                     self.pending_player_row = None
-                self.turn_manager.player_moved = True
-                self.state = "PLAYER_ACTION_SELECT"
-                self.show_move_range = False
-                self.show_action_range = True
+                self._enter_action_select()
 
         elif self.state == "RESOLVE_ACTION":
             self.turn_manager.resolve_timer += dt
@@ -1384,14 +1402,14 @@ class GameplayScene(Scene):
                   settings.GOLD, 13)
 
         phase_text = "PLAYER MOVE"
-        phase_symbol = "\u0394x"
+        phase_symbol = "dx"
         phase_color = settings.CYAN
         if self.state in ("PLAYER_ACTION_SELECT", "RESOLVE_ACTION"):
             phase_text = "PLAYER ATTACK"
             phase_symbol = "f'(x)"
         elif self.state == "RESOLVE_MOVE":
             phase_text = "PLAYER MOVE"
-            phase_symbol = "\u0394x"
+            phase_symbol = "dx"
         elif self.state == "ENEMY_TURN":
             phase_color = settings.RED
             if self.enemy_phase == "ATTACK":
@@ -1399,14 +1417,14 @@ class GameplayScene(Scene):
                 phase_symbol = "!x"
             else:
                 phase_text = "ENEMY MOVE"
-                phase_symbol = "\u2200x"
+                phase_symbol = "Ax"
         elif self.state == "TURN_END":
             phase_text = "TURN END"
             phase_symbol = "="
             phase_color = settings.ORANGE
         elif self.state == "VICTORY_TRANSITION":
             phase_text = "Q.E.D."
-            phase_symbol = "\u25a1"
+            phase_symbol = "[QED]"
             phase_color = settings.GOLD
 
         center_x = settings.WINDOW_WIDTH // 2
@@ -1433,6 +1451,11 @@ class GameplayScene(Scene):
         controls = "Mouse/WASD cursor  Click/Enter confirm  Space attack  1/2 toggle  R undo  E wait  Esc pause"
         controls_img = pygame.font.Font(None, 11).render(controls, True, settings.GRAY)
         screen.blit(controls_img, (settings.UI_PADDING, settings.WINDOW_HEIGHT - 14))
+
+        if self.state == "PLAYER_ACTION_SELECT" and not self._has_valid_action():
+            no_target_img = pygame.font.Font(None, 18).render(
+                "No targets in range - press E to wait", True, settings.YELLOW)
+            screen.blit(no_target_img, (center_x - no_target_img.get_width() // 2, bar_y - 22))
 
     def _draw_bar(self, screen, x, y, w, h, pct, fill_color, bg_color):
         pygame.draw.rect(screen, bg_color, (x, y, w, h))
