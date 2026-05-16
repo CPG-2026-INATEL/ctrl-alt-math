@@ -40,6 +40,6 @@ class RewindEffects:
             screen.blit(s, (x, y))
 
         pulse = int(180 + 75 * (0.5 + 0.5 * math.sin(time_val * 8)))
-        draw_text(screen, "\u27e8\u27e8 REWIND \u27e9\u27e9",
+        draw_text(screen, "<< REWIND >>",
                  (settings.WINDOW_WIDTH // 2, 30),
                  (pulse, 255, pulse), 32)

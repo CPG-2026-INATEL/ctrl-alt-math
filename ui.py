@@ -134,7 +134,7 @@ class UI:
             s.fill(settings.WHITE)
             screen.blit(s, (x, y))
 
-        symbols = ["\u222b", "\u2211", "\u221a", "\u03c0", "\u221e", "\u0394", "\u2207", "\u03a3"]
+        symbols = ["int", "sum", "sqrt", "pi", "inf", "dx", "grad", "sig"]
         for i, sym in enumerate(symbols):
             x = 50 + i * 95
             y = 80 + int(math.sin(time_val * 2 + i) * 10)

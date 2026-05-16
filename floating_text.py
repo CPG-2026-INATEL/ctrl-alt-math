@@ -92,7 +92,7 @@ class FloatingTextSystem:
         self.add(x, y - 10, f"+{amount}", settings.GREEN, 18, 1.0, bounce=True, shadow=True)
 
     def add_rigor(self, x, y, amount):
-        self.add(x, y - 10, f"+{amount} \u2211", settings.BLUE, 14, 0.8, bounce=True, shadow=False)
+        self.add(x, y - 10, f"+{amount} R", settings.BLUE, 14, 0.8, bounce=True, shadow=False)
 
     def add_info(self, x, y, text, color=settings.CYAN):
         self.add(x, y - 10, text, color, 14, 0.8, bounce=False, shadow=False)
@@ -107,7 +107,7 @@ class FloatingTextSystem:
         self.add(x, y - 10, "BLOCKED", settings.LIGHT_GRAY, 14, 0.7, bounce=True, shadow=False)
 
     def add_evasion(self, x, y):
-        self.add(x, y - 10, "∇×0", settings.PURPLE, 14, 0.7, bounce=True, shadow=False)
+        self.add(x, y - 10, "NO HIT", settings.PURPLE, 14, 0.7, bounce=True, shadow=False)
 
     def update(self, dt):
         for t in self.texts:

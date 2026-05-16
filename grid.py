@@ -129,7 +129,7 @@ class Grid:
                             cells.append((scol, srow))
         return cells
 
-    def pathfind(self, start_col, start_row, end_col, end_row):
+    def pathfind(self, start_col, start_row, end_col, end_row, allow_diagonal=True):
         if not self.is_valid(end_col, end_row):
             return []
         if self.is_blocked(end_col, end_row):
@@ -137,13 +137,17 @@ class Grid:
         if (start_col, start_row) == (end_col, end_row):
             return [(end_col, end_row)]
 
+        directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]
+        if allow_diagonal:
+            directions += [(-1, -1), (-1, 1), (1, -1), (1, 1)]
+
         queue = deque()
         queue.append((start_col, start_row, []))
         visited = {(start_col, start_row)}
 
         while queue:
             col, row, path = queue.popleft()
-            for dc, dr in [(-1, 0), (1, 0), (0, -1), (0, 1), (-1, -1), (-1, 1), (1, -1), (1, 1)]:
+            for dc, dr in directions:
                 nc, nr = col + dc, row + dr
                 if not self.is_valid(nc, nr):
                     continue
@@ -243,7 +247,7 @@ class Grid:
             screen.blit(s, rect)
             pygame.draw.rect(screen, settings.CYAN, rect, 1)
             font = pygame.font.Font(None, 14)
-            img = font.render("\u03b8\u1d62=\u03b8\u1d63", True, settings.CYAN)
+            img = font.render("theta_i=theta_r", True, settings.CYAN)
             screen.blit(img, (rect.centerx - img.get_width() // 2,
                             rect.centery - img.get_height() // 2))
 

@@ -3,10 +3,10 @@ import random
 import settings
 
 FORMULAS = [
-    "\u222bf(x)dx", "\u2211(n=1\u2192\u221e)", "\u221a(a\u00b2+b\u00b2)=c", "\u2202f/\u2202x", "\u2207\u00d7F",
-    "e^(i\u03c0)+1=0", "\u222eB\u00b7dl=\u03bc\u2080I", "\u0394S\u22650", "\u03bb=h/p", "F=ma",
-    "E=mc\u00b2", "\u2207\u00b2\u03c6=0", "det(A)\u22600", "lim(x\u21920)", "\u220f(1+1/n)",
-    "sin\u00b2\u03b8+cos\u00b2\u03b8=1", "a\u00b7b=|a||b|cos\u03b8", "\u222b\u222b\u222b dV", "P(A|B)=P(B|A)P(A)/P(B)",
+    "int f(x) dx", "sum(n=1->inf)", "sqrt(a^2+b^2)=c", "df/dx", "curl(F)",
+    "e^(i*pi)+1=0", "int B.dl = mu0 I", "dS>=0", "lambda=h/p", "F=ma",
+    "E=mc^2", "grad^2 phi=0", "det(A)!=0", "lim(x->0)", "prod(1+1/n)",
+    "sin^2(t)+cos^2(t)=1", "a.b=|a||b|cos(t)", "int int int dV", "P(A|B)=P(B|A)P(A)/P(B)",
 ]
 
 

@@ -37,6 +37,8 @@ class Player:
         self.anim_from_py = 0
         self.anim_to_px = 0
         self.anim_to_py = 0
+        self.anim_cells = []
+        self.anim_step_idx = 0
 
         self.last_crit = False
 
@@ -49,7 +51,9 @@ class Player:
         self.row = int(row)
         self.x, self.y = grid.to_pixel(self.col, self.row)
 
-    def start_move_anim(self, from_col, from_row, to_col, to_row, grid):
+    def _begin_anim_step(self, grid):
+        from_col, from_row = self.anim_cells[self.anim_step_idx]
+        to_col, to_row = self.anim_cells[self.anim_step_idx + 1]
         self.anim_from_col = from_col
         self.anim_from_row = from_row
         self.anim_to_col = to_col
@@ -64,18 +68,35 @@ class Player:
             self.dir_x /= length
             self.dir_y /= length
 
+    def start_move_anim(self, from_col, from_row, to_col, to_row, grid, path=None):
+        if path is None:
+            path = [(to_col, to_row)]
+        self.anim_cells = [(from_col, from_row)] + [(int(col), int(row)) for col, row in path]
+        self.anim_step_idx = 0
+        self._begin_anim_step(grid)
+
+    def is_animating(self):
+        return len(self.anim_cells) > 1
+
     def update_animation(self, dt, grid=None):
-        if self.anim_progress < 1.0:
-            self.anim_progress = min(1.0, self.anim_progress + dt * 5)
+        if self.is_animating():
+            self.anim_progress = min(1.0, self.anim_progress + dt * 10)
             t = self.anim_progress
             t = t * t * (3 - 2 * t)
             self.x = self.anim_from_px + (self.anim_to_px - self.anim_from_px) * t
             self.y = self.anim_from_py + (self.anim_to_py - self.anim_from_py) * t
             if self.anim_progress >= 1.0:
+                self.anim_step_idx += 1
                 self.col = int(self.anim_to_col)
                 self.row = int(self.anim_to_row)
-                if grid is not None:
-                    self.x, self.y = grid.to_pixel(self.col, self.row)
+                if self.anim_step_idx >= len(self.anim_cells) - 1:
+                    self.anim_cells = []
+                    self.anim_step_idx = 0
+                    self.anim_progress = 1.0
+                    if grid is not None:
+                        self.x, self.y = grid.to_pixel(self.col, self.row)
+                elif grid is not None:
+                    self._begin_anim_step(grid)
 
     def update(self, dt, keys):
         self.attack_cooldown = max(0, getattr(self, 'attack_cooldown', 0) - dt)

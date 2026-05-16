@@ -32,6 +32,8 @@ class Enemy:
         self.anim_from_py = 0
         self.anim_to_px = 0
         self.anim_to_py = 0
+        self.anim_cells = []
+        self.anim_step_idx = 0
 
         if enemy_type == "censor":
             self.hp = settings.CENSOR_HP
@@ -89,20 +91,9 @@ class Enemy:
         self.row = int(row)
         self.x, self.y = grid.to_pixel(self.col, self.row)
 
-    def update_animation(self, dt, grid=None):
-        if self.anim_progress < 1.0:
-            self.anim_progress = min(1.0, self.anim_progress + dt * 4)
-            t = self.anim_progress
-            t = t * t * (3 - 2 * t)
-            self.x = self.anim_from_px + (self.anim_to_px - self.anim_from_px) * t
-            self.y = self.anim_from_py + (self.anim_to_py - self.anim_from_py) * t
-            if self.anim_progress >= 1.0:
-                self.col = int(self.anim_to_col)
-                self.row = int(self.anim_to_row)
-                if grid is not None:
-                    self.x, self.y = grid.to_pixel(self.col, self.row)
-
-    def start_move_anim(self, from_col, from_row, to_col, to_row, grid):
+    def _begin_anim_step(self, grid):
+        from_col, from_row = self.anim_cells[self.anim_step_idx]
+        to_col, to_row = self.anim_cells[self.anim_step_idx + 1]
         self.anim_from_col = from_col
         self.anim_from_row = from_row
         self.anim_to_col = to_col
@@ -110,6 +101,36 @@ class Enemy:
         self.anim_from_px, self.anim_from_py = grid.to_pixel(from_col, from_row)
         self.anim_to_px, self.anim_to_py = grid.to_pixel(to_col, to_row)
         self.anim_progress = 0.0
+
+    def is_animating(self):
+        return len(self.anim_cells) > 1
+
+    def update_animation(self, dt, grid=None):
+        if self.is_animating():
+            self.anim_progress = min(1.0, self.anim_progress + dt * 8)
+            t = self.anim_progress
+            t = t * t * (3 - 2 * t)
+            self.x = self.anim_from_px + (self.anim_to_px - self.anim_from_px) * t
+            self.y = self.anim_from_py + (self.anim_to_py - self.anim_from_py) * t
+            if self.anim_progress >= 1.0:
+                self.anim_step_idx += 1
+                self.col = int(self.anim_to_col)
+                self.row = int(self.anim_to_row)
+                if self.anim_step_idx >= len(self.anim_cells) - 1:
+                    self.anim_cells = []
+                    self.anim_step_idx = 0
+                    self.anim_progress = 1.0
+                    if grid is not None:
+                        self.x, self.y = grid.to_pixel(self.col, self.row)
+                elif grid is not None:
+                    self._begin_anim_step(grid)
+
+    def start_move_anim(self, from_col, from_row, to_col, to_row, grid, path=None):
+        if path is None:
+            path = [(to_col, to_row)]
+        self.anim_cells = [(from_col, from_row)] + [(int(col), int(row)) for col, row in path]
+        self.anim_step_idx = 0
+        self._begin_anim_step(grid)
 
     def get_hitbox(self):
         return pygame.Rect(self.x - self.size, self.y - self.size,
@@ -267,7 +288,7 @@ class Enemy:
                          (x + size - 2, y - size + 2),
                          (x - size + 2, y + size - 2), 2)
         font = pygame.font.Font(None, 12)
-        label = font.render("\u00acP", True, settings.WHITE)
+        label = font.render("NOT", True, settings.WHITE)
         label.set_alpha(alpha)
         screen.blit(label, (x - label.get_width() // 2, y - size - 14))
 
@@ -281,7 +302,7 @@ class Enemy:
         pygame.draw.circle(screen, settings.WHITE, (x - size // 2, y - size // 3), eye_size)
         pygame.draw.circle(screen, settings.WHITE, (x + size // 2, y - size // 3), eye_size)
         font = pygame.font.Font(None, 12)
-        label = font.render("\u21d2?", True, settings.WHITE)
+        label = font.render("ARG", True, settings.WHITE)
         label.set_alpha(alpha)
         screen.blit(label, (x - label.get_width() // 2, y - size - 14))
 

@@ -1,8 +1,5 @@
 import pygame
 import math
-import json
-import os
-
 import settings
 from utils import draw_text
 
@@ -133,9 +130,9 @@ class WorldMap:
                          (settings.WINDOW_WIDTH // 2, 565),
                          settings.GREEN, 16)
             elif player_room.state == "completed":
-                draw_text(screen, "Completed \u2713 \u2014 ENTER to replay",
+                draw_text(screen, "Completed - ENTER to replay",
                          (settings.WINDOW_WIDTH // 2, 565),
-                         settings.GOLD, 16)
+                          settings.GOLD, 16)
         else:
             draw_text(screen, "???",
                      (settings.WINDOW_WIDTH // 2, 535),
@@ -159,8 +156,8 @@ class WorldMap:
             bg_color = (40, 30, 15)
             border_color = settings.ORANGE
         elif room.type == "victory":
-            bg_color = (15, 40, 15)
-            border_color = settings.GREEN
+            bg_color = (28, 22, 42)
+            border_color = settings.GOLD
         else:
             bg_color = (25, 25, 40)
             border_color = settings.LIGHT_GRAY
@@ -203,40 +200,15 @@ class WorldMap:
 
     def _get_room_icon(self, room):
         if room.state == "completed":
-            return "\u2713"
+            return "OK"
         if room.state == "locked":
-            return "\u25a0"
+            return "X"
         if room.type == "hub":
-            return "\u2302"
+            return "H"
         if room.type == "boss":
-            return "\u2694"
+            return "B"
         if room.type == "challenge":
-            return "\u2605"
+            return "!"
         if room.type == "victory":
-            return "\u2726"
-        return "\u25c7"
-
-    def save(self):
-        data = {
-            "player_room": list(self.player_room),
-            "rooms": {}
-        }
-        for pos, room in self.rooms.items():
-            data["rooms"][f"{pos[0]},{pos[1]}"] = room.state
-        with open("save.json", "w") as f:
-            json.dump(data, f)
-
-    def load(self):
-        if not os.path.exists("save.json"):
-            return False
-        try:
-            with open("save.json", "r") as f:
-                data = json.load(f)
-            self.player_room = tuple(data["player_room"])
-            for pos_str, state in data["rooms"].items():
-                pos = tuple(int(x) for x in pos_str.split(","))
-                if pos in self.rooms:
-                    self.rooms[pos].state = state
-            return True
-        except Exception:
-            return False
+            return "V"
+        return "O"

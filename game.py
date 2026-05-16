@@ -58,7 +58,6 @@ class Game:
         self.floating_text = FloatingTextSystem()
         self.math_bg = MathBackground()
         self.world_map = WorldMap()
-        self.world_map.load()
 
         self.entropy = 0
         self.rewind_cooldown = 0
@@ -85,7 +84,6 @@ class Game:
         self.floating_text = FloatingTextSystem()
         self.math_bg = MathBackground()
         self.world_map = WorldMap()
-        self.world_map.load()
 
         self.entropy = 0
         self.rewind_cooldown = 0

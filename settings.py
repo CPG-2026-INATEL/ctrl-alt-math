@@ -79,7 +79,7 @@ HIGH_ENTROPY_THRESHOLD = 50
 
 VICTORY_TRANSITION_DURATION = 2.5
 
-UI_BAR_HEIGHT = 55
+UI_BAR_HEIGHT = 72
 UI_PADDING = 8
 ARENA_WIDTH = 760
 ARENA_HEIGHT = 500
@@ -147,7 +147,7 @@ SKILL_TREE_DATA = [
     {
         "id": "axioma",
         "name": "Axioma B\u00e1sico",
-        "desc": "The foundation of all\nmathematical thought.\n\u2200x: f(x) = f(x)",
+        "desc": "The foundation of all\nmathematical thought.\nforall x: f(x) = f(x)",
         "cost": 0,
         "prereqs": [],
         "x": 400, "y": 60,
@@ -156,7 +156,7 @@ SKILL_TREE_DATA = [
     {
         "id": "derivada",
         "name": "Derivada",
-        "desc": "Predict enemy movement.\n\u2202f/\u2202x shows the\ndirection of change.",
+        "desc": "Predict enemy movement.\ndf/dx shows the\ndirection of change.",
         "cost": 1,
         "prereqs": ["axioma"],
         "x": 200, "y": 160,
@@ -165,7 +165,7 @@ SKILL_TREE_DATA = [
     {
         "id": "pitagoras",
         "name": "Pit\u00e1goras",
-        "desc": "Geometric attack (r\u22643).\nd = \u221a(\u0394x\u00b2+\u0394y\u00b2)\nDeals 25 damage.",
+        "desc": "Geometric attack (r<=3).\nd = sqrt(dx^2+dy^2)\nDeals 25 damage.",
         "cost": 1,
         "prereqs": ["axioma"],
         "x": 400, "y": 160,
@@ -174,7 +174,7 @@ SKILL_TREE_DATA = [
     {
         "id": "ctrlz",
         "name": "Ctrl+Z",
-        "desc": "Rewind 2 turns back.\nR\u207b\u00b9: undo(R) \u2192 R\u207b\u00b2\nPress R to undo.",
+        "desc": "Rewind 2 turns back.\nR^-1: undo(R) -> R^-2\nPress R to undo.",
         "cost": 1,
         "prereqs": ["axioma"],
         "x": 600, "y": 160,
@@ -183,7 +183,7 @@ SKILL_TREE_DATA = [
     {
         "id": "bayes",
         "name": "Bayes",
-        "desc": "Improved prediction.\nP(A|B) = P(B|A)\n\u00d7 P(A) / P(B)",
+        "desc": "Improved prediction.\nP(A|B) = P(B|A)\n* P(A) / P(B)",
         "cost": 2,
         "prereqs": ["derivada"],
         "x": 200, "y": 280,
@@ -192,7 +192,7 @@ SKILL_TREE_DATA = [
     {
         "id": "reflexao",
         "name": "Reflex\u00e3o",
-        "desc": "Barrier cells block enemies.\n\u03b8\u1d62=\u03b8\u1d63: reflection\nsymmetry. Press 2.",
+        "desc": "Barrier cells block enemies.\ntheta_i=theta_r: reflection\nsymmetry. Press 2.",
         "cost": 2,
         "prereqs": ["pitagoras"],
         "x": 400, "y": 280,
@@ -201,7 +201,7 @@ SKILL_TREE_DATA = [
     {
         "id": "entropia",
         "name": "Entropia Controlada",
-        "desc": "Reduce entropy gain\nfrom rewinding.\n\u0394S \u2192 0",
+        "desc": "Reduce entropy gain\nfrom rewinding.\ndS -> 0",
         "cost": 2,
         "prereqs": ["ctrlz"],
         "x": 600, "y": 280,

@@ -146,7 +146,7 @@ class SkillTree:
                       settings.LIGHT_GRAY, 14)
 
             if skill["unlocked"]:
-                check_surf = pygame.font.Font(None, 20).render("\u2713", True, settings.GREEN)
+                check_surf = pygame.font.Font(None, 20).render("OK", True, settings.GREEN)
                 screen.blit(check_surf, (rect.right - 20, rect.top + 5))
 
         draw_text(screen, f"Skill Points: {self.skill_points}",
