@@ -39,9 +39,9 @@ class NetworkHost:
         self._loop       = None        # asyncio event loop in the server thread
         self._next_id    = 1
         self._client_ids = {}          # websocket -> int id
-        # Keep legacy attributes so lobby_scene doesn't break
-        self.clients    = []           # not used internally but read by nothing critical
-        self.client_ids = {}
+        # Keep legacy attributes and keep them updated
+        self.clients    = []           # List of connected websockets
+        self.client_ids = {}           # dict: cid -> websocket
 
     # ------------------------------------------------------------------ start
 
@@ -72,6 +72,8 @@ class NetworkHost:
             self._next_id += 1
             self._client_ids[websocket] = cid
             self._websockets.add(websocket)
+            self.clients.append(websocket)
+            self.client_ids[cid] = websocket
         # Send initial handshake
         await websocket.send(json.dumps({"type": "assign_id", "id": cid}))
         await websocket.send(json.dumps({"type": "player_index",
@@ -91,6 +93,9 @@ class NetworkHost:
             with self.lock:
                 self._websockets.discard(websocket)
                 self._client_ids.pop(websocket, None)
+                if websocket in self.clients:
+                    self.clients.remove(websocket)
+                self.client_ids.pop(cid, None)
 
     # ------------------------------------------------------------------ send
 
@@ -128,12 +133,24 @@ class NetworkHost:
             self.inbox.clear()
         return msgs
 
+    def get_connected_clients_info(self):
+        """Returns a list of (cid, ip) for all connected clients."""
+        with self.lock:
+            info = []
+            for ws, cid in self._client_ids.items():
+                try:
+                    ip = ws.remote_address[0] if ws.remote_address else "unknown"
+                    info.append((cid, ip))
+                except Exception:
+                    info.append((cid, "unknown"))
+            return info
+
     # ------------------------------------------------------------------ stop
 
     def stop(self):
         self.running = False
-        if self._loop:
-            self._loop.call_soon_threadsafe(self._loop.stop)
+        # Do not call self._loop.stop() here; it causes RuntimeError.
+        # Setting self.running = False makes _serve() return, finishing run_until_complete().
 
     # ------------------------------------------------------------------ util
 
@@ -299,8 +316,9 @@ class NetworkClient:
 
     def disconnect(self):
         self.running = False
-        if self._loop:
-            self._loop.call_soon_threadsafe(self._loop.stop)
+        if self._loop and self._ws:
+            # Gracefully close the websocket; this will break the 'async for' loop in _recv_loop
+            asyncio.run_coroutine_threadsafe(self._ws.close(), self._loop)
 
 
 # ---------------------------------------------------------------------------

@@ -318,6 +318,9 @@ class LobbyScene(Scene):
                     self.status = t("lobby_player_joined")
                     self.status_color = settings.GREEN
 
+            # Update client list for display
+            self.connected_clients = self.host.get_connected_clients_info()
+
         if self.client:
             msgs = self.client.poll()
             for msg in msgs:
@@ -367,9 +370,19 @@ class LobbyScene(Scene):
             status_y = 215 + len(ips) * 24 + 10
             draw_text(screen, self.status,
                       (settings.WINDOW_WIDTH // 2, status_y), self.status_color, 18)
+
+            # Show connected clients
+            clients = getattr(self, "connected_clients", [])
+            if clients:
+                draw_text(screen, f"Connected: {len(clients)}",
+                          (settings.WINDOW_WIDTH // 2, status_y + 25), settings.LIGHT_GRAY, 16)
+                for i, (cid, ip) in enumerate(clients):
+                    draw_text(screen, f"Player {cid} ({ip})",
+                              (settings.WINDOW_WIDTH // 2, status_y + 45 + i * 20), settings.WHITE, 14)
+
             if self.connected:
                 draw_text(screen, t("lobby_start_prompt"),
-                          (settings.WINDOW_WIDTH // 2, status_y + 40), settings.GOLD, 24)
+                          (settings.WINDOW_WIDTH // 2, settings.WINDOW_HEIGHT - 100), settings.GOLD, 24)
             draw_text(screen, t("lobby_esc_cancel"),
                       (settings.WINDOW_WIDTH // 2, settings.WINDOW_HEIGHT - 40), settings.GRAY, 14)
 
