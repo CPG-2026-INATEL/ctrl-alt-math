@@ -132,7 +132,7 @@ class WorldMap:
         info_name_y = settings.WINDOW_HEIGHT - int(150 * settings.UI_SCALE)
         info_text_y = settings.WINDOW_HEIGHT - int(110 * settings.UI_SCALE)
         info_action_y = settings.WINDOW_HEIGHT - int(65 * settings.UI_SCALE)
-        avatar_size = max(12, int(16 * settings.UI_SCALE))
+        avatar_size = max(36, int(48 * settings.UI_SCALE))
         avatar_offset_y = int(20 * settings.UI_SCALE)
 
         draw_text(screen, t("archive_title"),
