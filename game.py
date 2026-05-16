@@ -51,7 +51,7 @@ class Game:
         self.scene_manager.add("map", MapScene)
         self.scene_manager.add("rewind_playback", RewindPlaybackScene)
         self.scene_manager.add("tilemap", TilemapScene)
-        self.scene_manager.switch("menu")
+        self.scene_manager.switch("tilemap")
 
     def _init_shared_state(self):
         self.player = Player()
