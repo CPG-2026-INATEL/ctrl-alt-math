@@ -309,7 +309,9 @@ class NetworkClient:
         import websockets
         uri = f"ws://{host}:{port}"
         try:
-            async with websockets.connect(uri, open_timeout=LAN_TIMEOUT) as ws:
+            # Use wait_for for compatibility with older websockets versions (<10.0)
+            ws = await asyncio.wait_for(websockets.connect(uri), timeout=LAN_TIMEOUT)
+            async with ws:
                 self._ws = ws
                 async for raw in ws:
                     try:
