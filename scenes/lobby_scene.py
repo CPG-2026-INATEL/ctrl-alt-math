@@ -87,7 +87,7 @@ class LobbyScene(Scene):
             self.status_color = settings.GREEN
             self.mode = "hosting"
             self.player_index = 1
-        except OSError as e:
+        except (OSError, RuntimeError) as e:
             self.status = f"Error: {e}"
             self.status_color = settings.RED
             self.host = None
@@ -108,16 +108,29 @@ class LobbyScene(Scene):
         self.status_color = settings.YELLOW
         self.discovery.start_scan()
 
+    def _parse_endpoint(self, text):
+        raw = text.strip()
+        if raw.startswith("tcp://"):
+            raw = raw[len("tcp://"):]
+        host = raw
+        port = settings.LAN_PORT
+        if ":" in raw:
+            host, port_str = raw.rsplit(":", 1)
+            if port_str.isdigit():
+                port = int(port_str)
+        return host.strip(), port
+
     def _connect_to(self, ip):
         self.client = NetworkClient()
         try:
-            self.client.connect(ip)
+            host, port = self._parse_endpoint(ip)
+            self.client.connect(host, port)
             self.connected = True
             self.status = t("lobby_connected")
             self.status_color = settings.GREEN
             self.mode = "connected"
             self.player_index = 2
-        except (ConnectionError, OSError) as e:
+        except (ConnectionError, OSError, RuntimeError) as e:
             self.status = f"Error: {e}"
             self.status_color = settings.RED
             self.client = None
@@ -218,7 +231,8 @@ class LobbyScene(Scene):
                 if self._start_rect().collidepoint(event.pos):
                     if self.client:
                         self.client.send({"type": "client_ready"})
-                    self._start_game()
+                        self.status = t("lobby_waiting_host")
+                        self.status_color = settings.YELLOW
                     return
                 if self._cancel_rect().collidepoint(event.pos):
                     if self.client:
@@ -278,7 +292,7 @@ class LobbyScene(Scene):
                     self._scan_lan()
                 else:
                     ch = event.unicode
-                    if ch and (ch.isdigit() or ch == "."):
+                    if ch and (ch.isalnum() or ch in ".:-/"):
                         self.ip_input += ch
             else:
                 if event.key == pygame.K_UP:
