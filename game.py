@@ -4,7 +4,6 @@ import sys
 import settings
 from player import Player
 from skills import SkillTree
-from rewind import RewindBuffer
 from particles import ParticleSystem
 from ui import UI
 from sfx import SFX
@@ -21,8 +20,6 @@ from scenes.pause_scene import PauseScene
 from scenes.game_over_scene import GameOverScene
 from scenes.victory_scene import VictoryScene
 from scenes.map_scene import MapScene
-from scenes.rewind_playback_scene import RewindPlaybackScene
-from scenes.tilemap_scene import TilemapScene
 
 
 class Game:
@@ -49,39 +46,28 @@ class Game:
         self.scene_manager.add("game_over", GameOverScene)
         self.scene_manager.add("victory", VictoryScene)
         self.scene_manager.add("map", MapScene)
-        self.scene_manager.add("rewind_playback", RewindPlaybackScene)
-        self.scene_manager.add("tilemap", TilemapScene)
         self.scene_manager.switch("menu")
 
     def _init_shared_state(self):
         self.player = Player()
         self.skill_tree = SkillTree()
-        self.rewind_buffer = RewindBuffer()
         self.particles = ParticleSystem()
         self.enemies = []
-        self.projectiles = []
         self.floating_text = FloatingTextSystem()
         self.math_bg = MathBackground()
         self.world_map = WorldMap()
         self.world_map.load()
 
-        self.current_wave = 0
         self.entropy = 0
         self.rewind_cooldown = 0
 
         self.screen_shake = 0.0
         self.shake_intensity = 0
 
-        self.queue_basic_damage = False
-        self.queue_pitagoras_damage = False
-
         self.prev_scene_name = None
 
         self.hit_stop_timer = 0
         self.hit_stop_duration = 0
-
-        self.wave_countdown = 0
-        self.wave_countdown_duration = 1.5
 
         self.current_room = None
         self.boss_hp_override = None
@@ -92,31 +78,23 @@ class Game:
     def reset_game_state(self):
         self.player = Player()
         self.skill_tree = SkillTree()
-        self.rewind_buffer = RewindBuffer()
         self.particles = ParticleSystem()
         self.enemies = []
-        self.projectiles = []
         self.floating_text = FloatingTextSystem()
         self.math_bg = MathBackground()
         self.world_map = WorldMap()
         self.world_map.load()
 
-        self.current_wave = 0
         self.entropy = 0
         self.rewind_cooldown = 0
 
         self.screen_shake = 0.0
         self.shake_intensity = 0
 
-        self.queue_basic_damage = False
-        self.queue_pitagoras_damage = False
-
         self.prev_scene_name = None
 
         self.hit_stop_timer = 0
         self.hit_stop_duration = 0
-
-        self.wave_countdown = 0
 
         self.current_room = None
         self.boss_hp_override = None

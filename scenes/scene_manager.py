@@ -12,17 +12,19 @@ class SceneManager:
         return self.scenes.get(name)
 
     def switch(self, name):
+        prev = self.current
         if self.current:
             self.current.exit()
         self.stack.clear()
         self.current = self.scenes[name]
-        self.current.enter()
+        self.current.enter(prev)
 
     def push(self, name):
+        prev = self.current
         if self.current:
             self.stack.append(self.current)
         self.current = self.scenes[name]
-        self.current.enter()
+        self.current.enter(prev)
 
     def pop(self):
         if self.stack:

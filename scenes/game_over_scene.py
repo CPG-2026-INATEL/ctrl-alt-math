@@ -27,5 +27,11 @@ class GameOverScene(Scene):
         self.game.sfx.play("game_over")
 
     def draw(self, screen):
-        self.game.scene_manager.get("gameplay").draw(screen)
-        self.game.ui.draw_game_over(screen, self.game.current_wave + 1)
+        gameplay = self.game.scene_manager.scenes.get("gameplay")
+        if gameplay:
+            gameplay.draw(screen)
+
+        room_name = ""
+        if self.game.current_room:
+            room_name = self.game.current_room.name
+        self.game.ui.draw_game_over(screen, room_name)

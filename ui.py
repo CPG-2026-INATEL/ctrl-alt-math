@@ -72,10 +72,10 @@ class UI:
         x += 30
 
         if has_ctrlz:
-            ready = game.rewind_cooldown <= 0 if game else False
+            ready = game.scene_manager.get("gameplay").turn_manager.can_undo() if game else False
             self._draw_cooldown_icon(screen, x, y, "R", ready,
-                                     game.rewind_cooldown if game else 0, 2.0,
-                                     len(game.rewind_buffer.buffer) > 0 if game else False)
+                                     0 if ready else 1, 1.0,
+                                     ready)
 
     def _draw_cooldown_icon(self, screen, x, y, key, ready, cooldown, max_cooldown, has_resource):
         size = 20
@@ -234,14 +234,19 @@ class UI:
                   (settings.WINDOW_WIDTH // 2, settings.WINDOW_HEIGHT // 2 + 50),
                   settings.GRAY, 16)
 
-    def draw_game_over(self, screen, wave):
+    def draw_game_over(self, screen, room_name):
         screen.fill(settings.DARK_RED)
         draw_text(screen, "GAME OVER",
                   (settings.WINDOW_WIDTH // 2, 200),
                   settings.RED, 56)
-        draw_text(screen, f"You fell at Wave {wave}",
-                  (settings.WINDOW_WIDTH // 2, 270),
-                  settings.LIGHT_GRAY, 24)
+        if room_name:
+            draw_text(screen, f"You fell at: {room_name}",
+                      (settings.WINDOW_WIDTH // 2, 270),
+                      settings.LIGHT_GRAY, 24)
+        else:
+            draw_text(screen, "You fell in battle",
+                      (settings.WINDOW_WIDTH // 2, 270),
+                      settings.LIGHT_GRAY, 24)
         draw_text(screen, "The regime has silenced another mind.",
                   (settings.WINDOW_WIDTH // 2, 310),
                   settings.GRAY, 18)

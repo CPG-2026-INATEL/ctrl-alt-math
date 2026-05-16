@@ -10,7 +10,8 @@ class RewindBuffer:
 
     def record(self, player, enemies, projectiles, dt):
         self.timer += dt
-        if self.timer >= settings.REWIND_SNAPSHOT_INTERVAL:
+        interval = 0.08
+        if self.timer >= interval:
             self.timer = 0
             snapshot = {
                 'time': pygame.time.get_ticks(),
@@ -36,14 +37,14 @@ class RewindBuffer:
                 ],
             }
             self.buffer.append(snapshot)
-            cutoff = pygame.time.get_ticks() - settings.REWIND_BUFFER_SECONDS * 1000
+            cutoff = pygame.time.get_ticks() - 3000
             while self.buffer and self.buffer[0]['time'] < cutoff:
                 self.buffer.pop(0)
 
     def rewind(self):
         if not self.buffer:
             return None
-        target_time = pygame.time.get_ticks() - settings.REWIND_SECONDS * 1000
+        target_time = pygame.time.get_ticks() - 1500
         best = None
         for entry in reversed(self.buffer):
             if entry['time'] <= target_time:

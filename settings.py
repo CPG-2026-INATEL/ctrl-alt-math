@@ -27,51 +27,51 @@ PLAYER_SPEED = 220
 PLAYER_MAX_HP = 100
 PLAYER_MAX_RIGOR = 100
 PLAYER_ATTACK_COOLDOWN = 0.3
-PLAYER_ATTACK_RANGE = 35
 PLAYER_ATTACK_DAMAGE = 15
 PLAYER_START_SKILL_POINTS = 2
-RIGOR_REGEN_RATE = 8
-RIGOR_REGEN_DELAY = 2.0
+RIGOR_REGEN_RATE = 15
+RIGOR_REGEN_DELAY = 0
 
+GRID_COLS = 16
+GRID_ROWS = 12
+PLAYER_MOVE_RANGE = 3
+BASIC_ATTACK_RANGE = 1
 PITAGORAS_RIGOR_COST = 20
 PITAGORAS_DAMAGE = 25
-PITAGORAS_RANGE = 80
-
+PITAGORAS_RANGE = 3
 REFLEXAO_RIGOR_COST = 30
-REFLEXAO_RANGE = 60
 REFLEXAO_DAMAGE = 10
-REFLEXAO_KNOCKBACK = 200
+REFLEXAO_RANGE = 2
+REFLEXAO_DURATION = 2
 
 ENEMY_SIZE = 14
 BOSS_SIZE = 36
-ENEMY_ACTION_INTERVAL = 1.2
+CENSOR_HP = 30
+CENSOR_MOVE_RANGE = 2
+CENSOR_DAMAGE = 12
+CENSOR_ATTACK_RANGE = 3
+STRAWMAN_HP = 20
+STRAWMAN_MOVE_RANGE = 3
+STRAWMAN_DAMAGE = 8
+STRAWMAN_ATTACK_RANGE = 3
+BAYESIAN_HP = 25
+BAYESIAN_MOVE_RANGE = 2
+BAYESIAN_DAMAGE = 10
+BAYESIAN_ATTACK_RANGE = 5
+BOSS_HP = 150
+BOSS_MOVE_RANGE = 1
+BOSS_DAMAGE = 15
+BOSS_ATTACK_RANGE = 4
 BOSS_ACTION_INTERVAL = 0.9
 
-CENSOR_HP = 30
-CENSOR_SPEED = 80
-CENSOR_DAMAGE = 12
-CENSOR_ATTACK_RANGE = 50
-
-STRAWMAN_HP = 20
-STRAWMAN_SPEED = 120
-STRAWMAN_DAMAGE = 8
-
-BAYESIAN_HP = 25
-BAYESIAN_SPEED = 90
-BAYESIAN_DAMAGE = 10
-BAYESIAN_PROJECTILE_SPEED = 150
-
-BOSS_HP = 150
-BOSS_SPEED = 60
-BOSS_DAMAGE = 15
-
-REWIND_BUFFER_SECONDS = 3.0
-REWIND_SNAPSHOT_INTERVAL = 0.08
-REWIND_SECONDS = 1.5
+ENTROPY_PER_TURN = 2
+REWIND_UNDO_TURNS = 2
 REWIND_ENTROPY_INCREASE = 12
+REWIND_COOLDOWN_TURNS = 3
 MAX_ENTROPY = 100
 HIGH_ENTROPY_THRESHOLD = 50
-ENTROPY_DECAY_RATE = 2
+
+VICTORY_TRANSITION_DURATION = 2.5
 
 UI_BAR_HEIGHT = 55
 UI_PADDING = 8
@@ -159,7 +159,7 @@ SKILL_TREE_DATA = [
     {
         "id": "pitagoras",
         "name": "Pit\u00e1goras",
-        "desc": "Geometric attack.\nPress 1 to use.",
+        "desc": "Geometric attack (range 3).\nPress 1 to target area.",
         "cost": 1,
         "prereqs": ["axioma"],
         "x": 400, "y": 160,
@@ -168,7 +168,7 @@ SKILL_TREE_DATA = [
     {
         "id": "ctrlz",
         "name": "Ctrl+Z",
-        "desc": "Rewind time.\nPress R to undo recent damage.",
+        "desc": "Rewind 2 turns back.\nPress R to undo.",
         "cost": 1,
         "prereqs": ["axioma"],
         "x": 600, "y": 160,
@@ -186,7 +186,7 @@ SKILL_TREE_DATA = [
     {
         "id": "reflexao",
         "name": "Reflex\u00e3o",
-        "desc": "Reflect projectiles.\nPress 2 for burst.",
+        "desc": "Barrier cells block enemies.\nPress 2 for barrier.",
         "cost": 2,
         "prereqs": ["pitagoras"],
         "x": 400, "y": 280,
