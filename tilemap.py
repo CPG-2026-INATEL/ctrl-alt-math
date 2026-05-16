@@ -110,7 +110,7 @@ class MapGenerator:
 
     def _apply_high_edge(self, grid):
         ALL_STAIRS = {TILE_STAIRS_UP, TILE_STAIRS_DOWN, TILE_STAIRS_LEFT, TILE_STAIRS_RIGHT}
-        BELOW = {TILE_LOW, TILE_HOLE} | ALL_STAIRS
+        BELOW = {TILE_LOW, TILE_HOLE, TILE_STAIRS_DOWN, TILE_STAIRS_LEFT, TILE_STAIRS_RIGHT}
         changes = []
         for r in range(self.height - 1):
             for c in range(self.width):
