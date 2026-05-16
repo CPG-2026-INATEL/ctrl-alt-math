@@ -122,6 +122,7 @@ class Game:
 
         self.entropy = 0
         self.rewind_cooldown = 0
+        self.rewind_fx_timer = 0
 
         self.screen_shake = 0.0
         self.shake_intensity = 0
@@ -149,6 +150,7 @@ class Game:
 
         self.entropy = 0
         self.rewind_cooldown = 0
+        self.rewind_fx_timer = 0
 
         self.screen_shake = 0.0
         self.shake_intensity = 0
@@ -174,6 +176,7 @@ class Game:
 
         self.entropy = 0
         self.rewind_cooldown = 0
+        self.rewind_fx_timer = 0
 
         self.screen_shake = 0.0
         self.shake_intensity = 0

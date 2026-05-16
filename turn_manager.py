@@ -12,7 +12,7 @@ class TurnManager:
         self.resolve_duration = 0
         self.current_action = None
         self.history = []
-        self.max_history = 10
+        self.max_history = 30
         self.rewind_cooldown_turns = 0
         self.barrier_turns_remaining = {}
 
@@ -103,15 +103,19 @@ class TurnManager:
         if len(self.history) > self.max_history:
             self.history.pop(0)
 
-    def undo(self):
+    def undo(self, steps=1):
         if not self.history:
             return None
-        target = self.history.pop()
-        self.turn_number = target["turn"]
+        target = None
+        for _ in range(steps):
+            if self.history:
+                target = self.history.pop()
+        if target is not None:
+            self.turn_number = target["turn"]
         return target
 
     def can_undo(self):
-        return len(self.history) > 0 and self.rewind_cooldown_turns <= 0
+        return len(self.history) >= 1 and self.rewind_cooldown_turns <= 0
 
     def end_turn(self, game_state):
         self.snapshot(game_state)
