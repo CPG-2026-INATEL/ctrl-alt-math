@@ -43,9 +43,14 @@ class NetworkHost:
         self.clients    = []           # List of connected websockets
         self.client_ids = {}           # dict: cid -> websocket
 
+    def _log(self, msg):
+        if getattr(settings, 'DEBUG_NETWORK', False):
+            print(f"[Host] {msg}")
+
     # ------------------------------------------------------------------ start
 
     def start(self):
+        self._log(f"Starting host on port {self.port}...")
         self._ensure_firewall_rules()
         self.running = True
         # Start asyncio loop in a daemon thread
@@ -55,6 +60,7 @@ class NetworkHost:
         # Discovery responder (UDP, no asyncio needed)
         dt = threading.Thread(target=self._discovery_loop, daemon=True)
         dt.start()
+        self._log("Host threads started.")
 
     def _run_loop(self):
         asyncio.set_event_loop(self._loop)
@@ -62,11 +68,16 @@ class NetworkHost:
 
     async def _serve(self):
         import websockets
-        async with websockets.serve(self._handle_client, "", self.port):
-            while self.running:
-                await asyncio.sleep(0.05)
+        self._log(f"WebSocket server binding to 0.0.0.0 (all interfaces) on port {self.port}")
+        try:
+            async with websockets.serve(self._handle_client, "0.0.0.0", self.port):
+                while self.running:
+                    await asyncio.sleep(0.05)
+        except Exception as e:
+            self._log(f"Server error: {e}")
 
     async def _handle_client(self, websocket):
+        addr = websocket.remote_address[0] if websocket.remote_address else "unknown"
         with self.lock:
             cid = self._next_id
             self._next_id += 1
@@ -74,6 +85,9 @@ class NetworkHost:
             self._websockets.add(websocket)
             self.clients.append(websocket)
             self.client_ids[cid] = websocket
+        
+        self._log(f"Client {cid} connected from {addr}. Total: {len(self._websockets)}")
+        
         # Send initial handshake
         await websocket.send(json.dumps({"type": "assign_id", "id": cid}))
         await websocket.send(json.dumps({"type": "player_index",
@@ -82,13 +96,14 @@ class NetworkHost:
             async for raw in websocket:
                 try:
                     msg = json.loads(raw)
+                    self._log(f"Recv from {cid}: {msg.get('type')}")
                     msg["_from"] = cid
                     with self.lock:
                         self.inbox.append(msg)
                 except json.JSONDecodeError:
-                    pass
-        except Exception:
-            pass
+                    self._log(f"JSON error from {cid}")
+        except Exception as e:
+            self._log(f"Error handling client {cid}: {e}")
         finally:
             with self.lock:
                 self._websockets.discard(websocket)
@@ -96,6 +111,7 @@ class NetworkHost:
                 if websocket in self.clients:
                     self.clients.remove(websocket)
                 self.client_ids.pop(cid, None)
+            self._log(f"Client {cid} disconnected. Remaining: {len(self._websockets)}")
 
     # ------------------------------------------------------------------ send
 
@@ -186,11 +202,11 @@ class NetworkHost:
 
     # ------------------------------------------------------------------ firewall
 
-    @staticmethod
-    def _ensure_firewall_rules():
+    def _ensure_firewall_rules(self):
         import subprocess, sys
         if sys.platform != "win32":
             return
+        self._log("Checking firewall rules...")
         rules = [
             ("CtrlAltMath-TCP-In",  "TCP", str(LAN_PORT)),
             ("CtrlAltMath-UDP-In",  "UDP", str(LAN_DISCOVERY_PORT)),
@@ -198,15 +214,19 @@ class NetworkHost:
         ]
         for name, proto, port in rules:
             try:
-                subprocess.run(
+                res = subprocess.run(
                     ["netsh", "advfirewall", "firewall", "add", "rule",
                      f"name={name}", "dir=in", "action=allow",
                      f"protocol={proto}", f"localport={port}",
                      "enable=yes", "profile=any"],
                     capture_output=True, timeout=3
                 )
-            except Exception:
-                pass
+                if res.returncode == 0:
+                    self._log(f"Firewall rule added: {name}")
+                else:
+                    self._log(f"Firewall rule note: {name} (may require Admin or already exists)")
+            except Exception as e:
+                self._log(f"Firewall setup error for {name}: {e}")
 
     # ------------------------------------------------------------------ discovery (UDP)
 
@@ -223,6 +243,7 @@ class NetworkHost:
                 data, addr = sock.recvfrom(256)
                 text = data.decode("utf-8", errors="ignore")
                 if text.startswith("DISCOVER_REQUEST"):
+                    self._log(f"Discovery request from {addr[0]}")
                     reply_port = LAN_DISCOVERY_PORT + 1
                     if ":" in text:
                         try:
@@ -232,7 +253,8 @@ class NetworkHost:
                     sock.sendto(b"DISCOVER_RESPONSE", (addr[0], reply_port))
             except socket.timeout:
                 continue
-            except OSError:
+            except OSError as e:
+                self._log(f"Discovery socket error: {e}")
                 break
         sock.close()
 
@@ -250,7 +272,12 @@ class NetworkClient:
         self._ws      = None
         self._loop    = None
 
+    def _log(self, msg):
+        if getattr(settings, 'DEBUG_NETWORK', False):
+            print(f"[Client] {msg}")
+
     def connect(self, host, port=LAN_PORT):
+        self._log(f"Connecting to {host}:{port}...")
         self.running = True
         self._loop = asyncio.new_event_loop()
         t = threading.Thread(
@@ -266,7 +293,9 @@ class NetworkClient:
                 break
             time.sleep(0.05)
         if self._ws is None:
+            self._log(f"Failed to connect to {host}:{port}")
             raise ConnectionError(f"Could not connect to {host}:{port}")
+        self._log("Connected successfully.")
 
     def _run_loop(self, host, port):
         asyncio.set_event_loop(self._loop)
@@ -287,15 +316,18 @@ class NetworkClient:
                         msg = json.loads(raw)
                         if msg.get("type") == "assign_id":
                             self.my_id = msg["id"]
+                            self._log(f"Assigned ID: {self.my_id}")
                         else:
+                            self._log(f"Recv from host: {msg.get('type')}")
                             with self.lock:
                                 self.inbox.append(msg)
                     except json.JSONDecodeError:
-                        pass
-        except Exception:
-            pass
+                        self._log("JSON error from host")
+        except Exception as e:
+            self._log(f"Connection error: {e}")
         finally:
             self._ws = None
+            self._log("Disconnected from host.")
 
     def send(self, msg):
         if not self._loop or not self.running or self._ws is None:
