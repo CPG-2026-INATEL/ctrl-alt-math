@@ -23,6 +23,7 @@ from scenes.tilemap_scene import TilemapScene
 from scenes.victory_scene import VictoryScene
 from scenes.map_scene import MapScene
 from scenes.lore_scene import LoreScene
+from scenes.lobby_scene import LobbyScene
 
 
 class Game:
@@ -50,6 +51,7 @@ class Game:
         self.scene_manager.add("map", MapScene)
         self.scene_manager.add("tilemap", TilemapScene)
         self.scene_manager.add("lore", LoreScene)
+        self.scene_manager.add("lobby", LobbyScene)
         self.scene_manager.switch("menu")
 
     def _configure_display(self):
@@ -123,6 +125,10 @@ class Game:
         self.entropy = 0
         self.rewind_cooldown = 0
         self.rewind_fx_timer = 0
+        self.mp_is_multiplayer = False
+        self.mp_player_index = 1
+        self.mp_host = None
+        self.mp_client = None
 
         self.screen_shake = 0.0
         self.shake_intensity = 0

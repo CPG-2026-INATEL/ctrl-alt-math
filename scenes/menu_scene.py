@@ -18,6 +18,7 @@ class MenuScene(Scene):
         diff_str = t(f"difficulty_{settings.DIFFICULTY}")
         self.menu_items = [
             (t("menu_start"), ""),
+            (t("menu_multiplayer"), ""),
             (t("menu_how_to"), ""),
             (t("menu_lore"), ""),
             (f"{t('menu_language')}: {lang_str}", ""),
@@ -60,10 +61,12 @@ class MenuScene(Scene):
                 self.game.reset_game_state()
                 self.game.scene_manager.switch("map")
             elif self.selected == 1:
-                self.showing_how_to_play = True
+                self.game.scene_manager.switch("lobby")
             elif self.selected == 2:
-                self.game.scene_manager.switch("lore")
+                self.showing_how_to_play = True
             elif self.selected == 3:
+                self.game.scene_manager.switch("lore")
+            elif self.selected == 4:
                 # Toggle Language
                 if settings.LANGUAGE == LANG_EN:
                     settings.LANGUAGE = LANG_PT
@@ -71,20 +74,20 @@ class MenuScene(Scene):
                     settings.LANGUAGE = LANG_EN
                 self._update_menu_items()
                 self._speak_selection()
-            elif self.selected == 4:
+            elif self.selected == 5:
                 # Cycle Difficulty
                 diffs = [settings.DIFFICULTY_EASY, settings.DIFFICULTY_MEDIUM, settings.DIFFICULTY_HARD]
                 curr_idx = diffs.index(settings.DIFFICULTY)
                 settings.DIFFICULTY = diffs[(curr_idx + 1) % len(diffs)]
                 self._update_menu_items()
                 self._speak_selection()
-            elif self.selected == 5:
+            elif self.selected == 6:
                 # Toggle TTS
                 settings.TTS_ENABLED = not settings.TTS_ENABLED
                 self.game.tts.enabled = settings.TTS_ENABLED
                 self._update_menu_items()
                 self._speak_selection()
-            elif self.selected == 6:
+            elif self.selected == 7:
                 self.game.running = False
 
     def update(self, dt):
