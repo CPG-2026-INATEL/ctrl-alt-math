@@ -265,6 +265,30 @@ STRINGS = {
     "lobby_connected": {LANG_EN: "Connected!", LANG_PT: "Conectado!"},
     "lobby_press_start": {LANG_EN: "Press ENTER to ready up", LANG_PT: "Pressione ENTER para pronto"},
     "menu_multiplayer": {LANG_EN: "LAN Co-op", LANG_PT: "Co-op LAN"},
+    "menu_achievements": {LANG_EN: "Achievements", LANG_PT: "Conquistas"},
+    "achievements_title": {LANG_EN: "ACHIEVEMENTS", LANG_PT: "CONQUISTAS"},
+
+    # Achievements
+    "ach_first_room_name": {LANG_EN: "The First Proof", LANG_PT: "A Primeira Prova"},
+    "ach_first_room_desc": {LANG_EN: "Complete your first room.", LANG_PT: "Complete sua primeira sala."},
+    "ach_no_damage_name": {LANG_EN: "Untouchable", LANG_PT: "Intocável"},
+    "ach_no_damage_desc": {LANG_EN: "Complete a room without taking damage.", LANG_PT: "Complete uma sala sem sofrer dano."},
+    "ach_fast_win_name": {LANG_EN: "Efficient Thinker", LANG_PT: "Pensador Eficiente"},
+    "ach_fast_win_desc": {LANG_EN: "Complete a room in less than 10 turns.", LANG_PT: "Complete uma sala em menos de 10 turnos."},
+    "ach_skill_master_name": {LANG_EN: "Forbidden Knowledge", LANG_PT: "Conhecimento Proibido"},
+    "ach_skill_master_desc": {LANG_EN: "Unlock 5 or more skills.", LANG_PT: "Desbloqueie 5 ou mais habilidades."},
+    "ach_crit_thinking_name": {LANG_EN: "Critical Thinking", LANG_PT: "Pensamento Crítico"},
+    "ach_crit_thinking_desc": {LANG_EN: "Land 3 critical hits in a single room.", LANG_PT: "Acerte 3 golpes críticos em uma única sala."},
+    "ach_math_god_name": {LANG_EN: "Q.E.D.", LANG_PT: "Q.E.D."},
+    "ach_math_god_desc": {LANG_EN: "Reach the ultimate conclusion of the proof.", LANG_PT: "Alcance a conclusão definitiva da prova."},
+    "ach_stars_1": {LANG_EN: "Easy", LANG_PT: "Fácil"},
+    "ach_stars_2": {LANG_EN: "Medium", LANG_PT: "Médio"},
+    "ach_stars_3": {LANG_EN: "Hard", LANG_PT: "Difícil"},
+    "ach_locked": {LANG_EN: "Locked", LANG_PT: "Bloqueado"},
+    "achievement_unlocked_toast": {LANG_EN: "Achievement Unlocked!", LANG_PT: "Conquista Desbloqueada!"},
+    "lore_toast_title": {LANG_EN: "BERNOULLI LOG", LANG_PT: "REGISTRO BERNOULLI"},
+    "ach_reset_hint": {LANG_EN: "Press R to Reset All Achievements", LANG_PT: "Pressione R para Reiniciar Conquistas"},
+    "map_title": {LANG_EN: "WORLD ARCHIVE", LANG_PT: "ARQUIVO MUNDIAL"},
 }
 
 # Merge Lore Strings

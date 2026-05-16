@@ -25,6 +25,13 @@ class SkillTree:
             skill["unlocked"] = True
             self.skill_points -= skill["cost"]
             self.unlock_animations[skill_id] = 0.5
+            
+            # Check for skill_master achievement
+            unlocked_count = sum(1 for s in self.skills.values() if s["unlocked"])
+            if unlocked_count >= 5:
+                from achievement_manager import AchievementManager
+                AchievementManager().unlock("skill_master", settings.DIFFICULTY)
+            
             return True
         return False
 

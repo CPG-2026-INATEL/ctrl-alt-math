@@ -8,7 +8,7 @@ from i18n import t
 
 
 class LoreToast:
-    def __init__(self, text, title="BERNOULLI_LOG"):
+    def __init__(self, text, title="lore_toast_title"):
         self.full_text = text
         self.title = title
         self.display_text = ""
@@ -37,9 +37,38 @@ class LoreToast:
     def is_dead(self):
         return self.life <= 0
 
+class AchievementToast:
+    def __init__(self, ach_id, difficulty):
+        from achievement_manager import AchievementManager
+        ach = AchievementManager().achievements.get(ach_id)
+        self.name = ach["name"] if ach else "ach_unnamed"
+        self.difficulty = difficulty
+        self.timer = 0
+        self.life = 4.0
+        self.fade_timer = 0.5
+        self.y_offset = 50
+        self.target_y = 20
+        self.state = "sliding"
+
+    def update(self, dt):
+        self.life -= dt
+        if self.state == "sliding":
+            self.y_offset += (self.target_y - self.y_offset) * dt * 5
+            if abs(self.y_offset - self.target_y) < 1:
+                self.y_offset = self.target_y
+                self.state = "waiting"
+        
+    def is_dead(self):
+        return self.life <= 0
+
 class UI:
     def __init__(self):
         self.lore_toast = None
+        self.achievement_queue = []
+
+    def show_achievement(self, ach_id, difficulty):
+        from ui import AchievementToast
+        self.achievement_queue.append(AchievementToast(ach_id, difficulty))
 
     def draw_hud(self, screen, player, wave, skill_points, entropy, wave_count, game=None):
         bar_y = settings.WINDOW_HEIGHT - settings.UI_BAR_HEIGHT
@@ -181,7 +210,7 @@ class UI:
 
         # Title
         font_title = pygame.font.Font(None, 14)
-        title_surf = font_title.render(f"[{toast.title}]", True, settings.GOLD)
+        title_surf = font_title.render(f"[{t(toast.title)}]", True, settings.GOLD)
         title_surf.set_alpha(alpha)
         screen.blit(title_surf, (x + 10, y + 8))
 
@@ -201,6 +230,35 @@ class UI:
             glitch_surf = pygame.Surface((glitch_w, 2), pygame.SRCALPHA)
             glitch_surf.fill((settings.CYAN[0], settings.CYAN[1], settings.CYAN[2], 100))
             screen.blit(glitch_surf, (x + random.randint(0, w-glitch_w), y + random.randint(0, h)))
+
+    def draw_achievement_notification(self, screen, toast):
+        if not toast:
+            return
+
+        w, h = 260, 75
+        x = (settings.WINDOW_WIDTH - w) // 2
+        y = toast.y_offset
+        
+        alpha = 255
+        if toast.life <= toast.fade_timer:
+            alpha = max(0, min(255, int(255 * (toast.life / toast.fade_timer))))
+        
+        # Background
+        surf = pygame.Surface((w, h), pygame.SRCALPHA)
+        bg_alpha = max(0, min(255, int(230 * (alpha/255))))
+        pygame.draw.rect(surf, (20, 20, 40, bg_alpha), (0, 0, w, h), border_radius=15)
+        pygame.draw.rect(surf, settings.GOLD, (0, 0, w, h), 2, border_radius=15)
+        screen.blit(surf, (x, y))
+
+        # Content
+        from i18n import t
+        draw_text(screen, t("achievement_unlocked_toast").upper(), (x + w // 2, y + 15), settings.CYAN, 14)
+        draw_text(screen, t(toast.name), (x + w // 2, y + 35), settings.WHITE, 20)
+        
+        from achievement_manager import AchievementManager
+        star_count = {"easy": 1, "medium": 2, "hard": 3}.get(toast.difficulty, 1)
+        # Draw stars at the bottom center
+        self._draw_stars(screen, x + (w - 60) // 2, y + 55, star_count)
 
     def draw_main_menu(self, screen, menu_items, selected_item):
         screen.fill(settings.DARK_BLUE)
@@ -232,8 +290,8 @@ class UI:
             img.set_alpha(alpha)
             screen.blit(img, (x, y))
 
-        # Title block — sits at ~12% from top
-        top_y = int(H * 0.12)
+        # Title block — sits at ~10% from top
+        top_y = int(H * 0.10)
         title_size = max(36, int(H * 0.075))
         draw_text(screen, t("game_title"), (cx, top_y), settings.CYAN, title_size)
 
@@ -248,10 +306,10 @@ class UI:
         draw_text(screen, t("intro_2"), (cx, intro_y + line_gap),   settings.GRAY, intro_size)
         draw_text(screen, t("intro_3"), (cx, intro_y + line_gap*2), settings.GRAY, intro_size)
 
-        # Menu items — start at ~47% from top, spaced proportionally
+        # Menu items — start at ~38% from top, spaced proportionally
         item_size = max(20, int(H * 0.038))
-        item_gap  = max(36, int(H * 0.065))
-        y_start   = int(H * 0.47)
+        item_gap  = max(32, int(H * 0.055))
+        y_start   = int(H * 0.38)
         for i, (text, desc) in enumerate(menu_items):
             color = settings.WHITE if i == selected_item else settings.GRAY
             label = f"> {text} <" if i == selected_item else text
@@ -717,3 +775,78 @@ class UI:
         draw_text(screen, t("lore_footer"), (settings.WINDOW_WIDTH // 2, settings.WINDOW_HEIGHT - 40), settings.GRAY, 14)
         
         return max_scroll
+    def draw_achievements(self, screen, ach_list, selected_index, scroll_y):
+        screen.fill(settings.DARK_BLUE)
+        
+        # Title
+        draw_text(screen, t("achievements_title"), (settings.WINDOW_WIDTH // 2, 40), settings.CYAN, 32)
+        
+        # Content Area
+        margin_x = 100
+        view_rect = pygame.Rect(margin_x, 80, settings.WINDOW_WIDTH - margin_x * 2, settings.WINDOW_HEIGHT - 120)
+        
+        # Clip area
+        content_surf = pygame.Surface((view_rect.width, view_rect.height), pygame.SRCALPHA)
+        
+        from achievement_manager import AchievementManager
+        manager = AchievementManager()
+        
+        item_h = 90
+        for i, ach in enumerate(ach_list):
+            y_pos = i * item_h - scroll_y
+            if -item_h < y_pos < view_rect.height:
+                is_selected = (i == selected_index)
+                stars = manager.get_stars(ach["id"])
+                unlocked = stars > 0
+                
+                # Item box
+                box_rect = pygame.Rect(0, y_pos, view_rect.width, item_h - 10)
+                bg_color = (30, 40, 60, 200) if is_selected else (20, 25, 45, 150)
+                border_color = settings.GOLD if is_selected else (settings.GRAY if unlocked else (50, 50, 70))
+                
+                pygame.draw.rect(content_surf, bg_color, box_rect, border_radius=10)
+                pygame.draw.rect(content_surf, border_color, box_rect, 2 if is_selected else 1, border_radius=10)
+                
+                # Achievement info
+                text_color = settings.WHITE if unlocked else settings.GRAY
+                name_font = pygame.font.Font(None, 24)
+                desc_font = pygame.font.Font(None, 18)
+                
+                name_surf = name_font.render(t(ach["name"]), True, settings.GOLD if is_selected else text_color)
+                content_surf.blit(name_surf, (20, y_pos + 15))
+                
+                desc_surf = desc_font.render(t(ach["desc"]), True, text_color)
+                content_surf.blit(desc_surf, (20, y_pos + 40))
+                
+                # Stars
+                self._draw_stars(content_surf, view_rect.width - 100, y_pos + 25, stars)
+                
+                if not unlocked:
+                    lock_font = pygame.font.Font(None, 14)
+                    lock_surf = lock_font.render(t("ach_locked").upper(), True, (100, 50, 50))
+                    content_surf.blit(lock_surf, (view_rect.width - 100, y_pos + 55))
+
+        screen.blit(content_surf, (view_rect.x, view_rect.y))
+        
+        # Footer
+        draw_text(screen, t("how_to_return"), (settings.WINDOW_WIDTH // 2, settings.WINDOW_HEIGHT - 35), settings.GRAY, 14)
+        draw_text(screen, t("ach_reset_hint"), (settings.WINDOW_WIDTH // 2, settings.WINDOW_HEIGHT - 15), settings.ORANGE, 12)
+
+    def _draw_stars(self, surf, x, y, count):
+        star_size = 15
+        gap = 5
+        for i in range(3):
+            color = settings.GOLD if i < count else (40, 40, 40)
+            px = x + i * (star_size + gap)
+            py = y
+            # Draw a simple star shape (diamond/cross)
+            points = [
+                (px + star_size // 2, py),
+                (px + star_size, py + star_size // 2),
+                (px + star_size // 2, py + star_size),
+                (px, py + star_size // 2)
+            ]
+            pygame.draw.polygon(surf, color, points)
+            if i < count:
+                # Add a little glow
+                pygame.draw.polygon(surf, settings.WHITE, points, 1)

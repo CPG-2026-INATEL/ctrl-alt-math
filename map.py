@@ -214,7 +214,7 @@ class WorldMap:
         avatar_size = max(36, int(48 * settings.UI_SCALE))
         avatar_offset_y = int(20 * settings.UI_SCALE)
 
-        draw_text(screen, t("archive_title"),
+        draw_text(screen, t("map_title"),
                  (settings.WINDOW_WIDTH // 2, title_y),
                  settings.CYAN, 32)
 

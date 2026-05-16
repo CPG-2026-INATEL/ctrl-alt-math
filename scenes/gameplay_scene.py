@@ -60,6 +60,8 @@ class GameplayScene(Scene):
         
         self.lore_timer = 15.0 # Start after 15 seconds
         self.lore_toast = None
+        self.player_took_damage_this_room = False
+        self.crits_this_room = 0
 
     def enter(self, prev_scene=None):
         self.state = "WAVE_INTRO"
@@ -77,6 +79,8 @@ class GameplayScene(Scene):
         self.show_action_range = False
         self.selected_skill = None
         self.turn_log = []
+        self.player_took_damage_this_room = False
+        self.crits_this_room = 0
 
         if prev_scene and hasattr(prev_scene, "room"):
             room = prev_scene.room
@@ -111,6 +115,7 @@ class GameplayScene(Scene):
 
             if len(self.game.enemies) == 0:
                 self.state = "NO_COMBAT"
+                self._check_victory()
             
             # Speak room narrative
             text = f"{t(room.name)}. {t(room.narrative)}"
@@ -646,6 +651,13 @@ class GameplayScene(Scene):
                 self.game.sfx.play("hit")
                 if enemy.dead:
                     self._on_enemy_death(enemy)
+            
+            if is_crit:
+                self.crits_this_room += 1
+                if self.crits_this_room >= 3:
+                    from achievement_manager import AchievementManager
+                    AchievementManager().unlock("crit_thinking", settings.DIFFICULTY)
+            
             self.turn_log.append(f"Attack{' (CRIT!)' if is_crit else ''}")
         else:
             self.game.floating_text.add_miss(self.game.player.x, self.game.player.y)
@@ -689,6 +701,13 @@ class GameplayScene(Scene):
                     self._on_enemy_death(target_enemy)
             else:
                 self.game.floating_text.add_evasion(target_enemy.x, target_enemy.y)
+            
+            if is_crit:
+                self.crits_this_room += 1
+                if self.crits_this_room >= 3:
+                    from achievement_manager import AchievementManager
+                    AchievementManager().unlock("crit_thinking", settings.DIFFICULTY)
+
             self.turn_log.append(f"Pitagoras{' (CRIT!)' if is_crit else ''}" if hit else "Pitagoras Miss")
             self.game.sfx.play("pitagoras")
 
@@ -707,12 +726,19 @@ class GameplayScene(Scene):
             for enemy in self.game.enemies:
                 if not enemy.dead and (enemy.col, enemy.row) in target_cells:
                     enemy.take_damage(dmg)
+                    self.game.floating_text.add_formula(enemy.x, enemy.y - 30, "theta_i=theta_r", settings.CYAN)
                     self.game.floating_text.add_enemy_damage(enemy.x, enemy.y, dmg, is_crit)
                     self.game.particles.emit_burst(enemy.x, enemy.y, settings.CYAN, 8, 60, 0.3)
                     hit_count += 1
                     if enemy.dead:
                         self._on_enemy_death(enemy)
             
+            if is_crit:
+                self.crits_this_room += 1
+                if self.crits_this_room >= 3:
+                    from achievement_manager import AchievementManager
+                    AchievementManager().unlock("crit_thinking", settings.DIFFICULTY)
+
             # Effects
             self.game.particles.emit_burst(
                 self.game.player.x, self.game.player.y, settings.CYAN, 30, 120, 0.5
@@ -827,7 +853,7 @@ class GameplayScene(Scene):
         elif enemy.type == "strawman": exp_reward = settings.ENEMY_EXP_STRAWMAN
         elif enemy.type == "bayesian": exp_reward = settings.ENEMY_EXP_BAYESIAN
         elif enemy.type == "boss": exp_reward = settings.ENEMY_EXP_BOSS
-        
+
         if self.game.player.add_exp(exp_reward):
             self.game.floating_text.add_info(self.game.player.x, self.game.player.y - 60,
                                             f"LEVEL UP! ({self.game.player.level})", settings.GOLD)
@@ -844,11 +870,23 @@ class GameplayScene(Scene):
             pos = self.last_enemy_death_pos or (self.game.player.x, self.game.player.y)
             self.game.particles.emit_burst(pos[0], pos[1], settings.GOLD, 30, 100, 0.8)
             
-            # Award Skill Point per wave/room completion
-            self.game.skill_tree.add_points(1)
             self.game.floating_text.add_info(pos[0], pos[1] - 40, 
                                             t("earned_skill_point"), settings.GOLD)
             self.game.tts.speak(t("earned_skill_point"), lang=settings.LANGUAGE)
+            self.game.skill_tree.add_points(1)
+
+            from achievement_manager import AchievementManager
+            mgr = AchievementManager()
+            mgr.unlock("first_room", settings.DIFFICULTY)
+            
+            if not self.player_took_damage_this_room:
+                mgr.unlock("no_damage", settings.DIFFICULTY)
+            
+            if self.turn_manager.turn_number < 10:
+                mgr.unlock("fast_win", settings.DIFFICULTY)
+                
+            if self.game.current_room and (self.game.current_room.type == "victory" or getattr(self.game.current_room, "is_final_gate", False)):
+                mgr.unlock("math_god", settings.DIFFICULTY)
 
     def _start_enemy_turn(self):
         if self.state == "VICTORY_TRANSITION":
@@ -1189,6 +1227,7 @@ class GameplayScene(Scene):
             dx = abs(pc - enemy.col)
             dy = abs(pr - enemy.row)
             if self.game.player.take_damage(dmg):
+                self.player_took_damage_this_room = True
                 self.game.floating_text.add_damage(self.game.player.x, self.game.player.y, dmg, enemy.last_crit)
                 self.game.particles.emit_burst(self.game.player.x, self.game.player.y, settings.RED, 10, 60, 0.3)
                 self.game.screen_shake = 0.15 if enemy.last_crit else 0.1
@@ -1218,6 +1257,7 @@ class GameplayScene(Scene):
         if player_hit:
             dmg = enemy.roll_damage()
             if self.game.player.take_damage(dmg):
+                self.player_took_damage_this_room = True
                 self.game.floating_text.add_damage(self.game.player.x, self.game.player.y, dmg, enemy.last_crit)
                 self.game.particles.emit_burst(self.game.player.x, self.game.player.y, settings.RED, 10, 60, 0.3)
                 self.game.screen_shake = 0.15 if enemy.last_crit else 0.1
@@ -1263,6 +1303,7 @@ class GameplayScene(Scene):
 
             if c == self.game.player.col and r == self.game.player.row:
                 if self.game.player.take_damage(dmg):
+                    self.player_took_damage_this_room = True
                     self.game.floating_text.add_damage(self.game.player.x, self.game.player.y, dmg, enemy.last_crit)
                     self.game.particles.emit_burst(self.game.player.x, self.game.player.y, settings.RED, 10, 60, 0.3)
                     self.game.screen_shake = 0.15
@@ -1305,6 +1346,7 @@ class GameplayScene(Scene):
             if c == pc and r == pr:
                 if not self.grid.is_level_change(ec, er, c, r):
                     if self.game.player.take_damage(dmg):
+                        self.player_took_damage_this_room = True
                         self.game.floating_text.add_damage(self.game.player.x, self.game.player.y, dmg, enemy.last_crit)
                         self.game.particles.emit_burst(self.game.player.x, self.game.player.y, settings.RED, 8, 50, 0.3)
                         self.game.screen_shake = 0.12
@@ -1328,6 +1370,7 @@ class GameplayScene(Scene):
             for row in range(tr - radius, tr + radius + 1):
                 if col == self.game.player.col and row == self.game.player.row:
                     if self.game.player.take_damage(dmg):
+                        self.player_took_damage_this_room = True
                         self.game.floating_text.add_damage(self.game.player.x, self.game.player.y, dmg, enemy.last_crit)
                         self.game.particles.emit_burst(self.game.player.x, self.game.player.y, settings.RED, 10, 60, 0.3)
                         self.game.screen_shake = 0.15
