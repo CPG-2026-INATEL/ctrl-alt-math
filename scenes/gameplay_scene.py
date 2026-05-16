@@ -740,7 +740,6 @@ class GameplayScene(Scene):
             enemy.flash_timer = max(0, enemy.flash_timer - dt)
             if enemy.type == "boss":
                 enemy.pulse_timer += dt * 2
-            e._vy *= SEP_DAMP
         # ────────────────────────────────────────────────────────────────
 
 
