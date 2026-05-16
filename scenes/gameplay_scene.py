@@ -303,7 +303,7 @@ class GameplayScene(Scene):
     def _confirm_player_cursor(self):
         pc = self.game.player.col
         pr = self.game.player.row
-        reachable = self.grid.get_reachable_cells(pc, pr, settings.PLAYER_MOVE_RANGE)
+        reachable = self.grid.get_reachable_cells(pc, pr, self.game.player.move_range)
 
         if (self.cursor_col, self.cursor_row) == (pc, pr):
             self.turn_manager.player_moved = True
@@ -507,7 +507,7 @@ class GameplayScene(Scene):
         if hit_enemies:
             is_crit = self.game.player.check_crit()
             for enemy in hit_enemies:
-                base_dmg = settings.PLAYER_ATTACK_DAMAGE
+                base_dmg = self.game.player.base_damage
                 if is_crit:
                     dmg = int(base_dmg * settings.PLAYER_CRIT_MULTIPLIER)
                 else:
@@ -632,7 +632,15 @@ class GameplayScene(Scene):
                 (int(c), int(r)) for c, r in target["barrier_cells"]
             )
 
-        self.game.entropy = target["entropy"]
+        # Apply Bonus Regeneration (15% of Max HP)
+        heal_amount = int(self.game.player.max_hp * 0.15)
+        self.game.player.hp = min(self.game.player.max_hp, self.game.player.hp + heal_amount)
+        self.game.floating_text.add_info(self.game.player.x, self.game.player.y - 40, 
+                                        f"+{heal_amount} HP (OPTIMIZED)", settings.GREEN)
+
+        # Correctly increase Entropy cost
+        self.game.entropy = target["entropy"] + settings.REWIND_ENTROPY_INCREASE
+        
         self.game.particles.emit_burst(
             self.game.player.x, self.game.player.y, settings.CYAN, 30, 100, 0.6
         )
@@ -656,6 +664,20 @@ class GameplayScene(Scene):
         self.game.shake_intensity = 4
         self.game.sfx.play("enemy_die")
         self.last_enemy_death_pos = (enemy.x, enemy.y)
+        
+        # Award EXP
+        exp_reward = 0
+        if enemy.type == "censor": exp_reward = settings.ENEMY_EXP_CENSOR
+        elif enemy.type == "strawman": exp_reward = settings.ENEMY_EXP_STRAWMAN
+        elif enemy.type == "bayesian": exp_reward = settings.ENEMY_EXP_BAYESIAN
+        elif enemy.type == "boss": exp_reward = settings.ENEMY_EXP_BOSS
+        
+        if self.game.player.add_exp(exp_reward):
+            self.game.floating_text.add_info(self.game.player.x, self.game.player.y - 60,
+                                            f"LEVEL UP! ({self.game.player.level})", settings.GOLD)
+            self.game.sfx.play("victory")
+            self.game.particles.emit_burst(self.game.player.x, self.game.player.y, settings.GOLD, 20, 100, 0.5)
+
         self._check_victory()
 
     def _check_victory(self):
@@ -665,6 +687,12 @@ class GameplayScene(Scene):
             self.victory_timer = 0
             pos = self.last_enemy_death_pos or (self.game.player.x, self.game.player.y)
             self.game.particles.emit_burst(pos[0], pos[1], settings.GOLD, 30, 100, 0.8)
+            
+            # Award Skill Point per wave/room completion
+            self.game.skill_tree.add_points(1)
+            self.game.floating_text.add_info(pos[0], pos[1] - 40, 
+                                            t("earned_skill_point"), settings.GOLD)
+            self.game.tts.speak(t("earned_skill_point"), lang=settings.LANGUAGE)
 
     def _start_enemy_turn(self):
         if self.state == "VICTORY_TRANSITION":
@@ -1154,7 +1182,7 @@ class GameplayScene(Scene):
         if self.state == "PLAYER_INPUT" and self.show_move_range:
             pc = self.game.player.col
             pr = self.game.player.row
-            reachable = self.grid.get_reachable_cells(pc, pr, settings.PLAYER_MOVE_RANGE)
+            reachable = self.grid.get_reachable_cells(pc, pr, self.game.player.move_range)
             self.grid.draw(temp, highlight_cells=reachable, highlight_color=settings.BLUE, offset=world_offset)
 
         if self.state == "PLAYER_ACTION_SELECT" and self.show_action_range:
@@ -1348,7 +1376,7 @@ class GameplayScene(Scene):
             tile_name = "STAIRS"
         lines.append((f"Tile: {tile_name}", settings.LIGHT_GRAY))
 
-        reachable = self.grid.get_reachable_cells(pc, pr, settings.PLAYER_MOVE_RANGE)
+        reachable = self.grid.get_reachable_cells(pc, pr, self.game.player.move_range)
         if (cc, cr) in reachable or (cc, cr) == (pc, pr):
             can_reach = True
         else:
@@ -1446,18 +1474,31 @@ class GameplayScene(Scene):
 
         self._draw_bar(screen, settings.UI_PADDING, bar_y + 31, 160, 14,
                        rigor_pct, settings.BLUE, (20, 20, 60))
-        draw_text(screen, f"Rigor: {self.game.player.rigor:.0f}/{self.game.player.max_rigor}",
+        draw_text(screen, f"{t('rigor')}: {self.game.player.rigor:.0f}/{self.game.player.max_rigor}",
                   (settings.UI_PADDING + 80, bar_y + 38),
                   settings.WHITE, 14)
 
+        # EXP Bar
+        exp_pct = self.game.player.exp / self.game.player.next_level_exp
         self._draw_bar(screen, settings.UI_PADDING + 180, bar_y + 10, 120, 14,
-                       entropy_pct, settings.COLOR_ENTROPY_BAR, (40, 10, 40))
-        draw_text(screen, f"Entropy: {self.game.entropy:.0f}",
+                       exp_pct, settings.GOLD, (40, 40, 10))
+        draw_text(screen, f"LVL {self.game.player.level} ({int(exp_pct*100)}%)",
                   (settings.UI_PADDING + 240, bar_y + 17),
                   settings.WHITE, 13)
-        draw_text(screen, f"Crit: {int(settings.PLAYER_CRIT_CHANCE * 100)}% x{settings.PLAYER_CRIT_MULTIPLIER:.0f}",
+
+        self._draw_bar(screen, settings.UI_PADDING + 180, bar_y + 31, 120, 14,
+                       entropy_pct, settings.COLOR_ENTROPY_BAR, (40, 10, 40))
+        draw_text(screen, f"Entropy: {self.game.entropy:.0f}",
                   (settings.UI_PADDING + 240, bar_y + 38),
-                  settings.GOLD, 13)
+                  settings.WHITE, 13)
+
+        # Crit display moved
+        draw_text(screen, f"Crit: {int(settings.PLAYER_CRIT_CHANCE * 100)}% x{settings.PLAYER_CRIT_MULTIPLIER:.0f}",
+                  (settings.UI_PADDING + 340, bar_y + 17),
+                  settings.GOLD, 12)
+        draw_text(screen, f"Dmg: {self.game.player.base_damage}",
+                  (settings.UI_PADDING + 340, bar_y + 38),
+                  settings.CYAN, 12)
 
         phase_text = "PLAYER MOVE"
         phase_symbol = "\u0394x"

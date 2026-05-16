@@ -15,8 +15,14 @@ class Player:
         self.size = settings.PLAYER_SIZE
         self.hp = settings.PLAYER_MAX_HP
         self.max_hp = settings.PLAYER_MAX_HP
+        self.base_damage = settings.PLAYER_ATTACK_DAMAGE
         self.rigor = settings.PLAYER_MAX_RIGOR
         self.max_rigor = settings.PLAYER_MAX_RIGOR
+        
+        self.level = 1
+        self.exp = 0
+        self.next_level_exp = settings.PLAYER_EXP_BASE
+        self.move_range = settings.PLAYER_MOVE_RANGE
 
         self.dir_x = 0
         self.dir_y = -1
@@ -188,6 +194,26 @@ class Player:
 
         
         self.glow_phase += dt * 4
+
+    def add_exp(self, amount):
+        self.exp += amount
+        leveled_up = False
+        while self.exp >= self.next_level_exp:
+            self.exp -= self.next_level_exp
+            self.level_up()
+            leveled_up = True
+        return leveled_up
+
+    def level_up(self):
+        self.level += 1
+        self.max_hp += settings.PLAYER_HP_PER_LEVEL
+        self.hp = self.max_hp  # Heal on level up
+        self.base_damage += settings.PLAYER_DMG_PER_LEVEL
+        self.next_level_exp = int(self.next_level_exp * settings.PLAYER_EXP_GROWTH)
+        
+        # Increase move range every 2 levels
+        if self.level % 2 == 0:
+            self.move_range += 1
 
     def basic_attack(self):
         return True

@@ -64,10 +64,18 @@ class UI:
                   (settings.UI_PADDING + 80, bar_y + 33),
                   settings.WHITE, 14)
 
+        # EXP Bar
+        exp_pct = player.exp / player.next_level_exp
         self._draw_bar(screen, settings.UI_PADDING + 180, bar_y + 8, 120, 14,
+                       exp_pct, settings.GOLD, (40, 40, 10))
+        draw_text(screen, f"LVL {player.level} ({int(exp_pct*100)}%)",
+                  (settings.UI_PADDING + 240, bar_y + 15),
+                  settings.WHITE, 14)
+
+        self._draw_bar(screen, settings.UI_PADDING + 180, bar_y + 26, 120, 14,
                        entropy_pct, settings.COLOR_ENTROPY_BAR, (40, 10, 40))
         draw_text(screen, f"{t('entropy')}: {entropy:.0f}",
-                  (settings.UI_PADDING + 240, bar_y + 15),
+                  (settings.UI_PADDING + 240, bar_y + 33),
                   settings.WHITE, 14)
 
         draw_text(screen, t("wave_count", wave=wave) + f"/{wave_count}",
@@ -77,6 +85,10 @@ class UI:
         draw_text(screen, f"{t('skill_points')}: {skill_points}",
                   (settings.WINDOW_WIDTH // 2, bar_y + 38),
                   settings.GOLD, 16)
+
+        draw_text(screen, f"Dmg: {player.base_damage}",
+                  (settings.WINDOW_WIDTH // 2 + 100, bar_y + 38),
+                  settings.CYAN, 14)
 
         self._draw_skill_cooldowns(screen, bar_y, player, game)
         self._draw_controls(screen, bar_y)
