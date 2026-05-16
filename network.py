@@ -44,6 +44,8 @@ class NetworkHost:
         # Programmatically start the localtunnel
         try:
             self.tunnel = Tunnel()
+            # Monkeypatch check_local_port to be a no-op to avoid triggering raw TCP handshake EOFError warnings on websockets
+            self.tunnel.check_local_port = lambda: None
             # Fetch the URL first (instantaneous)
             raw_url = self.tunnel.get_url(None)
             # Convert https:// to wss:// for public WebSocket connection
