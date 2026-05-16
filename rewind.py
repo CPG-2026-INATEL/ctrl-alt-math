@@ -8,16 +8,34 @@ class RewindBuffer:
         self.buffer = []
         self.timer = 0
 
-    def record(self, player_pos, player_hp, player_max_hp, dt):
+    def record(self, player, enemies, projectiles, dt):
         self.timer += dt
         if self.timer >= settings.REWIND_SNAPSHOT_INTERVAL:
             self.timer = 0
-            self.buffer.append({
-                'pos': (player_pos[0], player_pos[1]),
-                'hp': player_hp,
-                'max_hp': player_max_hp,
-                'time': pygame.time.get_ticks()
-            })
+            snapshot = {
+                'time': pygame.time.get_ticks(),
+                'player': {
+                    'x': player.x, 'y': player.y,
+                    'hp': player.hp, 'max_hp': player.max_hp,
+                },
+                'enemies': [
+                    {
+                        'x': e.x, 'y': e.y, 'hp': e.hp, 'max_hp': e.max_hp,
+                        'type': e.type, 'alive': e.alive, 'dead': e.dead,
+                        'size': e.size, 'color': e.color,
+                    }
+                    for e in enemies if not e.dead
+                ],
+                'projectiles': [
+                    {
+                        'x': p.x, 'y': p.y, 'vx': p.vx, 'vy': p.vy,
+                        'damage': p.damage, 'owner': p.owner,
+                        'color': p.color, 'size': p.size,
+                    }
+                    for p in projectiles if p.alive
+                ],
+            }
+            self.buffer.append(snapshot)
             cutoff = pygame.time.get_ticks() - settings.REWIND_BUFFER_SECONDS * 1000
             while self.buffer and self.buffer[0]['time'] < cutoff:
                 self.buffer.pop(0)
@@ -33,7 +51,7 @@ class RewindBuffer:
                 break
         if best is None:
             best = self.buffer[0]
-        return (best['pos'], best['hp'], best['max_hp'])
+        return best
 
     def clear(self):
         self.buffer.clear()

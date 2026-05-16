@@ -83,10 +83,6 @@ class SkillTree:
         draw_text(screen, "SKILL TREE", (settings.WINDOW_WIDTH // 2, 20),
                   settings.WHITE, 36)
 
-        draw_text(screen, f"Skill Points: {self.skill_points}",
-                  (settings.WINDOW_WIDTH // 2, 65),
-                  settings.GOLD, 28)
-
         for sid, skill in self.skills.items():
             for prereq in skill["prereqs"]:
                 if prereq in self.skills:
@@ -152,6 +148,10 @@ class SkillTree:
             if skill["unlocked"]:
                 check_surf = pygame.font.Font(None, 20).render("\u2713", True, settings.GREEN)
                 screen.blit(check_surf, (rect.right - 20, rect.top + 5))
+
+        draw_text(screen, f"Skill Points: {self.skill_points}",
+                  (settings.WINDOW_WIDTH // 2, 110),
+                  settings.GOLD, 28)
 
         if self.hovered_id:
             skill = self.skills[self.hovered_id]

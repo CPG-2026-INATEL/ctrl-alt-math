@@ -30,3 +30,29 @@ def lerp(a, b, t):
 
 def point_in_rect(px, py, rx, ry, rw, rh):
     return rx <= px <= rx + rw and ry <= py <= ry + rh
+
+def resolve_obstacle_collision(entity_x, entity_y, entity_size, obstacles):
+    entity_rect = pygame.Rect(
+        entity_x - entity_size, entity_y - entity_size,
+        entity_size * 2, entity_size * 2
+    )
+    for obs in obstacles:
+        if entity_rect.colliderect(obs):
+            overlap_left = entity_rect.right - obs.left
+            overlap_right = obs.right - entity_rect.left
+            overlap_top = entity_rect.bottom - obs.top
+            overlap_bottom = obs.bottom - entity_rect.top
+            min_overlap = min(overlap_left, overlap_right, overlap_top, overlap_bottom)
+            if min_overlap == overlap_left:
+                entity_x -= overlap_left
+            elif min_overlap == overlap_right:
+                entity_x += overlap_right
+            elif min_overlap == overlap_top:
+                entity_y -= overlap_top
+            else:
+                entity_y += overlap_bottom
+            entity_rect = pygame.Rect(
+                entity_x - entity_size, entity_y - entity_size,
+                entity_size * 2, entity_size * 2
+            )
+    return entity_x, entity_y

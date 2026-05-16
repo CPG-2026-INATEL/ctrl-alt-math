@@ -61,7 +61,7 @@ BAYESIAN_SPEED = 90
 BAYESIAN_DAMAGE = 10
 BAYESIAN_PROJECTILE_SPEED = 150
 
-BOSS_HP = 200
+BOSS_HP = 150
 BOSS_SPEED = 60
 BOSS_DAMAGE = 15
 
@@ -116,17 +116,17 @@ WAVES = [
         "post_narrative": "You recover a lost axiom\nfrom a censored archive."
     },
     {
-        "enemies": [("censor", 3)],
+        "enemies": [("censor", 2)],
         "narrative": "The regime sends more censors.\nThey cannot erase what is proven.",
         "post_narrative": "Derivatives and integrals\nwhisper in the static."
     },
     {
-        "enemies": [("censor", 2), ("strawman", 2)],
+        "enemies": [("censor", 1), ("strawman", 1)],
         "narrative": "Rhetorical tricksters enter the field.\nThey distort your theorems.",
         "post_narrative": "You see through their\nlogical fallacies."
     },
     {
-        "enemies": [("censor", 2), ("strawman", 1), ("bayesian", 2)],
+        "enemies": [("censor", 1), ("strawman", 1), ("bayesian", 1)],
         "narrative": "An Inquisidor Bayesiano joins.\nIt calculates your every move.",
         "post_narrative": "Probability bends to your will.\nThe end approaches."
     },
@@ -216,4 +216,182 @@ SKILL_TO_KEY = {
     "pitagoras": "1",
     "reflexao": "2",
     "ctrlz": "r",
+}
+
+MAP_COLS = 5
+MAP_ROWS = 4
+MAP_START_ROOM = (2, 1)
+MAP_ROOM_WIDTH = 120
+MAP_ROOM_HEIGHT = 80
+MAP_ROOM_GAP = 30
+MAP_OFFSET_X = 80
+MAP_OFFSET_Y = 80
+
+MAP_ROOMS = {
+    (2, 1): {
+        "type": "hub",
+        "name": "The Archive",
+        "narrative": "A safe haven where forbidden knowledge persists.",
+        "connections": [(1, 1), (3, 1), (2, 0), (2, 2)],
+        "enemies": [],
+        "obstacles": [],
+    },
+    (1, 1): {
+        "type": "normal",
+        "name": "Censored Library",
+        "narrative": "Books burn themselves as you enter.",
+        "connections": [(2, 1), (0, 1), (1, 0)],
+        "enemies": [("censor", 2)],
+        "obstacles": [
+            {"x": 200, "y": 100, "w": 50, "h": 30},
+            {"x": 550, "y": 300, "w": 50, "h": 30},
+        ],
+    },
+    (3, 1): {
+        "type": "normal",
+        "name": "Logic Chamber",
+        "narrative": "Every argument here must be proven.",
+        "connections": [(2, 1), (4, 1), (3, 2)],
+        "enemies": [("censor", 1), ("strawman", 1)],
+        "obstacles": [
+            {"x": 300, "y": 150, "w": 40, "h": 60},
+            {"x": 450, "y": 350, "w": 60, "h": 40},
+        ],
+    },
+    (2, 0): {
+        "type": "normal",
+        "name": "Proof Gallery",
+        "narrative": "Theorems hang on walls like paintings.",
+        "connections": [(2, 1), (1, 0), (3, 0)],
+        "enemies": [("censor", 1), ("strawman", 2)],
+        "obstacles": [
+            {"x": 150, "y": 200, "w": 30, "h": 80},
+            {"x": 620, "y": 200, "w": 30, "h": 80},
+        ],
+    },
+    (2, 2): {
+        "type": "normal",
+        "name": "Derivative Hall",
+        "narrative": "Rates of change echo through corridors.",
+        "connections": [(2, 1), (1, 2), (3, 2)],
+        "enemies": [("censor", 2), ("strawman", 1)],
+        "obstacles": [
+            {"x": 250, "y": 120, "w": 50, "h": 50},
+            {"x": 500, "y": 280, "w": 50, "h": 50},
+        ],
+    },
+    (0, 1): {
+        "type": "challenge",
+        "name": "Fallacy Maze",
+        "narrative": "Every path leads to a logical trap.",
+        "connections": [(1, 1), (0, 0)],
+        "enemies": [("censor", 2), ("strawman", 2)],
+        "obstacles": [
+            {"x": 180, "y": 100, "w": 40, "h": 40},
+            {"x": 380, "y": 200, "w": 40, "h": 80},
+            {"x": 580, "y": 320, "w": 40, "h": 40},
+        ],
+    },
+    (1, 0): {
+        "type": "challenge",
+        "name": "Induction Tower",
+        "narrative": "Prove the base case to ascend.",
+        "connections": [(2, 0), (0, 1)],
+        "enemies": [("censor", 1), ("strawman", 1), ("bayesian", 1)],
+        "obstacles": [
+            {"x": 300, "y": 100, "w": 60, "h": 30},
+            {"x": 400, "y": 350, "w": 60, "h": 30},
+        ],
+    },
+    (1, 2): {
+        "type": "challenge",
+        "name": "Probability Dungeon",
+        "narrative": "Bayesian inference is your only light.",
+        "connections": [(2, 2), (0, 2)],
+        "enemies": [("censor", 1), ("bayesian", 2)],
+        "obstacles": [
+            {"x": 200, "y": 150, "w": 30, "h": 60},
+            {"x": 570, "y": 250, "w": 30, "h": 60},
+        ],
+    },
+    (0, 0): {
+        "type": "boss",
+        "name": "The Censor General",
+        "narrative": "The head of all censorship awaits.",
+        "connections": [(0, 1)],
+        "enemies": [("boss", 1)],
+        "obstacles": [
+            {"x": 250, "y": 180, "w": 40, "h": 40},
+            {"x": 510, "y": 180, "w": 40, "h": 40},
+            {"x": 380, "y": 300, "w": 40, "h": 40},
+        ],
+        "boss_hp": 150,
+    },
+    (3, 0): {
+        "type": "boss",
+        "name": "The Reduction Engine",
+        "narrative": "It reduces complexity to nothing.",
+        "connections": [(2, 0), (4, 0)],
+        "enemies": [("boss", 1)],
+        "obstacles": [
+            {"x": 180, "y": 120, "w": 50, "h": 50},
+            {"x": 570, "y": 120, "w": 50, "h": 50},
+        ],
+        "boss_hp": 180,
+    },
+    (4, 1): {
+        "type": "boss",
+        "name": "O Grande Simplificador",
+        "narrative": "The final boss. It wants one-dimensional thought.",
+        "connections": [(3, 1), (4, 2)],
+        "enemies": [("boss", 1)],
+        "obstacles": [
+            {"x": 200, "y": 100, "w": 40, "h": 40},
+            {"x": 560, "y": 100, "w": 40, "h": 40},
+            {"x": 380, "y": 250, "w": 40, "h": 80},
+        ],
+        "boss_hp": 200,
+    },
+    (4, 2): {
+        "type": "victory",
+        "name": "The Unbound Theorem",
+        "narrative": "Mathematics cannot be contained.",
+        "connections": [(4, 1)],
+        "enemies": [],
+        "obstacles": [],
+    },
+    (0, 2): {
+        "type": "normal",
+        "name": "Integral Sanctuary",
+        "narrative": "Accumulated knowledge flows here.",
+        "connections": [(1, 2)],
+        "enemies": [("censor", 2), ("bayesian", 1)],
+        "obstacles": [
+            {"x": 300, "y": 200, "w": 80, "h": 40},
+        ],
+    },
+    (3, 2): {
+        "type": "normal",
+        "name": "Matrix Vault",
+        "narrative": "Linear transformations guard this room.",
+        "connections": [(2, 2), (3, 1)],
+        "enemies": [("censor", 1), ("strawman", 1), ("bayesian", 1)],
+        "obstacles": [
+            {"x": 200, "y": 150, "w": 40, "h": 40},
+            {"x": 560, "y": 300, "w": 40, "h": 40},
+        ],
+    },
+    (4, 0): {
+        "type": "challenge",
+        "name": "Chaos Theory Lab",
+        "narrative": "Small changes have massive consequences.",
+        "connections": [(3, 0)],
+        "enemies": [("censor", 3), ("strawman", 2), ("bayesian", 1)],
+        "obstacles": [
+            {"x": 150, "y": 100, "w": 30, "h": 30},
+            {"x": 300, "y": 250, "w": 30, "h": 30},
+            {"x": 450, "y": 150, "w": 30, "h": 30},
+            {"x": 600, "y": 350, "w": 30, "h": 30},
+        ],
+    },
 }

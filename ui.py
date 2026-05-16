@@ -365,12 +365,16 @@ class UI:
                 pred2_x = enemy.x + (dx / dist) * 55
                 pred2_y = enemy.y + (dy / dist) * 55
 
-            s2 = pygame.Surface((8, 8))
+            dist_to_player = distance((enemy.x, enemy.y), (player.x, player.y))
+            proximity = max(0, 1.0 - (dist_to_player / enemy.attack_range))
+            square_size = int(8 + proximity * 16)
+
+            s2 = pygame.Surface((square_size, square_size))
             s2.set_alpha(80)
             s2.fill(settings.PURPLE)
-            screen.blit(s2, (pred2_x - 4, pred2_y - 4))
+            screen.blit(s2, (pred2_x - square_size // 2, pred2_y - square_size // 2))
             pygame.draw.rect(screen, settings.PURPLE,
-                           (pred2_x - 4, pred2_y - 4, 8, 8), 1)
+                           (pred2_x - square_size // 2, pred2_y - square_size // 2, square_size, square_size), 1)
 
         if has_teoria:
             dx = player.x - enemy.x
