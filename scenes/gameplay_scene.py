@@ -82,10 +82,9 @@ class GameplayScene(Scene):
             room = prev_scene.room
             self.game.current_room = room
             
-            # Randomize map size from 2x to 4x current size (area)
-            # Current area is 16*12 = 192.
-            # We use a factor on dimensions between sqrt(2) and sqrt(4)
-            size_factor = random.uniform(1.41, 2.0)
+            # Randomize map size based on difficulty
+            scaling = settings.DIFFICULTY_SCALING.get(settings.DIFFICULTY, settings.DIFFICULTY_SCALING[settings.DIFFICULTY_HARD])
+            size_factor = random.uniform(scaling["arena_size_min"], scaling["arena_size_max"])
             new_cols = int(settings.GRID_COLS * size_factor)
             new_rows = int(settings.GRID_ROWS * size_factor)
             self.grid = Grid(new_cols, new_rows)
