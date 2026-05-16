@@ -301,15 +301,6 @@ class GameplayScene(Scene):
         self.state = "PLAYER_ACTION_SELECT"
         self.show_move_range = False
         self.show_action_range = True
-        if not self._has_valid_action():
-            self.turn_manager.player_acted = True
-            self.show_action_range = False
-            self.selected_skill = None
-            self.turn_log.append("No targets - Wait")
-            self.game.floating_text.add_info(
-                self.game.player.x, self.game.player.y - 30,
-                "No targets in range", settings.GRAY)
-            self._start_enemy_turn()
 
     def _confirm_player_cursor(self):
         pc = self.game.player.col
@@ -351,21 +342,6 @@ class GameplayScene(Scene):
             cell for cell in self.grid.get_cells_in_range(pc, pr, settings.BASIC_ATTACK_RANGE)
             if cell != (pc, pr)
         ]
-
-    def _has_valid_action(self):
-        for enemy in self.game.enemies:
-            if enemy.dead:
-                continue
-            d = self.grid.grid_distance(self.game.player.col, self.game.player.row,
-                                        enemy.col, enemy.row)
-            if d <= settings.BASIC_ATTACK_RANGE:
-                return True
-            if self.game.skill_tree.is_unlocked("pitagoras") and d <= settings.PITAGORAS_RANGE:
-                return True
-        if self.game.skill_tree.is_unlocked("reflexao") and \
-                self.game.player.rigor >= settings.REFLEXAO_RIGOR_COST:
-            return True
-        return False
 
     def _can_execute_cursor_action(self):
         action_cells = self._get_action_cells()
@@ -1477,13 +1453,9 @@ class GameplayScene(Scene):
         controls_img = pygame.font.Font(None, 11).render(controls, True, settings.GRAY)
         screen.blit(controls_img, (settings.UI_PADDING, settings.WINDOW_HEIGHT - 14))
 
-        if self.state == "PLAYER_ACTION_SELECT" and not self._has_valid_action():
-            no_target_img = pygame.font.Font(None, 18).render(
-                "No targets in range - press E to wait", True, settings.YELLOW)
-            screen.blit(no_target_img, (center_x - no_target_img.get_width() // 2, bar_y - 22))
-
     def _draw_bar(self, screen, x, y, w, h, pct, fill_color, bg_color):
         pygame.draw.rect(screen, bg_color, (x, y, w, h))
         if pct > 0:
             pygame.draw.rect(screen, fill_color, (x, y, int(w * pct), h))
+        pygame.draw.rect(screen, settings.LIGHT_GRAY, (x, y, w, h), 1)
         pygame.draw.rect(screen, settings.LIGHT_GRAY, (x, y, w, h), 1)
