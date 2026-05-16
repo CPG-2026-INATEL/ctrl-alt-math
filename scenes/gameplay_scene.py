@@ -912,7 +912,7 @@ class GameplayScene(Scene):
             self.lore_toast.update(dt)
             if self.lore_toast.is_dead():
                 self.lore_toast = None
-        else:
+        elif settings.SHOW_LORE_TOASTS:
             self.lore_timer -= dt
             if self.lore_timer <= 0:
                 from lore_data import SHORT_LORE_SNIPPETS
@@ -1033,7 +1033,8 @@ class GameplayScene(Scene):
                     self.game.world_map.complete_room(
                         (self.game.current_room.col, self.game.current_room.row)
                     )
-                    if self.game.current_room.type == "victory":
+                    # If victory room OR final boss gate completed, go to victory screen
+                    if self.game.current_room.type == "victory" or getattr(self.game.current_room, "is_final_gate", False):
                         self.game.scene_manager.switch("victory")
                     else:
                         self.game.scene_manager.switch("map")
