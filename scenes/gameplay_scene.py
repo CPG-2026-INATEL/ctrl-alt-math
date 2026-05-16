@@ -678,7 +678,8 @@ class GameplayScene(Scene):
                 (int(c), int(r)) for c, r in target["barrier_cells"]
             )
 
-        self.game.entropy = target["entropy"]
+        self.game.entropy = target["entropy"] + settings.REWIND_ENTROPY_INCREASE
+        self.game.entropy = min(self.game.entropy, settings.MAX_ENTROPY)
         self.game.particles.emit_burst(
             self.game.player.x, self.game.player.y, settings.CYAN, 30, 100, 0.6
         )
