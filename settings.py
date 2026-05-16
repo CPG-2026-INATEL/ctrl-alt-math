@@ -8,6 +8,7 @@ TTS_ENABLED = True
 TTS_RATE = 170
 FULLSCREEN = False
 BORDERLESS = True  # Borderless windowed - no display mode change, no Alt-Tab glitch
+SHOW_LORE_TOASTS = True
 BASE_WIDTH = 800
 BASE_HEIGHT = 600
 UI_SCALE = 1.0
