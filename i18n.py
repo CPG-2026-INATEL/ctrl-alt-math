@@ -155,8 +155,8 @@ STRINGS = {
     },
     "skill_ctrlz_name": {LANG_EN: "Ctrl+Z", LANG_PT: "Ctrl+Z"},
     "skill_ctrlz_desc": {
-        LANG_EN: "Rewind 2 turns back.\nR^-1: undo(R) -> R^-2\nPress R to undo.",
-        LANG_PT: "Volte 2 turnos atrás.\nR^-1: desfazer(R) -> R^-2\nPressione R p/ desfazer."
+        LANG_EN: "Rewind 2 turns back.\nR^-1: undo(R) -> R^-2\nRestores +10 HP. Press R.",
+        LANG_PT: "Volte 2 turnos atrás.\nR^-1: desfazer(R) -> R^-2\nCura +10 HP. Pressione R."
     },
     "skill_bayes_name": {LANG_EN: "Bayes", LANG_PT: "Bayes"},
     "skill_bayes_desc": {
@@ -165,8 +165,8 @@ STRINGS = {
     },
     "skill_reflexao_name": {LANG_EN: "Reflexão", LANG_PT: "Reflexão"},
     "skill_reflexao_desc": {
-        LANG_EN: "Barrier cells block enemies.\ntheta_i=theta_r: reflection\nsymmetry. Press 2.",
-        LANG_PT: "Células barreira bloqueiam.\ntheta_i=theta_r: simetria\nde reflexão. Pressione 2."
+        LANG_EN: "High-energy pulse (r<=2).\nArea damage skill.\nDeals 15 damage.",
+        LANG_PT: "Pulso de alta energia (r<=2).\nHabilidade de dano em área.\nCausa 15 de dano."
     },
     "skill_entropia_name": {LANG_EN: "Entropia Controlada", LANG_PT: "Entropia Controlada"},
     "skill_entropia_desc": {

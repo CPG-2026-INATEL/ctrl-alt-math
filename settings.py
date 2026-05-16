@@ -69,7 +69,7 @@ PITAGORAS_RIGOR_COST = 20
 PITAGORAS_DAMAGE = 25
 PITAGORAS_RANGE = 3
 REFLEXAO_RIGOR_COST = 30
-REFLEXAO_DAMAGE = 10
+REFLEXAO_DAMAGE = 15
 REFLEXAO_RANGE = 2
 REFLEXAO_DURATION = 2
 
@@ -121,6 +121,7 @@ ENTROPY_PER_TURN = 2
 REWIND_UNDO_TURNS = 2
 REWIND_ENTROPY_INCREASE = 25
 REWIND_COOLDOWN_TURNS = 3
+REWIND_HEAL_AMOUNT = 10
 MAX_ENTROPY = 100
 HIGH_ENTROPY_THRESHOLD = 50
 
@@ -217,7 +218,7 @@ SKILL_TREE_DATA = [
         "desc": "skill_axioma_desc",
         "cost": 0,
         "prereqs": [],
-        "x": 400, "y": 60,
+        "x": 400, "y": 140,
         "color": (100, 200, 255)
     },
     {
@@ -226,7 +227,7 @@ SKILL_TREE_DATA = [
         "desc": "skill_derivada_desc",
         "cost": 1,
         "prereqs": ["axioma"],
-        "x": 200, "y": 160,
+        "x": 200, "y": 240,
         "color": (100, 255, 100)
     },
     {
@@ -235,7 +236,7 @@ SKILL_TREE_DATA = [
         "desc": "skill_pitagoras_desc",
         "cost": 1,
         "prereqs": ["axioma"],
-        "x": 400, "y": 160,
+        "x": 400, "y": 240,
         "color": (255, 200, 100)
     },
     {
@@ -244,7 +245,7 @@ SKILL_TREE_DATA = [
         "desc": "skill_ctrlz_desc",
         "cost": 1,
         "prereqs": ["axioma"],
-        "x": 600, "y": 160,
+        "x": 600, "y": 240,
         "color": (255, 100, 100)
     },
     {
@@ -253,7 +254,7 @@ SKILL_TREE_DATA = [
         "desc": "skill_bayes_desc",
         "cost": 2,
         "prereqs": ["derivada"],
-        "x": 200, "y": 280,
+        "x": 200, "y": 360,
         "color": (200, 100, 255)
     },
     {
@@ -262,7 +263,7 @@ SKILL_TREE_DATA = [
         "desc": "skill_reflexao_desc",
         "cost": 2,
         "prereqs": ["pitagoras"],
-        "x": 400, "y": 280,
+        "x": 400, "y": 360,
         "color": (100, 255, 200)
     },
     {
@@ -271,7 +272,7 @@ SKILL_TREE_DATA = [
         "desc": "skill_entropia_desc",
         "cost": 2,
         "prereqs": ["ctrlz"],
-        "x": 600, "y": 280,
+        "x": 600, "y": 360,
         "color": (255, 150, 200)
     },
     {
@@ -280,7 +281,7 @@ SKILL_TREE_DATA = [
         "desc": "skill_teoria_jogos_desc",
         "cost": 3,
         "prereqs": ["bayes"],
-        "x": 200, "y": 400,
+        "x": 200, "y": 480,
         "color": (255, 215, 0)
     },
 ]

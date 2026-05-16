@@ -235,8 +235,6 @@ class Player:
         if self.rigor < settings.REFLEXAO_RIGOR_COST:
             return False
         self.rigor -= settings.REFLEXAO_RIGOR_COST
-        self.reflexao_active = True
-        self.reflexao_timer = 0.3
         self.reflexao_cooldown = 2.0
         return True
 

@@ -253,6 +253,7 @@ class GameplayScene(Scene):
     def _begin_room(self):
         self.state = "PLAYER_INPUT"
         self.turn_manager.start_turn()
+        self.turn_manager.snapshot(self._get_game_state()) # Initial snapshot for Turn 1
         self.show_move_range = True
         self._generate_enemy_intents()
         self.danger_locked = False
@@ -554,6 +555,10 @@ class GameplayScene(Scene):
             self._confirm_player_cursor()
             return
 
+        if k == pygame.K_r:
+            self._rewind_turn()
+            return
+
     def _handle_action_input(self, event):
         k = event.key
 
@@ -578,6 +583,8 @@ class GameplayScene(Scene):
         elif k == pygame.K_2:
             if self.game.skill_tree.is_unlocked("reflexao"):
                 self._toggle_skill("reflexao")
+        elif k == pygame.K_r:
+            self._rewind_turn()
 
     def _execute_basic_attack(self, target_enemy=None):
         pc = self.game.player.col
@@ -668,24 +675,119 @@ class GameplayScene(Scene):
         elif skill == "reflexao":
             if not self.game.player.reflexao_attack():
                 return False
-            barrier_cells = self.grid.get_cells_in_radius(pc, pr, settings.REFLEXAO_RANGE)
-            for col, row in barrier_cells:
-                self.grid.mark_barrier(col, row, True)
+            
+            # Area damage
+            target_cells = self.grid.get_cells_in_radius(pc, pr, settings.REFLEXAO_RANGE)
+            hit_count = 0
+            dmg = settings.REFLEXAO_DAMAGE
+            is_crit = self.game.player.check_crit()
+            if is_crit: 
+                dmg = int(dmg * settings.PLAYER_CRIT_MULTIPLIER)
+            
+            for enemy in self.game.enemies:
+                if not enemy.dead and (enemy.col, enemy.row) in target_cells:
+                    enemy.take_damage(dmg)
+                    self.game.floating_text.add_enemy_damage(enemy.x, enemy.y, dmg, is_crit)
+                    self.game.particles.emit_burst(enemy.x, enemy.y, settings.CYAN, 8, 60, 0.3)
+                    hit_count += 1
+                    if enemy.dead:
+                        self._on_enemy_death(enemy)
+            
+            # Effects
             self.game.particles.emit_burst(
-                self.game.player.x, self.game.player.y, settings.CYAN, 15, 70, 0.3
+                self.game.player.x, self.game.player.y, settings.CYAN, 30, 120, 0.5
             )
+            self.game.screen_shake = 0.15
+            self.game.shake_intensity = 6
             self.game.floating_text.add_formula(
                 self.game.player.x, self.game.player.y - 30,
-                "theta_i=theta_r (reflection)", settings.CYAN
+                "Pulse: sum(E) in area", settings.CYAN
             )
             self.game.sfx.play("reflexao")
-            self.turn_log.append("Reflexao")
+            self.turn_log.append(f"Reflexao hit {hit_count} enemies")
 
         self.turn_manager.player_acted = True
         self.show_action_range = False
         self.selected_skill = None
         self._start_enemy_turn()
         return True
+
+    def _rewind_turn(self):
+        if not self.game.skill_tree.is_unlocked("ctrlz"):
+            self.game.floating_text.add_info(self.game.player.x, self.game.player.y - 40, "SKILL LOCKED", settings.GRAY)
+            return
+        
+        if not self.turn_manager.can_undo():
+            self.game.floating_text.add_info(self.game.player.x, self.game.player.y - 40, "CAN'T UNDO", settings.RED)
+            return
+
+        snapshot = self.turn_manager.undo()
+        if snapshot:
+            # Restore Player
+            self.game.player.col = snapshot["player"]["col"]
+            self.game.player.row = snapshot["player"]["row"]
+            self.game.player.hp = snapshot["player"]["hp"]
+            self.game.player.rigor = snapshot["player"]["rigor"]
+            self.game.player.x, self.game.player.y = self.grid.to_pixel(self.game.player.col, self.game.player.row)
+            
+            # Restore Enemies
+            # Note: TurnManager stores a copy of enemy state. 
+            # We match them by index for consistency.
+            for i, enemy_data in enumerate(snapshot["enemies"]):
+                if i < len(self.game.enemies):
+                    e = self.game.enemies[i]
+                    e.col = enemy_data["col"]
+                    e.row = enemy_data["row"]
+                    e.hp = enemy_data["hp"]
+                    e.max_hp = enemy_data["max_hp"]
+                    e.alive = enemy_data["alive"]
+                    e.dead = enemy_data["dead"]
+                    e.x, e.y = self.grid.to_pixel(e.col, e.row)
+                    e.current_anim = "idle"
+                    e.anim_timer = 0
+            
+            # Restore Entropy and other state
+            self.game.entropy = snapshot["entropy"]
+            self.grid.clear_barriers()
+            for bc in snapshot["barrier_cells"]:
+                self.grid.mark_barrier(bc[0], bc[1], True)
+
+            # Apply penalty: Increase entropy
+            # If "entropia" skill is unlocked, reduce penalty
+            penalty = settings.REWIND_ENTROPY_INCREASE
+            if self.game.skill_tree.is_unlocked("entropia"):
+                penalty //= 2
+            
+            self.game.entropy = min(settings.MAX_ENTROPY, self.game.entropy + penalty)
+            self.turn_manager.rewind_cooldown_turns = settings.REWIND_COOLDOWN_TURNS
+            
+            # HP Regeneration
+            heal = settings.REWIND_HEAL_AMOUNT
+            old_hp = self.game.player.hp
+            self.game.player.hp = min(self.game.player.max_hp, self.game.player.hp + heal)
+            actual_heal = self.game.player.hp - old_hp
+            
+            # Visuals and feedback
+            self.game.sfx.play("reflexao") # Glitchy sound
+            self.game.floating_text.add_info(self.game.player.x, self.game.player.y - 60, "CTRL+Z REWIND", settings.CYAN)
+            if actual_heal > 0:
+                self.game.floating_text.add_info(self.game.player.x, self.game.player.y - 80, f"+{actual_heal} HP", settings.GREEN)
+            
+            self.game.particles.emit_burst(self.game.player.x, self.game.player.y, settings.CYAN, 20, 100, 0.5)
+            self.game.screen_shake = 0.2
+            self.game.shake_intensity = 8
+            
+            # Reset UI state
+            self.state = "PLAYER_INPUT"
+            self.turn_manager.start_turn()
+            self.show_move_range = True
+            self.show_action_range = False
+            self.selected_skill = None
+            self.cursor_col, self.cursor_row = self.game.player.col, self.game.player.row
+            self._generate_enemy_intents()
+            
+            # Special: log it
+            self.turn_log.append(f"REWIND to Turn {self.turn_manager.turn_number}")
 
     def _on_enemy_death(self, enemy):
         self.game.floating_text.add_formula(
@@ -1216,9 +1318,7 @@ class GameplayScene(Scene):
             self.turn_log.append(f"Boss AoE missed")
 
     def _end_turn(self):
-        gs = self._get_game_state()
-        self.turn_manager.end_turn(gs)
-
+        # Apply regeneration first
         self.game.player.rigor = min(
             self.game.player.max_rigor,
             self.game.player.rigor + settings.RIGOR_REGEN_RATE
@@ -1229,6 +1329,7 @@ class GameplayScene(Scene):
         )
         self.grid.clear_barriers()
 
+        # Check for room completion or death before taking snapshot for next turn
         alive = [e for e in self.game.enemies if not e.dead]
         if len(alive) == 0:
             self.state = "VICTORY_TRANSITION"
@@ -1251,6 +1352,7 @@ class GameplayScene(Scene):
             self.game.sfx.play("player_hit")
             return
 
+        # Prepare for next turn and take snapshot
         self.state = "PLAYER_INPUT"
         self.turn_manager.start_turn()
         self.show_move_range = True
@@ -1258,6 +1360,10 @@ class GameplayScene(Scene):
         self.selected_skill = None
         self._generate_enemy_intents()
         self.danger_locked = False
+        
+        # Snapshot the state at the START of the new turn
+        gs = self._get_game_state()
+        self.turn_manager.end_turn(gs) # This handles turn increment and history
 
     def _get_game_state(self):
         return {
