@@ -28,11 +28,17 @@ class MapScene(Scene):
         room = self.game.world_map.select_room()
         if not room:
             return
+        
+        # If the room is a victory room, we win.
+        # If it's a boss room designated as the 'final gate', we win ONLY if it's completed.
         if room.type == "victory":
+            self.game.scene_manager.switch("victory")
+        elif getattr(room, "is_final_gate", False) and room.state == "completed":
             self.game.scene_manager.switch("victory")
         else:
             self.room = room
             self.game.scene_manager.switch("gameplay")
+            
         self.game.sfx.play("menu_confirm")
 
     def handle_event(self, event):

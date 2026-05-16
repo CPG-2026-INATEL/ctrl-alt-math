@@ -91,9 +91,7 @@ class WorldMap:
                 else:
                     target_pos = max(self.rooms.keys(), key=lambda k: k[0])
             
-            self.rooms[target_pos].type = "victory"
-            self.rooms[target_pos].name = "room_victory_name"
-            self.rooms[target_pos].narrative = "room_victory_narr"
+            self.rooms[target_pos].is_final_gate = True
 
         start = settings.MAP_START_ROOM
         self.rooms[start].state = "available"
