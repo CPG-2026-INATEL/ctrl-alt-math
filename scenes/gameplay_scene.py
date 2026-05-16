@@ -81,7 +81,7 @@ class GameplayScene(Scene):
         return [player for player in self.players if player.hp > 0]
 
     def _player_label(self, idx):
-        return f"P{idx + 1}"
+        return "HOST" if idx == 0 else "P2"
 
     def _restore_primary_player(self):
         if self.players:
@@ -213,6 +213,10 @@ class GameplayScene(Scene):
         if prev_scene and hasattr(prev_scene, "room"):
             room = prev_scene.room
             self.game.current_room = room
+            
+            # Deterministic random for room generation
+            room_seed = getattr(self.game, "seed", 0) ^ hash((room.col, room.row))
+            random.seed(room_seed)
             
             # Randomize map size based on difficulty
             scaling = settings.DIFFICULTY_SCALING.get(settings.DIFFICULTY, settings.DIFFICULTY_SCALING[settings.DIFFICULTY_HARD])
@@ -1311,6 +1315,23 @@ class GameplayScene(Scene):
             if self.mp_sync_timer >= 1.0 / settings.LAN_TICK_RATE:
                 self.mp_sync_timer = 0
                 self.game.mp_host.broadcast(self._serialize_mp_state())
+
+            # Host: process commands from clients
+            msgs = self.game.mp_host.poll()
+            for msg in msgs:
+                if msg.get("type") == "gp_cmd":
+                    self._apply_remote_gameplay_command(msg)
+
+        if self.game.mp_is_multiplayer and self.game.mp_client:
+            # Client: apply state updates from host
+            msgs = self.game.mp_client.poll()
+            for msg in msgs:
+                if msg.get("type") == "gp_state":
+                    self._apply_mp_state(msg)
+                elif msg.get("type") == "scene_switch":
+                    target = msg.get("scene")
+                    self._restore_primary_player()
+                    self.game.scene_manager.switch(target)
 
     def _resolve_enemy_turn(self, dt):
         if self.enemy_resolve_idx >= len(self.enemy_actions):

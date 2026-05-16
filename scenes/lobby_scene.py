@@ -125,9 +125,11 @@ class LobbyScene(Scene):
     def _start_game(self):
         if self.host:
             # Broadcast difficulty + seed so client uses same settings
+            seed = int(pygame.time.get_ticks())
+            self.game.seed = seed
             self.host.broadcast({
                 "type": "start_game",
-                "seed": int(pygame.time.get_ticks()),
+                "seed": seed,
                 "difficulty": settings.DIFFICULTY,
             })
             self._start_delay = 0.25  # wait 250ms before switching
@@ -135,19 +137,23 @@ class LobbyScene(Scene):
             # Client: transition immediately (driven by server message)
             self._do_enter_game()
 
-    def _do_enter_game(self, difficulty=None):
+    def _do_enter_game(self, difficulty=None, seed=None):
         # Apply host difficulty on client side
         if difficulty:
             settings.DIFFICULTY = difficulty
+        if seed:
+            self.game.seed = seed
         # Save mp references before reset wipes them
         mp_host = self.host
         mp_client = self.client
         mp_player_index = self.player_index
+        mp_seed = getattr(self.game, "seed", None)
         self.game.reset_game_state()
         # Restore mp references after reset
         self.game.mp_host = mp_host
         self.game.mp_client = mp_client
         self.game.mp_player_index = mp_player_index
+        self.game.seed = mp_seed
         self.game.mp_is_multiplayer = True
         # Go to the map so the normal room-selection flow works
         self.game.scene_manager.switch("map")
@@ -317,7 +323,8 @@ class LobbyScene(Scene):
             for msg in msgs:
                 if msg.get("type") == "start_game":
                     difficulty = msg.get("difficulty")
-                    self._do_enter_game(difficulty=difficulty)
+                    seed = msg.get("seed")
+                    self._do_enter_game(difficulty=difficulty, seed=seed)
 
         if self.discovery:
             self.scan_hosts = list(set(self.discovery.hosts))
