@@ -18,6 +18,13 @@ TILE_STAIRS_DOWN = 11 # escada descendo (sul)
 TILE_STAIRS_LEFT = 9+16 # escada esquerda (oeste)
 TILE_STAIRS_RIGHT = 8 +16# escada direita (leste)
 
+OBSTACLE_TILE_IDS = [
+    0, 1, 2, 3,
+]
+
+WALKABLE_TILES = {TILE_LOW, TILE_HIGH, TILE_HIGH_EDGE,
+                   TILE_STAIRS_UP, TILE_STAIRS_DOWN, TILE_STAIRS_LEFT, TILE_STAIRS_RIGHT}
+
 
 
 
@@ -28,6 +35,8 @@ class TileMap:
         self.tiles_per_row = self.tileset.get_width() // tile_size
         self.tiles_per_col = self.tileset.get_height() // tile_size
         self.map_data = []
+        self.obstacle_data = []
+        self.obstacle_tileset = None
         self.map_width = 0
         self.map_height = 0
 
@@ -35,6 +44,11 @@ class TileMap:
         self.map_data = data
         self.map_height = len(data)
         self.map_width = max(len(row) for row in data) if data else 0
+
+    def load_obstacles(self, obstacle_data, tileset_path=None):
+        self.obstacle_data = obstacle_data
+        if tileset_path:
+            self.obstacle_tileset = pygame.image.load(tileset_path).convert_alpha()
 
     def load_from_file(self, path):
         with open(path) as f:
@@ -69,6 +83,21 @@ class TileMap:
                 dy = offset_y + row * self.tile_size
                 screen.blit(self.tileset, (dx, dy), (sx, sy, self.tile_size, self.tile_size))
 
+    def draw_obstacles(self, screen, offset_x=0, offset_y=0):
+        if not self.obstacle_data or not self.obstacle_tileset:
+            return
+        obs_tiles_per_row = self.obstacle_tileset.get_width() // self.tile_size
+        for row in range(self.map_height):
+            for col in range(len(self.obstacle_data[row])):
+                obs_id = self.obstacle_data[row][col]
+                if obs_id is None:
+                    continue
+                sx = (obs_id % obs_tiles_per_row) * self.tile_size
+                sy = (obs_id // obs_tiles_per_row) * self.tile_size
+                dx = offset_x + col * self.tile_size
+                dy = offset_y + row * self.tile_size
+                screen.blit(self.obstacle_tileset, (dx, dy), (sx, sy, self.tile_size, self.tile_size))
+
     def get_world_size(self):
         return self.map_width * self.tile_size, self.map_height * self.tile_size
 
@@ -84,6 +113,7 @@ class MapGenerator:
         high_terrain_ratio=0.30,
         high_terrain_count=3,
         stairs_per_area=2,
+        obstacle_density=0.05,
         seed=42,
     ):
         self.width = width
@@ -92,6 +122,7 @@ class MapGenerator:
         self.high_terrain_ratio = high_terrain_ratio
         self.high_terrain_count = high_terrain_count
         self.stairs_per_area = stairs_per_area
+        self.obstacle_density = obstacle_density
         self.seed = seed
 
     MIN_WALKABLE_RATIO = 0.5
@@ -113,11 +144,12 @@ class MapGenerator:
             self._enforce_full_connectivity(grid)
             self._apply_high_edge(grid)
             self._fix_stair_edges(grid)
+            obstacles = self._place_obstacles(grid)
 
             walkable = sum(1 for r in grid for c in r if c in WALKABLE)
             if walkable >= min_walkable:
-                return grid
-        return grid
+                return grid, obstacles
+        return grid, obstacles
 
     def _apply_high_edge(self, grid):
         ALL_STAIRS = {TILE_STAIRS_UP, TILE_STAIRS_DOWN, TILE_STAIRS_LEFT, TILE_STAIRS_RIGHT}
@@ -368,3 +400,17 @@ class MapGenerator:
                     if placed == 0 and border_candidates:
                         lr, lc, stair_dir = border_candidates[0]
                         grid[lr][lc] = CARDINAL_TILES[stair_dir]
+
+    def _place_obstacles(self, grid):
+        obstacles = [[None] * self.width for _ in range(self.height)]
+        candidates = []
+        for r in range(self.height):
+            for c in range(self.width):
+                if grid[r][c] in WALKABLE_TILES:
+                    candidates.append((r, c))
+        random.shuffle(candidates)
+        count = int(len(candidates) * self.obstacle_density)
+        for i in range(count):
+            r, c = candidates[i]
+            obstacles[r][c] = random.choice(OBSTACLE_TILE_IDS)
+        return obstacles
