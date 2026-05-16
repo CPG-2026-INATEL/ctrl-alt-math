@@ -133,7 +133,7 @@ class WorldMap:
                          (settings.WINDOW_WIDTH // 2, 565),
                          settings.GREEN, 16)
             elif player_room.state == "completed":
-                draw_text(screen, "Completed \u2713",
+                draw_text(screen, "Completed \u2713 \u2014 ENTER to replay",
                          (settings.WINDOW_WIDTH // 2, 565),
                          settings.GOLD, 16)
         else:
@@ -165,7 +165,10 @@ class WorldMap:
             bg_color = (25, 25, 40)
             border_color = settings.LIGHT_GRAY
 
-        if room.state == "locked":
+        if room.state == "completed":
+            bg_color = (15, 45, 15)
+            border_color = settings.GREEN
+        elif room.state == "locked":
             bg_color = (15, 15, 15)
             border_color = (40, 40, 40)
 
@@ -179,15 +182,24 @@ class WorldMap:
 
         pygame.draw.rect(screen, border_color, rect, border_width, border_radius=6)
 
-        icon = self._get_room_icon(room)
-        draw_text(screen, icon, rect.center,
-                 settings.WHITE if room.state != "locked" else (60, 60, 60),
-                 24)
+        if room.state == "completed" and not is_player:
+            glow = pygame.Surface((rect.width + 4, rect.height + 4))
+            glow.set_alpha(30)
+            glow.fill(settings.GREEN)
+            screen.blit(glow, (rect.x - 2, rect.y - 2))
 
+        icon = self._get_room_icon(room)
+        icon_color = settings.WHITE if room.state != "locked" else (60, 60, 60)
+        if room.state == "completed":
+            icon_color = settings.GREEN
+        draw_text(screen, icon, rect.center, icon_color, 24)
+
+        name_color = settings.LIGHT_GRAY if room.state != "locked" else (50, 50, 50)
+        if room.state == "completed":
+            name_color = settings.GREEN
         draw_text(screen, room.name,
                  (rect.centerx, rect.bottom - 12),
-                 settings.LIGHT_GRAY if room.state != "locked" else (50, 50, 50),
-                 10)
+                 name_color, 10)
 
     def _get_room_icon(self, room):
         if room.state == "completed":

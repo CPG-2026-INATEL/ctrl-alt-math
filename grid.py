@@ -63,11 +63,24 @@ class Grid:
     def load_obstacles(self, obstacles):
         self.blocked.clear()
         for obs in obstacles:
-            for col in range(self.cols):
-                for row in range(self.rows):
-                    cell_rect = self.cell_rect(col, row)
-                    if cell_rect.colliderect(obs):
-                        self.blocked.add((col, row))
+            col, row = obs["col"], obs["row"]
+            w, h = obs.get("w", 1), obs.get("h", 1)
+            for dc in range(w):
+                for dr in range(h):
+                    c, r = col + dc, row + dr
+                    if self.is_valid(c, r):
+                        self.blocked.add((c, r))
+
+    def obstacle_rects(self, obstacles):
+        rects = []
+        for obs in obstacles:
+            col, row = obs["col"], obs["row"]
+            w, h = obs.get("w", 1), obs.get("h", 1)
+            r = self.cell_rect(col, row)
+            pw = self.cell_w * w
+            ph = self.cell_h * h
+            rects.append(pygame.Rect(r.x, r.y, pw, ph))
+        return rects
 
     def get_cells_in_radius(self, center_col, center_row, radius):
         cells = []

@@ -72,8 +72,8 @@ class Game:
         self.current_room = None
         self.boss_hp_override = None
 
-        self.obstacles = [pygame.Rect(o["x"], o["y"], o["w"], o["h"])
-                          for o in settings.ARENA_OBSTACLES]
+        from grid import Grid
+        self.obstacles = Grid().obstacle_rects(settings.ARENA_OBSTACLES)
 
     def reset_game_state(self):
         self.player = Player()
@@ -99,8 +99,31 @@ class Game:
         self.current_room = None
         self.boss_hp_override = None
 
-        self.obstacles = [pygame.Rect(o["x"], o["y"], o["w"], o["h"])
-                          for o in settings.ARENA_OBSTACLES]
+        from grid import Grid
+        self.obstacles = Grid().obstacle_rects(settings.ARENA_OBSTACLES)
+
+    def reset_player_state(self):
+        self.player = Player()
+        self.skill_tree = SkillTree()
+        self.particles = ParticleSystem()
+        self.enemies = []
+        self.floating_text = FloatingTextSystem()
+        self.math_bg = MathBackground()
+
+        self.entropy = 0
+        self.rewind_cooldown = 0
+
+        self.screen_shake = 0.0
+        self.shake_intensity = 0
+
+        self.hit_stop_timer = 0
+        self.hit_stop_duration = 0
+
+        self.current_room = None
+        self.boss_hp_override = None
+
+        from grid import Grid
+        self.obstacles = Grid().obstacle_rects(settings.ARENA_OBSTACLES)
 
     def run(self):
         while self.running:

@@ -16,6 +16,7 @@ class GameplayScene(Scene):
         self.state = "WAVE_INTRO"
         self.grid = Grid()
         self.turn_manager = TurnManager()
+        self.obstacles_data = settings.ARENA_OBSTACLES
 
         self.cursor_col = 8
         self.cursor_row = 6
@@ -51,8 +52,8 @@ class GameplayScene(Scene):
         if prev_scene and hasattr(prev_scene, "room"):
             room = prev_scene.room
             self.game.current_room = room
-            self.game.obstacles = [pygame.Rect(o["x"], o["y"], o["w"], o["h"])
-                                    for o in room.obstacles]
+            self.obstacles_data = room.obstacles
+            self.game.obstacles = self.grid.obstacle_rects(room.obstacles)
             self.game.enemies = []
             for enemy_type, count in room.enemies:
                 for _ in range(count):
@@ -66,10 +67,10 @@ class GameplayScene(Scene):
             if len(room.enemies) == 0:
                 self.state = "NO_COMBAT"
         else:
-            self.game.obstacles = [pygame.Rect(o["x"], o["y"], o["w"], o["h"])
-                                   for o in settings.ARENA_OBSTACLES]
+            self.obstacles_data = settings.ARENA_OBSTACLES
+            self.game.obstacles = self.grid.obstacle_rects(settings.ARENA_OBSTACLES)
 
-        self.grid.load_obstacles(self.game.obstacles)
+        self.grid.load_obstacles(self.obstacles_data)
 
         pcol, prow = self.grid.cols // 2, self.grid.rows - 2
         self.game.player.set_grid_position(pcol, prow, self.grid)

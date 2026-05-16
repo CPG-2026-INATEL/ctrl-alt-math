@@ -20,8 +20,8 @@ class VictoryScene(Scene):
         if event.type != pygame.KEYDOWN:
             return
         if event.key == pygame.K_RETURN:
-            self.game.reset_game_state()
-            self.game.scene_manager.switch("gameplay")
+            self.game.reset_player_state()
+            self.game.scene_manager.switch("map")
         elif event.key == pygame.K_ESCAPE:
             self.game.sfx.play("menu_select")
             self.game.scene_manager.switch("menu")

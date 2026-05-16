@@ -250,9 +250,12 @@ class UI:
         draw_text(screen, "The regime has silenced another mind.",
                   (settings.WINDOW_WIDTH // 2, 310),
                   settings.GRAY, 18)
-        draw_text(screen, "Press ENTER to restart, Esc to quit to menu",
+        draw_text(screen, "All upgrades lost. Progress saved.",
+                  (settings.WINDOW_WIDTH // 2, 340),
+                  settings.ORANGE, 16)
+        draw_text(screen, "Press ENTER to return to map",
                   (settings.WINDOW_WIDTH // 2, 380),
-                  settings.GRAY, 18)
+                  settings.WHITE, 18)
 
     def draw_victory(self, screen):
         screen.fill(settings.DARK_BLUE)

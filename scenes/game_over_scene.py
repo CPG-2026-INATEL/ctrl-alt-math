@@ -12,10 +12,8 @@ class GameOverScene(Scene):
     def handle_event(self, event):
         if event.type != pygame.KEYDOWN:
             return
-        if event.key == pygame.K_RETURN:
-            self.game.reset_game_state()
-            self.game.scene_manager.switch("gameplay")
-        elif event.key == pygame.K_ESCAPE:
+        if event.key in (pygame.K_RETURN, pygame.K_ESCAPE):
+            self.game.reset_player_state()
             self.game.sfx.play("menu_select")
             self.game.scene_manager.switch("menu")
 
