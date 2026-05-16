@@ -292,10 +292,8 @@ class GameplayScene(Scene):
             self.grid.height,
         )
         if not arena_rect.collidepoint(pos):
-            # We also need to check outside the arena_rect if the camera moved
             pass
         
-        # Adjust mouse pos by camera offset
         world_x = pos[0] + self.camera_x
         world_y = pos[1] + self.camera_y
         
@@ -386,12 +384,22 @@ class GameplayScene(Scene):
             )
 
     def _get_enemy_at_cursor(self):
-        for enemy in self.game.enemies:
-            if enemy.dead:
-                continue
-            if (enemy.col, enemy.row) == (self.cursor_col, self.cursor_row):
-                return enemy
-        return None
+        enemies = [
+            e for e in self.game.enemies
+            if not e.dead and (e.col, e.row) == (self.cursor_col, self.cursor_row)
+        ]
+        if not enemies:
+            return None
+        real = [e for e in enemies if not getattr(e, 'is_decoy', False)]
+        if real:
+            return real[0]
+        return enemies[0]
+
+    def _get_enemies_at_cursor(self):
+        return [
+            e for e in self.game.enemies
+            if not e.dead and (e.col, e.row) == (self.cursor_col, self.cursor_row)
+        ]
 
     def _get_action_cells(self):
         pc = self.game.player.col
@@ -416,11 +424,10 @@ class GameplayScene(Scene):
         return self._get_enemy_at_cursor() is not None
 
     def _confirm_action_cursor(self):
-        # Click on self or empty space to Wait
         is_self = (self.cursor_col, self.cursor_row) == (self.game.player.col, self.game.player.row)
-        target_enemy = self._get_enemy_at_cursor()
+        target_enemies = self._get_enemies_at_cursor()
         
-        if is_self or (target_enemy is None and self.selected_skill is None):
+        if is_self or (not target_enemies and self.selected_skill is None):
             self.turn_manager.player_acted = True
             self.show_action_range = False
             self.selected_skill = None
@@ -445,7 +452,7 @@ class GameplayScene(Scene):
                 self.game.floating_text.add_info(self.game.player.x, self.game.player.y - 40, t("not_enough_rigor"), settings.RED)
                 self.game.sfx.play("error")
         else:
-            self._execute_basic_attack(target_enemy=target_enemy)
+            self._execute_basic_attack(target_enemies=target_enemies)
 
     def handle_event(self, event):
         if event.type == pygame.MOUSEMOTION:
@@ -529,6 +536,10 @@ class GameplayScene(Scene):
             self.game.scene_manager.push("skill_tree")
             return
 
+        if event.key == pygame.K_r and self.state in ("PLAYER_INPUT", "PLAYER_ACTION_SELECT"):
+            self._try_rewind()
+            return
+
         if self.state == "PLAYER_INPUT":
             self._handle_player_input(event)
         elif self.state == "PLAYER_ACTION_SELECT":
@@ -580,15 +591,16 @@ class GameplayScene(Scene):
             if self.game.skill_tree.is_unlocked("reflexao"):
                 self._toggle_skill("reflexao")
 
-    def _execute_basic_attack(self, target_enemy=None):
+    def _execute_basic_attack(self, target_enemies=None):
         pc = self.game.player.col
         pr = self.game.player.row
         hit_enemies = []
 
-        if target_enemy is not None:
-            d = self.grid.grid_distance(pc, pr, target_enemy.col, target_enemy.row)
-            if d <= settings.BASIC_ATTACK_RANGE and not self.grid.is_level_change(pc, pr, target_enemy.col, target_enemy.row):
-                hit_enemies.append(target_enemy)
+        if target_enemies is not None:
+            for enemy in target_enemies:
+                d = self.grid.grid_distance(pc, pr, enemy.col, enemy.row)
+                if d <= settings.BASIC_ATTACK_RANGE and not self.grid.is_level_change(pc, pr, enemy.col, enemy.row):
+                    hit_enemies.append(enemy)
         else:
             for enemy in self.game.enemies:
                 if enemy.dead:
@@ -740,6 +752,9 @@ class GameplayScene(Scene):
 
     def update(self, dt):
         self.cursor_timer += dt
+
+        if self.game.rewind_fx_timer > 0:
+            self.game.rewind_fx_timer -= dt
         
         # Update Camera to follow player first, so hover checks use current frame's camera
         target_cam_x = self.game.player.x - settings.WINDOW_WIDTH / 2
@@ -1260,6 +1275,70 @@ class GameplayScene(Scene):
         self._generate_enemy_intents()
         self.danger_locked = False
 
+    def _try_rewind(self):
+        if not self.game.skill_tree.is_unlocked("ctrlz"):
+            self.game.floating_text.add_info(
+                self.game.player.x, self.game.player.y - 40,
+                t("not_enough_rigor"), settings.RED
+            )
+            self.game.sfx.play("error")
+            return
+        if not self.turn_manager.can_undo():
+            self.game.floating_text.add_info(
+                self.game.player.x, self.game.player.y - 40,
+                "No rewind available", settings.GRAY
+            )
+            self.game.sfx.play("error")
+            return
+
+        snapshot = self.turn_manager.undo()
+        if snapshot is None:
+            return
+
+        self.game.player.col = snapshot["player"]["col"]
+        self.game.player.row = snapshot["player"]["row"]
+        self.game.player.hp = snapshot["player"]["hp"]
+        self.game.player.max_hp = snapshot["player"]["max_hp"]
+        self.game.player.rigor = snapshot["player"]["rigor"]
+        self.game.player.x, self.game.player.y = self.grid.to_pixel(
+            self.game.player.col, self.game.player.row
+        )
+
+        for i, e_snap in enumerate(snapshot["enemies"]):
+            if i < len(self.game.enemies):
+                enemy = self.game.enemies[i]
+                enemy.col = e_snap["col"]
+                enemy.row = e_snap["row"]
+                enemy.hp = e_snap["hp"]
+                enemy.max_hp = e_snap["max_hp"]
+                enemy.alive = e_snap["alive"]
+                enemy.dead = e_snap["dead"]
+                enemy.x, enemy.y = self.grid.to_pixel(enemy.col, enemy.row)
+
+        self.game.entropy = snapshot["entropy"]
+
+        for col, row in snapshot.get("barrier_cells", []):
+            self.grid.mark_barrier(col, row, False)
+
+        self.game.entropy = min(
+            self.game.entropy + settings.REWIND_ENTROPY_INCREASE,
+            settings.MAX_ENTROPY
+        )
+        self.turn_manager.rewind_cooldown_turns = settings.REWIND_COOLDOWN_TURNS
+
+        self.game.rewind_fx_timer = 1.0
+        self.game.sfx.play("rewind")
+
+        self.state = "PLAYER_INPUT"
+        self.turn_manager.start_turn()
+        self.show_move_range = True
+        self.show_action_range = False
+        self.selected_skill = None
+        self._generate_enemy_intents()
+        self.danger_locked = False
+
+        self.game.floating_text.add_info(self.game.player.x, self.game.player.y - 40, "<< REWIND >>", settings.GREEN)
+
     def _get_game_state(self):
         return {
             "player_col": self.game.player.col,
@@ -1479,6 +1558,9 @@ class GameplayScene(Scene):
             screen.blit(temp, (sx, sy))
         else:
             screen.blit(temp, (0, 0))
+
+        if self.game.rewind_fx_timer > 0:
+            self.game.rewind_fx.apply_rewind_fx(screen, pygame.time.get_ticks() / 1000.0)
 
         if self.lore_toast:
             self.game.ui.draw_lore_toast(screen, self.lore_toast)
@@ -1750,7 +1832,7 @@ class GameplayScene(Scene):
         screen.blit(log_title, (log_x, bar_y + 10))
         self._draw_combat_log(screen, log_x, bar_y + 22)
 
-        controls = "WASD/click move + confirm  1/2 skills  Esc pause"
+        controls = "WASD/click move + confirm  1/2 skills  R rewind  Esc pause"
         controls_img = pygame.font.Font(None, 11).render(controls, True, settings.GRAY)
         screen.blit(controls_img, (settings.UI_PADDING, settings.WINDOW_HEIGHT - 14))
 
