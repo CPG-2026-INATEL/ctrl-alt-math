@@ -12,9 +12,9 @@ ROW_SIZE = 16
 TILE_HOLE = -1       # buraco (sem tile)
 TILE_LOW = ROW_SIZE * 1         # terreno baixo
 TILE_HIGH = 1        # terreno alto
-TILE_STAIRS_UP = 11   # escada subindo (norte)
-TILE_STAIRS_DOWN = 11+ROW_SIZE # escada descendo (sul)
-TILE_STAIRS_LEFT = 8+ROW_SIZE # escada esquerda (oeste)
+TILE_STAIRS_UP = 11+ROW_SIZE  # escada subindo (norte)
+TILE_STAIRS_DOWN = 11 # escada descendo (sul)
+TILE_STAIRS_LEFT = 9 # escada esquerda (oeste)
 TILE_STAIRS_RIGHT = 8 # escada direita (leste)
 
 
@@ -232,11 +232,6 @@ class MapGenerator:
 
     def _place_stairs(self, grid):
         CARDINAL = [(-1, 0), (1, 0), (0, -1), (0, 1)]
-        # Escada fica no LOW, aponta na direção do LOW para o HIGH:
-        # STAIRS_UP:    LOW está ABAIXO do HIGH, escada aponta pra CIMA
-        # STAIRS_DOWN:  LOW está ACIMA do HIGH, escada aponta pra BAIXO
-        # STAIRS_RIGHT: LOW está à ESQUERDA do HIGH, escada aponta pra DIREITA
-        # STAIRS_LEFT:  LOW está à DIREITA do HIGH, escada aponta pra ESQUERDA
         CARDINAL_TILES = {
             (-1, 0): TILE_STAIRS_UP,
             (1, 0): TILE_STAIRS_DOWN,
@@ -255,7 +250,7 @@ class MapGenerator:
                         cr, cc = queue.pop(0)
                         area.append((cr, cc))
                         for dr, dc in self.DIRS:
-                            nr, nc = cr + dr, c + dc
+                            nr, nc = cr + dr, cc + dc
                             if 0 <= nr < self.height and 0 <= nc < self.width:
                                 if (nr, nc) not in visited and grid[nr][nc] == TILE_HIGH:
                                     visited.add((nr, nc))
@@ -265,14 +260,14 @@ class MapGenerator:
                     for ar, ac in area:
                         for dr, dc in CARDINAL:
                             nr, nc = ar + dr, ac + dc
-                            # nr,nc = LOW tile; ar,ac = HIGH tile
-                            # dr,dc aponta do HIGH para o LOW
-                            # escada fica no LOW (nr,nc) e aponta do LOW para o HIGH
-                            # ou seja, a direção da escada é (-dr, -dc)
                             if 0 <= nr < self.height and 0 <= nc < self.width:
                                 if grid[nr][nc] == TILE_LOW:
                                     stair_dir = (-dr, -dc)
-                                    border_candidates.append((nr, nc, stair_dir))
+                                    opposite_r = nr - stair_dir[0]
+                                    opposite_c = nc - stair_dir[1]
+                                    if 0 <= opposite_r < self.height and 0 <= opposite_c < self.width:
+                                        if grid[opposite_r][opposite_c] == TILE_LOW:
+                                            border_candidates.append((nr, nc, stair_dir))
 
                     random.shuffle(border_candidates)
                     placed = 0
