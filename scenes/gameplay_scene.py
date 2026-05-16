@@ -7,16 +7,25 @@ from utils import draw_text, distance, angle_between
 from enemy import Enemy
 from grid import Grid
 from turn_manager import TurnManager
+from tilemap import TileMap, MapGenerator
+from tilemap import TILE_HOLE, TILE_LOW, TILE_HIGH, TILE_HIGH_EDGE
+from tilemap import TILE_STAIRS_UP, TILE_STAIRS_DOWN, TILE_STAIRS_LEFT, TILE_STAIRS_RIGHT
 from scenes.scene import Scene
 
 
 class GameplayScene(Scene):
+    TILESET_PATH = "assets/Tileset/tileset_arranged.png"
+    TILE_SIZE = 16
+
     def __init__(self, game):
         super().__init__(game)
         self.state = "WAVE_INTRO"
         self.grid = Grid()
         self.turn_manager = TurnManager()
         self.obstacles_data = settings.ARENA_OBSTACLES
+        self.tilemap = None
+        self.tile_offset_x = 0
+        self.tile_offset_y = 0
 
         self.cursor_col = 8
         self.cursor_row = 6
@@ -72,6 +81,8 @@ class GameplayScene(Scene):
 
         self.grid.load_obstacles(self.obstacles_data)
 
+        self._generate_tilemap()
+
         pcol, prow = self.grid.cols // 2, self.grid.rows - 2
         self.game.player.set_grid_position(pcol, prow, self.grid)
         self.cursor_col = pcol
@@ -125,6 +136,66 @@ class GameplayScene(Scene):
                     if self.grid.is_valid(nc, nr) and not self.grid.is_blocked(nc, nr):
                         return nc, nr
         return col, row
+
+    def _generate_tilemap(self):
+        seed = 42
+        if self.game.current_room:
+            seed = hash((self.game.current_room.col, self.game.current_room.row)) & 0xFFFFFFFF
+        gen = MapGenerator(
+            width=self.grid.cols,
+            height=self.grid.rows,
+            hole_density=0.05,
+            high_terrain_ratio=0.20,
+            high_terrain_count=2,
+            stairs_per_area=1,
+            seed=seed,
+        )
+        map_data = gen.generate()
+
+        ALL_STAIRS = {TILE_STAIRS_UP, TILE_STAIRS_DOWN, TILE_STAIRS_LEFT, TILE_STAIRS_RIGHT}
+        HIGH_TILES = {TILE_HIGH, TILE_HIGH_EDGE}
+
+        reachable_high = set()
+        queue = []
+        for r in range(self.grid.rows):
+            for c in range(len(map_data[r]) if r < len(map_data) else 0):
+                if r < len(map_data) and c < len(map_data[r]):
+                    tile = map_data[r][c]
+                    self.grid.tile_types[(c, r)] = tile
+                    if tile in ALL_STAIRS:
+                        queue.append((c, r))
+                        reachable_high.add((c, r))
+
+        while queue:
+            cx, cy = queue.pop(0)
+            for dx, dy in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+                nx, ny = cx + dx, cy + dy
+                if 0 <= nx < self.grid.cols and 0 <= ny < self.grid.rows:
+                    if (nx, ny) not in reachable_high and ny < len(map_data) and nx < len(map_data[ny]):
+                        if map_data[ny][nx] in HIGH_TILES:
+                            reachable_high.add((nx, ny))
+                            queue.append((nx, ny))
+
+        for r in range(self.grid.rows):
+            for c in range(self.grid.cols):
+                if r < len(map_data) and c < len(map_data[r]):
+                    tile = map_data[r][c]
+                    if tile == TILE_HOLE:
+                        self.grid.blocked.add((c, r))
+                    elif tile in HIGH_TILES and (c, r) not in reachable_high:
+                        self.grid.blocked.add((c, r))
+
+        for col, row in self.grid.blocked:
+            if self.grid.is_valid(col, row):
+                r_idx = min(row, len(map_data) - 1)
+                c_idx = min(col, len(map_data[r_idx]) - 1)
+                map_data[r_idx][c_idx] = TILE_HOLE
+
+        try:
+            self.tilemap = TileMap(self.TILESET_PATH, tile_size=self.TILE_SIZE)
+            self.tilemap.load_from_list(map_data)
+        except Exception:
+            self.tilemap = None
 
     def handle_event(self, event):
         if event.type != pygame.KEYDOWN:
@@ -256,21 +327,35 @@ class GameplayScene(Scene):
             if enemy.dead:
                 continue
             d = self.grid.grid_distance(pc, pr, enemy.col, enemy.row)
-            if d <= settings.BASIC_ATTACK_RANGE:
+            if d <= settings.BASIC_ATTACK_RANGE and not self.grid.is_level_change(pc, pr, enemy.col, enemy.row):
                 hit_enemies.append(enemy)
 
         if hit_enemies:
+            is_crit = self.game.player.check_crit()
             for enemy in hit_enemies:
-                enemy.take_damage(settings.PLAYER_ATTACK_DAMAGE)
-                self.game.floating_text.add_damage(enemy.x, enemy.y, settings.PLAYER_ATTACK_DAMAGE)
+                base_dmg = settings.PLAYER_ATTACK_DAMAGE
+                if is_crit:
+                    dmg = int(base_dmg * settings.PLAYER_CRIT_MULTIPLIER)
+                else:
+                    dmg = base_dmg
+                dx = abs(enemy.col - pc)
+                dy = abs(enemy.row - pr)
+                dist_formula = f"d={dx}+{dy}={dx+dy}" if dx + dy < 5 else f"|v|={dx+dy}"
+                self.game.floating_text.add_formula(
+                    enemy.x, enemy.y - 30,
+                    dist_formula, settings.YELLOW if not is_crit else settings.GOLD
+                )
+                enemy.take_damage(dmg)
+                self.game.floating_text.add_enemy_damage(enemy.x, enemy.y, dmg, is_crit)
                 self.game.particles.emit_burst(enemy.x, enemy.y, settings.WHITE, 8, 60, 0.3)
-                self.game.screen_shake = 0.05
-                self.game.shake_intensity = 3
+                self.game.screen_shake = 0.1 if is_crit else 0.05
+                self.game.shake_intensity = 6 if is_crit else 3
                 self.game.sfx.play("hit")
                 if enemy.dead:
                     self._on_enemy_death(enemy)
-            self.turn_log.append("Attack")
+            self.turn_log.append(f"Attack{' (CRIT!)' if is_crit else ''}")
         else:
+            self.game.floating_text.add_miss(self.game.player.x, self.game.player.y)
             self.turn_log.append("Miss")
 
         self.turn_manager.player_acted = True
@@ -288,20 +373,32 @@ class GameplayScene(Scene):
                 return
             range_cells = self.grid.get_cells_in_radius(pc, pr, settings.PITAGORAS_RANGE)
             hit = False
+            dx = abs(self.cursor_col - pc)
+            dy = abs(self.cursor_row - pr)
+            is_crit = self.game.player.check_crit()
+            self.game.floating_text.add_formula(
+                self.game.player.x, self.game.player.y - 30,
+                f"a\u00b2+b\u00b2=c\u00b2  ({dx}\u00b2+{dy}\u00b2={dx*dx+dy*dy})",
+                settings.GOLD if is_crit else settings.YELLOW
+            )
             for enemy in self.game.enemies:
                 if enemy.dead:
                     continue
                 if (enemy.col, enemy.row) in range_cells:
-                    enemy.take_damage(settings.PITAGORAS_DAMAGE)
-                    self.game.floating_text.add_damage(enemy.x, enemy.y, settings.PITAGORAS_DAMAGE)
-                    self.game.particles.emit_burst(enemy.x, enemy.y, settings.YELLOW, 12, 80, 0.4)
-                    self.game.screen_shake = 0.08
-                    self.game.shake_intensity = 5
-                    self.game.sfx.play("enemy_hit")
-                    hit = True
-                    if enemy.dead:
-                        self._on_enemy_death(enemy)
-            self.turn_log.append("Pitagoras" if hit else "Pitagoras Miss")
+                    if not self.grid.is_level_change(pc, pr, enemy.col, enemy.row):
+                        dmg = int(settings.PITAGORAS_DAMAGE * settings.PLAYER_CRIT_MULTIPLIER) if is_crit else settings.PITAGORAS_DAMAGE
+                        enemy.take_damage(dmg)
+                        self.game.floating_text.add_enemy_damage(enemy.x, enemy.y, dmg, is_crit)
+                        self.game.particles.emit_burst(enemy.x, enemy.y, settings.YELLOW, 12, 80, 0.4)
+                        self.game.screen_shake = 0.12 if is_crit else 0.08
+                        self.game.shake_intensity = 7 if is_crit else 5
+                        self.game.sfx.play("enemy_hit")
+                        hit = True
+                        if enemy.dead:
+                            self._on_enemy_death(enemy)
+                    else:
+                        self.game.floating_text.add_evasion(enemy.x, enemy.y)
+            self.turn_log.append(f"Pitagoras{' (CRIT!)' if is_crit else ''}" if hit else "Pitagoras Miss")
             self.game.sfx.play("pitagoras")
 
         elif skill == "reflexao":
@@ -312,6 +409,10 @@ class GameplayScene(Scene):
                 self.grid.mark_barrier(col, row, True)
             self.game.particles.emit_burst(
                 self.game.player.x, self.game.player.y, settings.CYAN, 15, 70, 0.3
+            )
+            self.game.floating_text.add_formula(
+                self.game.player.x, self.game.player.y - 30,
+                "\u03b8\u1d62=\u03b8\u1d63 (reflection)", settings.CYAN
             )
             self.game.sfx.play("reflexao")
             self.turn_log.append("Reflexao")
@@ -371,8 +472,12 @@ class GameplayScene(Scene):
         self.cursor_row = int(p["row"])
 
     def _on_enemy_death(self, enemy):
+        self.game.floating_text.add_formula(
+            enemy.x, enemy.y,
+            "\u2203=0 (eliminated)", settings.GREEN
+        )
         self.game.particles.emit_burst(enemy.x, enemy.y, enemy.color, 15, 80, 0.4)
-        self.game.floating_text.add_info(enemy.x, enemy.y, "DESTROYED", settings.GREEN)
+        self.game.floating_text.add_info(enemy.x, enemy.y, "QED", settings.GREEN)
         self.game.screen_shake = 0.1
         self.game.shake_intensity = 4
         self.game.sfx.play("enemy_die")
@@ -496,24 +601,34 @@ class GameplayScene(Scene):
 
         self.turn_manager.resolve_timer = 0
 
-        if action["type"] == "move":
+        if action["type"] == "wait":
+            self.turn_log.append(f"{enemy.type} waits")
+        elif action["type"] == "move":
             tc, tr = action["target_col"], action["target_row"]
             if self.grid.is_valid(tc, tr) and not self.grid.is_blocked(tc, tr):
-                old_col, old_row = enemy.col, enemy.row
-                enemy.start_move_anim(old_col, old_row, tc, tr, self.grid)
-                enemy.col = tc
-                enemy.row = tr
-                enemy.x, enemy.y = self.grid.to_pixel(tc, tr)
-                self.turn_log.append(f"{enemy.type} moved")
+                if not self.grid.is_level_change(enemy.col, enemy.row, tc, tr):
+                    old_col, old_row = enemy.col, enemy.row
+                    enemy.start_move_anim(old_col, old_row, tc, tr, self.grid)
+                    enemy.col = tc
+                    enemy.row = tr
+                    enemy.x, enemy.y = self.grid.to_pixel(tc, tr)
+                    self.turn_log.append(f"{enemy.type} moved")
+                else:
+                    self.turn_log.append(f"{enemy.type} can't reach")
+            else:
+                self.turn_log.append(f"{enemy.type} blocked")
 
         elif action["type"] == "move_then_attack":
             tc, tr = action["target_col"], action["target_row"]
             if self.grid.is_valid(tc, tr) and not self.grid.is_blocked(tc, tr):
-                enemy.start_move_anim(enemy.col, enemy.row, tc, tr, self.grid)
-                enemy.col = tc
-                enemy.row = tr
-                enemy.x, enemy.y = self.grid.to_pixel(tc, tr)
-                self._enemy_attack(enemy)
+                if not self.grid.is_level_change(enemy.col, enemy.row, tc, tr):
+                    enemy.start_move_anim(enemy.col, enemy.row, tc, tr, self.grid)
+                    enemy.col = tc
+                    enemy.row = tr
+                    enemy.x, enemy.y = self.grid.to_pixel(tc, tr)
+                    self._enemy_attack(enemy)
+                else:
+                    self._enemy_attack(enemy)
 
         elif action["type"] == "attack":
             self._enemy_attack(enemy)
@@ -531,16 +646,28 @@ class GameplayScene(Scene):
         pr = self.game.player.row
         d = self.grid.grid_distance(enemy.col, enemy.row, pc, pr)
 
-        if d <= enemy.attack_range:
-            if self.game.player.take_damage(enemy.damage):
-                self.game.floating_text.add_damage(self.game.player.x, self.game.player.y, enemy.damage)
+        if d <= enemy.attack_range and not self.grid.is_level_change(enemy.col, enemy.row, pc, pr):
+            dmg = enemy.roll_damage()
+            dx = abs(pc - enemy.col)
+            dy = abs(pr - enemy.row)
+            if self.game.player.take_damage(dmg):
+                self.game.floating_text.add_damage(self.game.player.x, self.game.player.y, dmg, enemy.last_crit)
                 self.game.particles.emit_burst(self.game.player.x, self.game.player.y, settings.RED, 10, 60, 0.3)
-                self.game.screen_shake = 0.1
-                self.game.shake_intensity = 6
+                self.game.screen_shake = 0.15 if enemy.last_crit else 0.1
+                self.game.shake_intensity = 8 if enemy.last_crit else 6
                 self.game.sfx.play("player_hit")
-                self.turn_log.append(f"{enemy.type} hit you for {enemy.damage}")
+                if enemy.last_crit:
+                    self.game.floating_text.add_formula(
+                        self.game.player.x, self.game.player.y + 15,
+                        f"CRITICAL! ({dx}+{dy}={dx+dy})", settings.ORANGE
+                    )
+                self.turn_log.append(f"{enemy.type} hit for {dmg}{' (CRIT!)' if enemy.last_crit else ''}")
             else:
+                self.game.floating_text.add_blocked(self.game.player.x, self.game.player.y)
                 self.turn_log.append(f"{enemy.type} attacked (blocked)")
+        elif d <= enemy.attack_range:
+            self.game.floating_text.add_evasion(enemy.x, enemy.y)
+            self.turn_log.append(f"{enemy.type} can't reach (elevation)")
         else:
             self.turn_log.append(f"{enemy.type} attack missed")
 
@@ -561,6 +688,12 @@ class GameplayScene(Scene):
             phase = 2
 
         count = 3 if phase >= 3 else 2 if phase >= 2 else 1
+        dmg = enemy.roll_damage()
+        self.game.floating_text.add_formula(
+            enemy.x, enemy.y - 30,
+            f"Phase {['I','II','III'][phase-1]} \u2192 ||v||={count}",
+            settings.ORANGE
+        )
 
         for i in range(count):
             offset = i - (count - 1) // 2
@@ -570,13 +703,13 @@ class GameplayScene(Scene):
             r = max(0, min(self.grid.rows - 1, r))
 
             if c == self.game.player.col and r == self.game.player.row:
-                if self.game.player.take_damage(enemy.damage):
-                    self.game.floating_text.add_damage(self.game.player.x, self.game.player.y, enemy.damage)
+                if self.game.player.take_damage(dmg):
+                    self.game.floating_text.add_damage(self.game.player.x, self.game.player.y, dmg, enemy.last_crit)
                     self.game.particles.emit_burst(self.game.player.x, self.game.player.y, settings.RED, 10, 60, 0.3)
-                    self.game.screen_shake = 0.1
+                    self.game.screen_shake = 0.15
                     self.game.shake_intensity = 6
                     self.game.sfx.play("player_hit")
-                    self.turn_log.append(f"Boss line attack hit!")
+                    self.turn_log.append(f"Boss line attack hit for {dmg}!")
 
         self.game.particles.emit_burst(enemy.x, enemy.y, (255, 100, 100), 10, 50, 0.3)
         self.game.sfx.play("pitagoras")
@@ -585,18 +718,23 @@ class GameplayScene(Scene):
     def _enemy_area_attack(self, enemy, action):
         tc, tr = action["target_col"], action["target_row"]
         radius = 2
+        dmg = enemy.roll_damage()
         hit = False
+        self.game.floating_text.add_formula(
+            enemy.x, enemy.y - 30,
+            f"\u222b dA  r={radius}", settings.RED
+        )
         for col in range(tc - radius, tc + radius + 1):
             for row in range(tr - radius, tr + radius + 1):
                 if col == self.game.player.col and row == self.game.player.row:
-                    if self.game.player.take_damage(enemy.damage):
-                        self.game.floating_text.add_damage(self.game.player.x, self.game.player.y, enemy.damage)
+                    if self.game.player.take_damage(dmg):
+                        self.game.floating_text.add_damage(self.game.player.x, self.game.player.y, dmg, enemy.last_crit)
                         self.game.particles.emit_burst(self.game.player.x, self.game.player.y, settings.RED, 10, 60, 0.3)
-                        self.game.screen_shake = 0.1
+                        self.game.screen_shake = 0.15
                         self.game.shake_intensity = 6
                         self.game.sfx.play("player_hit")
                         hit = True
-                        self.turn_log.append(f"Boss AoE hit!")
+                        self.turn_log.append(f"Boss AoE hit for {dmg}!")
 
         cx, cy = self.grid.to_pixel(tc, tr)
         self.game.particles.emit_burst(cx, cy, settings.RED, 20, 80, 0.4)
@@ -611,6 +749,10 @@ class GameplayScene(Scene):
         self.game.player.rigor = min(
             self.game.player.max_rigor,
             self.game.player.rigor + settings.RIGOR_REGEN_RATE
+        )
+        self.game.floating_text.add_rigor(
+            self.game.player.x, self.game.player.y - 20,
+            settings.RIGOR_REGEN_RATE
         )
         self.grid.clear_barriers()
 
@@ -655,17 +797,39 @@ class GameplayScene(Scene):
             settings.ARENA_OFFSET_X, settings.ARENA_OFFSET_Y,
             settings.ARENA_WIDTH, settings.ARENA_HEIGHT
         )
-        pygame.draw.rect(temp, settings.COLOR_ARENA, arena_rect)
+
+        if self.tilemap:
+            scale_x = self.grid.cell_w / self.tilemap.tile_size
+            scale_y = self.grid.cell_h / self.tilemap.tile_size
+            for row in range(self.tilemap.map_height):
+                for col in range(len(self.tilemap.map_data[row])):
+                    tile_id = self.tilemap.map_data[row][col]
+                    if tile_id < 0:
+                        continue
+                    ts = self.tilemap.tile_size
+                    sx = (tile_id % self.tilemap.tiles_per_row) * ts
+                    sy = (tile_id // self.tilemap.tiles_per_row) * ts
+                    tile_surf = self.tilemap.tileset.subsurface(sx, sy, ts, ts)
+                    scaled_w = int(self.grid.cell_w)
+                    scaled_h = int(self.grid.cell_h)
+                    if scale_x != 1.0 or scale_y != 1.0:
+                        tile_surf = pygame.transform.scale(tile_surf, (scaled_w, scaled_h))
+                    dx = settings.ARENA_OFFSET_X + col * scaled_w
+                    dy = settings.ARENA_OFFSET_Y + row * scaled_h
+                    temp.blit(tile_surf, (dx, dy))
+        else:
+            pygame.draw.rect(temp, settings.COLOR_ARENA, arena_rect)
+
         pygame.draw.rect(temp, settings.COLOR_WALL, arena_rect, 2)
 
+        for (col, row) in self.grid.blocked:
+            rect = self.grid.cell_rect(col, row)
+            obs_surf = pygame.Surface((int(rect.width), int(rect.height)))
+            obs_surf.set_alpha(120)
+            obs_surf.fill((20, 20, 40))
+            temp.blit(obs_surf, rect)
+
         self.grid.draw(temp, show_grid=True, grid_color=(25, 25, 50))
-
-        for obs in self.game.obstacles:
-            pygame.draw.rect(temp, settings.COLOR_OBSTACLE, obs)
-            pygame.draw.rect(temp, settings.COLOR_OBSTACLE_BORDER, obs, 1)
-            pygame.draw.rect(temp, (50, 50, 80),
-                             (obs.x + 2, obs.y + 2, obs.width - 4, obs.height - 4))
-
         self.grid.draw_barriers(temp)
 
         self.game.math_bg.draw(temp)
@@ -769,6 +933,9 @@ class GameplayScene(Scene):
         self.game.particles.draw(temp)
         self.game.floating_text.draw(temp)
 
+        self._draw_cursor_info(temp)
+        self._draw_enemy_info(temp)
+
         self._draw_turn_hud(temp)
 
         if self.game.screen_shake > 0:
@@ -816,6 +983,126 @@ class GameplayScene(Scene):
                          (settings.WINDOW_WIDTH // 2, settings.WINDOW_HEIGHT // 2 + 80),
                          settings.GREEN, 16)
 
+    def _draw_cursor_info(self, screen):
+        if self.state not in ("PLAYER_INPUT", "PLAYER_ACTION_SELECT"):
+            return
+
+        pc = self.game.player.col
+        pr = self.game.player.row
+        cc = self.cursor_col
+        cr = self.cursor_row
+        dx = cc - pc
+        dy = cr - pr
+        dist = abs(dx) + abs(dy)
+        eucl = math.sqrt(dx * dx + dy * dy)
+
+        info_x = settings.ARENA_OFFSET_X + settings.ARENA_WIDTH + 5
+        if info_x + 180 > settings.WINDOW_WIDTH:
+            info_x = settings.WINDOW_WIDTH - 180
+
+        font = pygame.font.Font(None, 16)
+        info_y = settings.ARENA_OFFSET_Y + 5
+
+        label_color = settings.CYAN
+        value_color = settings.WHITE
+
+        lines = [
+            (f"v = ({dx:+d}, {dy:+d})", label_color),
+            (f"|v| = {dist}", value_color),
+        ]
+
+        if dist > 0:
+            lines.append((f"||v|| = {eucl:.2f}", settings.YELLOW))
+
+        tile_type = self.grid.tile_types.get((cc, cr), 0)
+        tile_name = "LOW"
+        if tile_type == -1:
+            tile_name = "HOLE"
+        elif tile_type in (16, 61):
+            tile_name = "HIGH"
+        elif tile_type in (27, 11, 25, 24):
+            tile_name = "STAIRS"
+        lines.append((f"Tile: {tile_name}", settings.LIGHT_GRAY))
+
+        reachable = self.grid.get_reachable_cells(pc, pr, settings.PLAYER_MOVE_RANGE)
+        if (cc, cr) in reachable or (cc, cr) == (pc, pr):
+            can_reach = True
+        else:
+            can_reach = False
+        lines.append(("Reachable" if can_reach else "Blocked",
+                       settings.GREEN if can_reach else settings.RED))
+
+        for text, color in lines:
+            img = font.render(text, True, color)
+            screen.blit(img, (info_x, info_y))
+            info_y += 16
+
+        tilted_font = pygame.font.Font(None, 13)
+        if self.state == "PLAYER_INPUT" and self.show_move_range and (cc, cr) in reachable:
+            move_label = tilted_font.render(f"\u0394pos({dx:+d},{dy:+d}) d={dist}", True, settings.BLUE)
+            screen.blit(move_label, (info_x, info_y + 4))
+
+        if self.state == "PLAYER_ACTION_SELECT":
+            if self.selected_skill == "pitagoras":
+                eucl_dist = math.sqrt(dx * dx + dy * dy)
+                skill_label = tilted_font.render(
+                    f"a\u00b2+b\u00b2=c\u00b2  c={eucl_dist:.1f}", True, settings.YELLOW)
+                screen.blit(skill_label, (info_x, info_y + 4))
+            elif self.selected_skill == "reflexao":
+                skill_label = tilted_font.render(
+                    "\u03b8\u1d62=\u03b8\u1d63 (reflect)", True, settings.CYAN)
+                screen.blit(skill_label, (info_x, info_y + 4))
+
+    def _draw_enemy_info(self, screen):
+        font = pygame.font.Font(None, 14)
+        pc = self.game.player.col
+        pr = self.game.player.row
+
+        for enemy in self.game.enemies:
+            if enemy.dead:
+                continue
+            d = self.grid.grid_distance(enemy.col, enemy.row, pc, pr)
+            if d <= 6:
+                ex, ey = self.grid.to_pixel(enemy.col, enemy.row)
+                type_symbols = {
+                    "censor": "\u00acP",
+                    "strawman": "A\u2192?",
+                    "bayesian": "P(B|A)",
+                    "boss": "\u2203!",
+                }
+                symbol = type_symbols.get(enemy.type, "?")
+                hp_text = f"{enemy.hp}/{enemy.max_hp}"
+                label = font.render(symbol, True, settings.YELLOW)
+                screen.blit(label, (int(ex) - label.get_width() // 2,
+                                     int(ey) - enemy.size - 18))
+
+    def _draw_combat_log(self, screen, log_y):
+        if not self.turn_log:
+            return
+
+        font = pygame.font.Font(None, 14)
+        max_lines = 4
+        start_idx = max(0, len(self.turn_log) - max_lines)
+        x = settings.UI_PADDING + 360
+
+        for i, entry in enumerate(self.turn_log[start_idx:start_idx + max_lines]):
+            alpha = int(180 + 75 * (i / max_lines))
+            if "CRIT" in entry or "CRITICAL" in entry:
+                color = settings.GOLD
+            elif "hit" in entry.lower() or "attack" in entry.lower():
+                color = settings.RED
+            elif "Miss" in entry or "missed" in entry:
+                color = settings.GRAY
+            elif "moved" in entry:
+                color = settings.LIGHT_GRAY
+            elif "QED" in entry.upper() or "eliminated" in entry:
+                color = settings.GREEN
+            else:
+                color = (160, 160, 200)
+
+            img = font.render(entry, True, color)
+            screen.blit(img, (x, log_y + i * 14))
+
     def _draw_turn_hud(self, screen):
         bar_y = settings.WINDOW_HEIGHT - settings.UI_BAR_HEIGHT
         pygame.draw.rect(screen, settings.DARK_GRAY,
@@ -827,9 +1114,11 @@ class GameplayScene(Scene):
         rigor_pct = self.game.player.rigor / self.game.player.max_rigor
         entropy_pct = self.game.entropy / settings.MAX_ENTROPY
 
+        hp_color = settings.RED if hp_pct > 0.5 else settings.ORANGE if hp_pct > 0.25 else settings.RED
         self._draw_bar(screen, settings.UI_PADDING, bar_y + 8, 160, 14,
-                       hp_pct, settings.RED, (60, 20, 20))
-        draw_text(screen, f"HP: {self.game.player.hp}/{self.game.player.max_hp}",
+                       hp_pct, hp_color, (60, 20, 20))
+        hp_text = f"HP: {self.game.player.hp}/{self.game.player.max_hp}"
+        draw_text(screen, hp_text,
                   (settings.UI_PADDING + 80, bar_y + 15),
                   settings.WHITE, 14)
 
@@ -841,30 +1130,46 @@ class GameplayScene(Scene):
 
         self._draw_bar(screen, settings.UI_PADDING + 180, bar_y + 8, 120, 14,
                        entropy_pct, settings.COLOR_ENTROPY_BAR, (40, 10, 40))
-        draw_text(screen, f"Entropy: {self.game.entropy:.0f}",
+        draw_text(screen, f"S: {self.game.entropy:.0f}",
                   (settings.UI_PADDING + 240, bar_y + 15),
                   settings.WHITE, 14)
 
+        crit_pct = int(settings.PLAYER_CRIT_CHANCE * 100)
+        font_small = pygame.font.Font(None, 12)
+        crit_label = font_small.render(f"CRIT: {crit_pct}%  \u00d7{settings.PLAYER_CRIT_MULTIPLIER:.0f}", True, settings.GOLD)
+        screen.blit(crit_label, (settings.UI_PADDING + 180, bar_y + 28))
+
         phase_text = "YOUR MOVE"
+        phase_symbol = "f(x)"
         if self.state == "PLAYER_ACTION_SELECT":
             phase_text = "YOUR ACTION"
+            phase_symbol = "f'(x)"
         elif self.state == "ENEMY_TURN":
             phase_text = "ENEMY TURN"
+            phase_symbol = "\u2200x"
         elif self.state == "RESOLVE_MOVE":
             phase_text = "MOVING..."
+            phase_symbol = "\u0394x"
         elif self.state == "VICTORY_TRANSITION":
             phase_text = "Q.E.D."
+            phase_symbol = "\u25a1"
 
-        draw_text(screen, f"TURN {self.turn_manager.turn_number} \u2014 {phase_text}",
-                  (settings.WINDOW_WIDTH // 2, bar_y + 15),
+        draw_text(screen, f"T{self.turn_manager.turn_number} {phase_symbol}",
+                  (settings.WINDOW_WIDTH // 2 - 60, bar_y + 10),
+                  settings.YELLOW if self.state in ("PLAYER_INPUT", "PLAYER_ACTION_SELECT") else settings.RED,
+                  12)
+        draw_text(screen, phase_text,
+                  (settings.WINDOW_WIDTH // 2, bar_y + 22),
                   settings.CYAN if self.state in ("PLAYER_INPUT", "PLAYER_ACTION_SELECT") else settings.RED,
-                  18)
+                  16)
 
         move_status = "\u2713" if self.turn_manager.player_moved else "\u25cb"
         act_status = "\u2713" if self.turn_manager.player_acted else "\u25cb"
-        draw_text(screen, f"Move: {move_status}  Action: {act_status}",
-                  (settings.WINDOW_WIDTH // 2, bar_y + 38),
+        draw_text(screen, f"\u0394x: {move_status}  f(x): {act_status}",
+                  (settings.WINDOW_WIDTH // 2, bar_y + 40),
                   settings.LIGHT_GRAY, 14)
+
+        self._draw_combat_log(screen, bar_y + 5)
 
         controls = [
             "WASD: Cursor",
@@ -873,10 +1178,10 @@ class GameplayScene(Scene):
             "1/2: Skills",
             "R: Undo",
             "E: Wait",
-            "Tab: Skills",
+            "Tab: Tree",
             "Esc: Pause",
         ]
-        x = settings.WINDOW_WIDTH - 110
+        x = settings.WINDOW_WIDTH - 95
         y = bar_y + 2
         for c in controls:
             draw_text(screen, c, (x, y), settings.GRAY, 10, center=False)

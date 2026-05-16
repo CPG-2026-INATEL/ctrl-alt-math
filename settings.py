@@ -28,6 +28,8 @@ PLAYER_MAX_HP = 100
 PLAYER_MAX_RIGOR = 100
 PLAYER_ATTACK_COOLDOWN = 0.3
 PLAYER_ATTACK_DAMAGE = 15
+PLAYER_CRIT_CHANCE = 0.15
+PLAYER_CRIT_MULTIPLIER = 2.0
 PLAYER_START_SKILL_POINTS = 2
 RIGOR_REGEN_RATE = 15
 RIGOR_REGEN_DELAY = 0
@@ -48,21 +50,25 @@ ENEMY_SIZE = 14
 BOSS_SIZE = 36
 CENSOR_HP = 30
 CENSOR_MOVE_RANGE = 2
-CENSOR_DAMAGE = 12
+CENSOR_DAMAGE = 10
 CENSOR_ATTACK_RANGE = 3
 STRAWMAN_HP = 20
 STRAWMAN_MOVE_RANGE = 3
-STRAWMAN_DAMAGE = 8
+STRAWMAN_DAMAGE = 7
 STRAWMAN_ATTACK_RANGE = 3
 BAYESIAN_HP = 25
 BAYESIAN_MOVE_RANGE = 2
-BAYESIAN_DAMAGE = 10
+BAYESIAN_DAMAGE = 9
 BAYESIAN_ATTACK_RANGE = 5
 BOSS_HP = 150
 BOSS_MOVE_RANGE = 1
 BOSS_DAMAGE = 15
 BOSS_ATTACK_RANGE = 4
 BOSS_ACTION_INTERVAL = 0.9
+
+ENEMY_CRIT_CHANCE = 0.08
+ENEMY_CRIT_MULTIPLIER = 1.8
+ENEMY_DAMAGE_VARIANCE = 0.15
 
 ENTROPY_PER_TURN = 2
 REWIND_UNDO_TURNS = 2
@@ -141,7 +147,7 @@ SKILL_TREE_DATA = [
     {
         "id": "axioma",
         "name": "Axioma B\u00e1sico",
-        "desc": "The foundation of all\nmathematical thought.",
+        "desc": "The foundation of all\nmathematical thought.\n\u2200x: f(x) = f(x)",
         "cost": 0,
         "prereqs": [],
         "x": 400, "y": 60,
@@ -150,7 +156,7 @@ SKILL_TREE_DATA = [
     {
         "id": "derivada",
         "name": "Derivada",
-        "desc": "Predict enemy movement.\nShows future positions.",
+        "desc": "Predict enemy movement.\n\u2202f/\u2202x shows the\ndirection of change.",
         "cost": 1,
         "prereqs": ["axioma"],
         "x": 200, "y": 160,
@@ -159,7 +165,7 @@ SKILL_TREE_DATA = [
     {
         "id": "pitagoras",
         "name": "Pit\u00e1goras",
-        "desc": "Geometric attack (range 3).\nPress 1 to target area.",
+        "desc": "Geometric attack (r\u22643).\nd = \u221a(\u0394x\u00b2+\u0394y\u00b2)\nDeals 25 damage.",
         "cost": 1,
         "prereqs": ["axioma"],
         "x": 400, "y": 160,
@@ -168,7 +174,7 @@ SKILL_TREE_DATA = [
     {
         "id": "ctrlz",
         "name": "Ctrl+Z",
-        "desc": "Rewind 2 turns back.\nPress R to undo.",
+        "desc": "Rewind 2 turns back.\nR\u207b\u00b9: undo(R) \u2192 R\u207b\u00b2\nPress R to undo.",
         "cost": 1,
         "prereqs": ["axioma"],
         "x": 600, "y": 160,
@@ -177,7 +183,7 @@ SKILL_TREE_DATA = [
     {
         "id": "bayes",
         "name": "Bayes",
-        "desc": "Improved prediction.\nShows attack intent.",
+        "desc": "Improved prediction.\nP(A|B) = P(B|A)\n\u00d7 P(A) / P(B)",
         "cost": 2,
         "prereqs": ["derivada"],
         "x": 200, "y": 280,
@@ -186,7 +192,7 @@ SKILL_TREE_DATA = [
     {
         "id": "reflexao",
         "name": "Reflex\u00e3o",
-        "desc": "Barrier cells block enemies.\nPress 2 for barrier.",
+        "desc": "Barrier cells block enemies.\n\u03b8\u1d62=\u03b8\u1d63: reflection\nsymmetry. Press 2.",
         "cost": 2,
         "prereqs": ["pitagoras"],
         "x": 400, "y": 280,
@@ -195,7 +201,7 @@ SKILL_TREE_DATA = [
     {
         "id": "entropia",
         "name": "Entropia Controlada",
-        "desc": "Reduce entropy gain\nfrom rewinding.",
+        "desc": "Reduce entropy gain\nfrom rewinding.\n\u0394S \u2192 0",
         "cost": 2,
         "prereqs": ["ctrlz"],
         "x": 600, "y": 280,
@@ -204,7 +210,7 @@ SKILL_TREE_DATA = [
     {
         "id": "teoria_jogos",
         "name": "Teoria dos Jogos",
-        "desc": "Reveal enemy targets.\nShows who enemies target.",
+        "desc": "Reveal enemy targets.\nNash equilibrium:\nno regrets strategy.",
         "cost": 3,
         "prereqs": ["bayes"],
         "x": 200, "y": 400,

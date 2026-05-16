@@ -1,5 +1,6 @@
 import pygame
 import math
+import random
 
 import settings
 from utils import clamp, distance
@@ -36,6 +37,12 @@ class Player:
         self.anim_from_py = 0
         self.anim_to_px = 0
         self.anim_to_py = 0
+
+        self.last_crit = False
+
+    def check_crit(self):
+        self.last_crit = random.random() < settings.PLAYER_CRIT_CHANCE
+        return self.last_crit
 
     def set_grid_position(self, col, row, grid):
         self.col = int(col)
@@ -153,3 +160,15 @@ class Player:
         tip_y = self.y + self.dir_y * self.size * 1.8
         pygame.draw.line(screen, settings.WHITE,
                          (self.x, self.y), (tip_x, tip_y), 3)
+
+        if abs(self.dir_x) + abs(self.dir_y) > 0:
+            font = pygame.font.Font(None, 14)
+            symbol = "f"
+            if self.last_crit:
+                symbol = "f'"
+                sym_color = settings.GOLD
+            else:
+                sym_color = settings.CYAN
+            label = font.render(symbol, True, sym_color)
+            screen.blit(label, (self.x - label.get_width() // 2,
+                                self.y - self.size - 12))

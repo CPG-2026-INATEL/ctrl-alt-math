@@ -17,6 +17,7 @@ class Grid:
         self.cell_h = self.height / self.rows
         self.blocked = set()
         self.barrier_cells = set()
+        self.tile_types = {}
 
     def to_grid(self, x, y):
         col = int((x - self.offset_x) / self.cell_w)
@@ -150,6 +151,8 @@ class Grid:
                     continue
                 if self.is_blocked(nc, nr) and (nc, nr) != (end_col, end_row):
                     continue
+                if self.is_level_change(col, row, nc, nr):
+                    continue
                 new_path = path + [(nc, nr)]
                 if (nc, nr) == (end_col, end_row):
                     return new_path
@@ -178,6 +181,8 @@ class Grid:
                     continue
                 if self.is_blocked(nc, nr):
                     continue
+                if self.is_level_change(col, row, nc, nr):
+                    continue
                 visited.add((nc, nr))
                 queue.append((nc, nr, steps + 1))
 
@@ -185,6 +190,22 @@ class Grid:
 
     def grid_distance(self, col1, row1, col2, row2):
         return abs(col1 - col2) + abs(row1 - row2)
+
+    def is_level_change(self, from_col, from_row, to_col, to_row):
+        from_tile = self.tile_types.get((from_col, from_row))
+        to_tile = self.tile_types.get((to_col, to_row))
+        if from_tile is None or to_tile is None:
+            return False
+        LOW_TILES = {0}
+        HIGH_TILES = {16, 61}
+        STAIR_TILES = {27, 11, 25, 24}
+        from_high = from_tile in HIGH_TILES
+        to_high = to_tile in HIGH_TILES
+        from_stairs = from_tile in STAIR_TILES
+        to_stairs = to_tile in STAIR_TILES
+        if from_high != to_high and not from_stairs and not to_stairs:
+            return True
+        return False
 
     def pixel_distance(self, col1, row1, col2, row2):
         x1, y1 = self.to_pixel(col1, row1)
