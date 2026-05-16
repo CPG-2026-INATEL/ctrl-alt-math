@@ -240,32 +240,71 @@ class Enemy:
         if self.dead:
             return None
 
+        occupied = {
+            (int(enemy.col), int(enemy.row))
+            for enemy in all_enemies
+            if enemy is not self and not enemy.dead
+        }
         dist = grid.grid_distance(self.col, self.row, player_col, player_row)
 
         if self.type == "boss":
-            return self._boss_decide(dist, player_col, player_row, grid)
+            return self._boss_decide(dist, player_col, player_row, grid, occupied)
 
         if dist <= self.attack_range and not grid.is_level_change(self.col, self.row, player_col, player_row):
             return {"type": "attack", "target_col": player_col, "target_row": player_row}
 
-        reachable = grid.get_reachable_cells(self.col, self.row, self.move_range)
+        reachable = grid.get_reachable_cells(
+            self.col,
+            self.row,
+            self.move_range,
+            include_barriers=True,
+            extra_blocked=occupied,
+        )
 
         if dist <= self.attack_range + 2:
-            reachable_set = set(reachable)
-            path = grid.pathfind(self.col, self.row, player_col, player_row)
-            if path and len(path) <= self.move_range:
-                target = path[-1]
-                if target in reachable_set:
-                    return {"type": "move_then_attack",
-                            "target_col": target[0], "target_row": target[1],
-                            "attack_after": True}
+            path = grid.pathfind(
+                self.col,
+                self.row,
+                player_col,
+                player_row,
+                include_barriers=True,
+                extra_blocked=occupied,
+            )
+            if path:
+                for step in path[:self.move_range]:
+                    if step in occupied:
+                        break
+                    if step == (player_col, player_row):
+                        break
+                    if grid.grid_distance(step[0], step[1], player_col, player_row) <= self.attack_range:
+                        if not grid.is_level_change(step[0], step[1], player_col, player_row):
+                            return {
+                                "type": "move_then_attack",
+                                "target_col": step[0],
+                                "target_row": step[1],
+                                "attack_after": True,
+                            }
 
-        path = grid.pathfind(self.col, self.row, player_col, player_row)
+        path = grid.pathfind(
+            self.col,
+            self.row,
+            player_col,
+            player_row,
+            include_barriers=True,
+            extra_blocked=occupied,
+        )
         if path:
+            last_step = None
             reachable_set = set(reachable)
-            for i, step in enumerate(path):
+            for step in path[:self.move_range]:
+                if step in occupied:
+                    break
+                if step == (player_col, player_row):
+                    break
                 if step in reachable_set:
-                    return {"type": "move", "target_col": step[0], "target_row": step[1]}
+                    last_step = step
+            if last_step is not None:
+                return {"type": "move", "target_col": last_step[0], "target_row": last_step[1]}
 
         closest_reachable = None
         closest_dist = float('inf')
@@ -281,7 +320,7 @@ class Enemy:
 
         return {"type": "wait"}
 
-    def _boss_decide(self, dist, player_col, player_row, grid):
+    def _boss_decide(self, dist, player_col, player_row, grid, occupied):
         phase = 1
         if self.hp < self.max_hp * 0.33:
             phase = 3
@@ -304,11 +343,24 @@ class Enemy:
         action = random.choice(choices)
 
         if action == "move":
-            path = grid.pathfind(self.col, self.row, player_col, player_row)
+            path = grid.pathfind(
+                self.col,
+                self.row,
+                player_col,
+                player_row,
+                include_barriers=True,
+                extra_blocked=occupied,
+            )
             if path:
-                steps = min(self.move_range, len(path))
-                target = path[steps - 1]
-                return {"type": "move", "target_col": target[0], "target_row": target[1]}
+                last_step = None
+                for step in path[:self.move_range]:
+                    if step in occupied:
+                        break
+                    if step == (player_col, player_row):
+                        break
+                    last_step = step
+                if last_step is not None:
+                    return {"type": "move", "target_col": last_step[0], "target_row": last_step[1]}
             return {"type": "wait"}
         elif action == "line_attack":
             return {"type": "line_attack", "target_col": player_col, "target_row": player_row}

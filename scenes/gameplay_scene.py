@@ -123,6 +123,13 @@ class GameplayScene(Scene):
         return x, y
 
     def _find_spawn_grid_cell(self):
+        occupied = {(self.game.player.col, self.game.player.row)}
+        occupied.update(
+            (enemy.col, enemy.row)
+            for enemy in self.game.enemies
+            if not enemy.dead and self.grid.is_valid(enemy.col, enemy.row)
+        )
+
         side = random.randint(0, 3)
         if side == 0:
             col = random.randint(2, self.grid.cols - 3)
@@ -137,12 +144,18 @@ class GameplayScene(Scene):
             col = self.grid.cols - 1
             row = random.randint(2, self.grid.rows - 3)
 
-        if self.grid.is_blocked(col, row):
+        if self.grid.is_blocked(col, row) or (col, row) in occupied:
             for dc in range(-2, 3):
                 for dr in range(-2, 3):
                     nc, nr = col + dc, row + dr
-                    if self.grid.is_valid(nc, nr) and not self.grid.is_blocked(nc, nr):
+                    if self.grid.is_valid(nc, nr) and not self.grid.is_blocked(nc, nr) and (nc, nr) not in occupied:
                         return nc, nr
+
+        for row_idx in range(self.grid.rows):
+            for col_idx in range(self.grid.cols):
+                if not self.grid.is_blocked(col_idx, row_idx) and (col_idx, row_idx) not in occupied:
+                    return col_idx, row_idx
+
         return col, row
 
     def _generate_tilemap(self):
@@ -233,8 +246,16 @@ class GameplayScene(Scene):
             self.selected_skill = skill_id
         self.show_action_range = True
 
-    def _build_anim_path(self, from_col, from_row, to_col, to_row):
-        path = self.grid.pathfind(from_col, from_row, to_col, to_row, allow_diagonal=False)
+    def _build_anim_path(self, from_col, from_row, to_col, to_row, include_barriers=False, extra_blocked=None):
+        path = self.grid.pathfind(
+            from_col,
+            from_row,
+            to_col,
+            to_row,
+            allow_diagonal=False,
+            include_barriers=include_barriers,
+            extra_blocked=extra_blocked,
+        )
         if path:
             return path
 
@@ -247,7 +268,7 @@ class GameplayScene(Scene):
                 if axis == "x":
                     while cur_col != to_col:
                         step_col = cur_col + (1 if to_col > cur_col else -1)
-                        if self.grid.is_blocked(step_col, cur_row):
+                        if self.grid.is_blocked(step_col, cur_row, include_barriers, extra_blocked):
                             return []
                         if self.grid.is_level_change(cur_col, cur_row, step_col, cur_row):
                             return []
@@ -256,7 +277,7 @@ class GameplayScene(Scene):
                 else:
                     while cur_row != to_row:
                         step_row = cur_row + (1 if to_row > cur_row else -1)
-                        if self.grid.is_blocked(cur_col, step_row):
+                        if self.grid.is_blocked(cur_col, step_row, include_barriers, extra_blocked):
                             return []
                         if self.grid.is_level_change(cur_col, cur_row, cur_col, step_row):
                             return []
@@ -290,11 +311,50 @@ class GameplayScene(Scene):
             )
             self.game.sfx.play("menu_select")
 
+    def _get_enemy_at_cursor(self):
+        for enemy in self.game.enemies:
+            if enemy.dead:
+                continue
+            if (enemy.col, enemy.row) == (self.cursor_col, self.cursor_row):
+                return enemy
+        return None
+
+    def _get_action_cells(self):
+        pc = self.game.player.col
+        pr = self.game.player.row
+        if self.selected_skill == "pitagoras":
+            return self.grid.get_cells_in_radius(pc, pr, settings.PITAGORAS_RANGE)
+        if self.selected_skill == "reflexao":
+            return self.grid.get_cells_in_radius(pc, pr, settings.REFLEXAO_RANGE)
+        return [
+            cell for cell in self.grid.get_cells_in_range(pc, pr, settings.BASIC_ATTACK_RANGE)
+            if cell != (pc, pr)
+        ]
+
+    def _can_execute_cursor_action(self):
+        action_cells = self._get_action_cells()
+        if (self.cursor_col, self.cursor_row) not in action_cells:
+            return False
+
+        if self.selected_skill == "reflexao":
+            return True
+
+        return self._get_enemy_at_cursor() is not None
+
     def _confirm_action_cursor(self):
+        if not self._can_execute_cursor_action():
+            self.game.floating_text.add_info(
+                self.game.player.x,
+                self.game.player.y - 30,
+                "OUT OF RANGE",
+                settings.GRAY,
+            )
+            return
+
         if self.selected_skill:
             self._execute_skill()
         else:
-            self._execute_basic_attack()
+            self._execute_basic_attack(target_enemy=self._get_enemy_at_cursor())
 
     def handle_event(self, event):
         if event.type == pygame.MOUSEMOTION:
@@ -401,8 +461,8 @@ class GameplayScene(Scene):
         elif k in (pygame.K_d, pygame.K_RIGHT):
             self.cursor_col = min(self.grid.cols - 1, self.cursor_col + 1)
 
-        if k == pygame.K_SPACE:
-            self._execute_basic_attack()
+        if k in (pygame.K_SPACE, pygame.K_RETURN):
+            self._confirm_action_cursor()
         elif k == pygame.K_1:
             if self.game.skill_tree.is_unlocked("pitagoras"):
                 self._toggle_skill("pitagoras")
@@ -412,8 +472,6 @@ class GameplayScene(Scene):
         elif k == pygame.K_r:
             if self.game.skill_tree.is_unlocked("ctrlz"):
                 self._try_rewind()
-        elif k == pygame.K_RETURN:
-            self._confirm_action_cursor()
         elif k == pygame.K_e:
             self.turn_manager.player_acted = True
             self.show_action_range = False
@@ -421,16 +479,22 @@ class GameplayScene(Scene):
             self.turn_log.append("Wait")
             self._start_enemy_turn()
 
-    def _execute_basic_attack(self):
+    def _execute_basic_attack(self, target_enemy=None):
         pc = self.game.player.col
         pr = self.game.player.row
         hit_enemies = []
-        for enemy in self.game.enemies:
-            if enemy.dead:
-                continue
-            d = self.grid.grid_distance(pc, pr, enemy.col, enemy.row)
-            if d <= settings.BASIC_ATTACK_RANGE and not self.grid.is_level_change(pc, pr, enemy.col, enemy.row):
-                hit_enemies.append(enemy)
+
+        if target_enemy is not None:
+            d = self.grid.grid_distance(pc, pr, target_enemy.col, target_enemy.row)
+            if d <= settings.BASIC_ATTACK_RANGE and not self.grid.is_level_change(pc, pr, target_enemy.col, target_enemy.row):
+                hit_enemies.append(target_enemy)
+        else:
+            for enemy in self.game.enemies:
+                if enemy.dead:
+                    continue
+                d = self.grid.grid_distance(pc, pr, enemy.col, enemy.row)
+                if d <= settings.BASIC_ATTACK_RANGE and not self.grid.is_level_change(pc, pr, enemy.col, enemy.row):
+                    hit_enemies.append(enemy)
 
         if hit_enemies:
             is_crit = self.game.player.check_crit()
@@ -471,9 +535,11 @@ class GameplayScene(Scene):
         skill = self.selected_skill
 
         if skill == "pitagoras":
+            target_enemy = self._get_enemy_at_cursor()
+            if target_enemy is None:
+                return
             if not self.game.player.pitagoras_attack():
                 return
-            range_cells = self.grid.get_cells_in_radius(pc, pr, settings.PITAGORAS_RANGE)
             hit = False
             dx = abs(self.cursor_col - pc)
             dy = abs(self.cursor_row - pr)
@@ -483,23 +549,19 @@ class GameplayScene(Scene):
                 f"a^2+b^2=c^2  ({dx}^2+{dy}^2={dx*dx+dy*dy})",
                 settings.GOLD if is_crit else settings.YELLOW
             )
-            for enemy in self.game.enemies:
-                if enemy.dead:
-                    continue
-                if (enemy.col, enemy.row) in range_cells:
-                    if not self.grid.is_level_change(pc, pr, enemy.col, enemy.row):
-                        dmg = int(settings.PITAGORAS_DAMAGE * settings.PLAYER_CRIT_MULTIPLIER) if is_crit else settings.PITAGORAS_DAMAGE
-                        enemy.take_damage(dmg)
-                        self.game.floating_text.add_enemy_damage(enemy.x, enemy.y, dmg, is_crit)
-                        self.game.particles.emit_burst(enemy.x, enemy.y, settings.YELLOW, 12, 80, 0.4)
-                        self.game.screen_shake = 0.12 if is_crit else 0.08
-                        self.game.shake_intensity = 7 if is_crit else 5
-                        self.game.sfx.play("enemy_hit")
-                        hit = True
-                        if enemy.dead:
-                            self._on_enemy_death(enemy)
-                    else:
-                        self.game.floating_text.add_evasion(enemy.x, enemy.y)
+            if not self.grid.is_level_change(pc, pr, target_enemy.col, target_enemy.row):
+                dmg = int(settings.PITAGORAS_DAMAGE * settings.PLAYER_CRIT_MULTIPLIER) if is_crit else settings.PITAGORAS_DAMAGE
+                target_enemy.take_damage(dmg)
+                self.game.floating_text.add_enemy_damage(target_enemy.x, target_enemy.y, dmg, is_crit)
+                self.game.particles.emit_burst(target_enemy.x, target_enemy.y, settings.YELLOW, 12, 80, 0.4)
+                self.game.screen_shake = 0.12 if is_crit else 0.08
+                self.game.shake_intensity = 7 if is_crit else 5
+                self.game.sfx.play("enemy_hit")
+                hit = True
+                if target_enemy.dead:
+                    self._on_enemy_death(target_enemy)
+            else:
+                self.game.floating_text.add_evasion(target_enemy.x, target_enemy.y)
             self.turn_log.append(f"Pitagoras{' (CRIT!)' if is_crit else ''}" if hit else "Pitagoras Miss")
             self.game.sfx.play("pitagoras")
 
@@ -709,10 +771,12 @@ class GameplayScene(Scene):
 
         if self.enemy_pending_attack is not None:
             self.enemy_phase = "ATTACK"
+            enemy, attack_type, action = self.enemy_pending_attack
+            if enemy.is_animating():
+                return
             self.enemy_attack_delay_timer += dt
             if self.enemy_attack_delay_timer < self.ENEMY_ATTACK_DELAY:
                 return
-            enemy, attack_type, action = self.enemy_pending_attack
             self.enemy_pending_attack = None
             self.enemy_attack_delay_timer = 0
             if attack_type == "attack":
@@ -741,10 +805,10 @@ class GameplayScene(Scene):
         elif action["type"] == "move":
             self.enemy_phase = "MOVE"
             tc, tr = action["target_col"], action["target_row"]
-            if self.grid.is_valid(tc, tr) and not self.grid.is_blocked(tc, tr):
+            if self.grid.is_valid(tc, tr) and not self.grid.is_blocked(tc, tr, include_barriers=True):
                 if not self.grid.is_level_change(enemy.col, enemy.row, tc, tr):
                     old_col, old_row = enemy.col, enemy.row
-                    anim_path = self._build_anim_path(old_col, old_row, tc, tr)
+                    anim_path = self._build_anim_path(old_col, old_row, tc, tr, include_barriers=True)
                     enemy.start_move_anim(old_col, old_row, tc, tr, self.grid, path=anim_path)
                     enemy.col = tc
                     enemy.row = tr
@@ -758,10 +822,10 @@ class GameplayScene(Scene):
             self.enemy_phase = "MOVE"
             tc, tr = action["target_col"], action["target_row"]
             moved = False
-            if self.grid.is_valid(tc, tr) and not self.grid.is_blocked(tc, tr):
+            if self.grid.is_valid(tc, tr) and not self.grid.is_blocked(tc, tr, include_barriers=True):
                 if not self.grid.is_level_change(enemy.col, enemy.row, tc, tr):
                     old_col, old_row = enemy.col, enemy.row
-                    anim_path = self._build_anim_path(old_col, old_row, tc, tr)
+                    anim_path = self._build_anim_path(old_col, old_row, tc, tr, include_barriers=True)
                     enemy.start_move_anim(old_col, old_row, tc, tr, self.grid, path=anim_path)
                     enemy.col = tc
                     enemy.row = tr
@@ -939,6 +1003,35 @@ class GameplayScene(Scene):
             "barrier_cells": self.grid.barrier_cells.copy(),
         }
 
+    def _draw_derivada_preview(self, screen):
+        pc = self.game.player.col
+        pr = self.game.player.row
+
+        for enemy in self.game.enemies:
+            if enemy.dead:
+                continue
+
+            if enemy.type == "boss":
+                self.grid.draw_vector_arrow(screen, enemy.col, enemy.row, pc, pr, settings.GREEN, 1)
+                continue
+
+            action = enemy.decide_action(pc, pr, self.grid, self.game.enemies)
+            if not action:
+                continue
+
+            action_type = action.get("type")
+            if action_type in ("move", "move_then_attack"):
+                tc = action["target_col"]
+                tr = action["target_row"]
+                color = settings.YELLOW if action_type == "move_then_attack" else settings.GREEN
+                self.grid.draw_vector_arrow(screen, enemy.col, enemy.row, tc, tr, color, 2)
+                self.grid.draw(screen, highlight_cells=[(tc, tr)], highlight_color=color, highlight_outline=True)
+                if action_type == "move_then_attack":
+                    self.grid.draw(screen, highlight_cells=[(pc, pr)], highlight_color=settings.GREEN, highlight_outline=True)
+            elif action_type in ("attack", "line_attack", "area_attack"):
+                self.grid.draw_vector_arrow(screen, enemy.col, enemy.row, pc, pr, settings.GREEN, 1)
+                self.grid.draw(screen, highlight_cells=[(pc, pr)], highlight_color=settings.GREEN, highlight_outline=True)
+
     def draw(self, screen):
         temp = pygame.Surface((settings.WINDOW_WIDTH, settings.WINDOW_HEIGHT))
         temp.fill(settings.COLOR_BG)
@@ -990,10 +1083,7 @@ class GameplayScene(Scene):
 
         if self.state == "PLAYER_ACTION_SELECT" and self.show_action_range:
             if self.selected_skill == "pitagoras":
-                cells = self.grid.get_cells_in_radius(
-                    self.game.player.col, self.game.player.row,
-                    settings.PITAGORAS_RANGE
-                )
+                cells = self._get_action_cells()
                 self.grid.draw(temp, highlight_cells=cells, highlight_color=settings.YELLOW)
                 self.grid.draw_triangle(temp,
                     self.game.player.col, self.game.player.row,
@@ -1001,40 +1091,14 @@ class GameplayScene(Scene):
                     self.cursor_col, self.cursor_row,
                     settings.YELLOW, 1)
             elif self.selected_skill == "reflexao":
-                cells = self.grid.get_cells_in_radius(
-                    self.game.player.col, self.game.player.row,
-                    settings.REFLEXAO_RANGE
-                )
+                cells = self._get_action_cells()
                 self.grid.draw(temp, highlight_cells=cells, highlight_color=settings.CYAN)
             else:
-                cells = self.grid.get_cells_in_range(
-                    self.game.player.col, self.game.player.row,
-                    settings.BASIC_ATTACK_RANGE
-                )
+                cells = self._get_action_cells()
                 self.grid.draw(temp, highlight_cells=cells, highlight_color=settings.RED)
 
         if self.game.skill_tree.is_unlocked("derivada"):
-            for enemy in self.game.enemies:
-                if enemy.dead:
-                    continue
-                if enemy.type == "bayesian":
-                    pred = enemy.get_predicted_grid_position(
-                        self.game.player.col, self.game.player.row, self.grid
-                    )
-                    px, py = self.grid.to_pixel(pred[0], pred[1])
-                    self.grid.draw_vector_arrow(temp, enemy.col, enemy.row,
-                                               pred[0], pred[1], settings.GREEN, 2)
-                else:
-                    dc = self.game.player.col - enemy.col
-                    dr = self.game.player.row - enemy.row
-                    if dc != 0 or dr != 0:
-                        length = math.sqrt(dc * dc + dr * dr)
-                        ndc = dc / length
-                        ndr = dr / length
-                        end_c = enemy.col + ndc * 1.5
-                        end_r = enemy.row + ndr * 1.5
-                        self.grid.draw_vector_arrow(temp, enemy.col, enemy.row,
-                                                   int(end_c), int(end_r), settings.GREEN, 1)
+            self._draw_derivada_preview(temp)
 
         if self.game.skill_tree.is_unlocked("bayes"):
             pc = self.game.player.col

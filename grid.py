@@ -41,8 +41,14 @@ class Grid:
     def is_valid(self, col, row):
         return 0 <= col < self.cols and 0 <= row < self.rows
 
-    def is_blocked(self, col, row):
-        return (col, row) in self.blocked
+    def is_blocked(self, col, row, include_barriers=False, extra_blocked=None):
+        if (col, row) in self.blocked:
+            return True
+        if include_barriers and (col, row) in self.barrier_cells:
+            return True
+        if extra_blocked and (col, row) in extra_blocked:
+            return True
+        return False
 
     def is_barrier(self, col, row):
         return (col, row) in self.barrier_cells
@@ -129,10 +135,19 @@ class Grid:
                             cells.append((scol, srow))
         return cells
 
-    def pathfind(self, start_col, start_row, end_col, end_row, allow_diagonal=True):
+    def pathfind(
+        self,
+        start_col,
+        start_row,
+        end_col,
+        end_row,
+        allow_diagonal=True,
+        include_barriers=False,
+        extra_blocked=None,
+    ):
         if not self.is_valid(end_col, end_row):
             return []
-        if self.is_blocked(end_col, end_row):
+        if self.is_blocked(end_col, end_row, include_barriers, extra_blocked):
             return []
         if (start_col, start_row) == (end_col, end_row):
             return [(end_col, end_row)]
@@ -153,7 +168,7 @@ class Grid:
                     continue
                 if (nc, nr) in visited:
                     continue
-                if self.is_blocked(nc, nr) and (nc, nr) != (end_col, end_row):
+                if self.is_blocked(nc, nr, include_barriers, extra_blocked) and (nc, nr) != (end_col, end_row):
                     continue
                 if self.is_level_change(col, row, nc, nr):
                     continue
@@ -165,7 +180,7 @@ class Grid:
 
         return []
 
-    def get_reachable_cells(self, start_col, start_row, max_steps):
+    def get_reachable_cells(self, start_col, start_row, max_steps, include_barriers=False, extra_blocked=None):
         reachable = []
         queue = deque()
         queue.append((start_col, start_row, 0))
@@ -183,7 +198,7 @@ class Grid:
                     continue
                 if (nc, nr) in visited:
                     continue
-                if self.is_blocked(nc, nr):
+                if self.is_blocked(nc, nr, include_barriers, extra_blocked):
                     continue
                 if self.is_level_change(col, row, nc, nr):
                     continue

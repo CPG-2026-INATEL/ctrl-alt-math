@@ -54,6 +54,10 @@ class WorldMap:
 
     def navigate(self, direction):
         col, row = self.player_room
+        current_room = self.rooms.get((col, row))
+        if current_room is None:
+            return False
+
         target = None
         if direction == "up" and (col, row - 1) in self.rooms:
             target = (col, row - 1)
@@ -64,8 +68,23 @@ class WorldMap:
         elif direction == "right" and (col + 1, row) in self.rooms:
             target = (col + 1, row)
 
-        if target:
-            self.player_room = target
+        if target and target in current_room.connections:
+            target_room = self.rooms.get(target)
+            if target_room and target_room.state != "locked":
+                self.player_room = target
+                return True
+        return False
+
+    def get_room_at_pos(self, pos):
+        for room in self.rooms.values():
+            if room.rect.collidepoint(pos):
+                return room
+        return None
+
+    def set_player_room(self, room_pos):
+        room = self.rooms.get(room_pos)
+        if room and room.state != "locked":
+            self.player_room = room_pos
             return True
         return False
 

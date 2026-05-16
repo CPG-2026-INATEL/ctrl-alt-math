@@ -11,7 +11,27 @@ class MapScene(Scene):
     def enter(self, prev_scene=None):
         self.room = None
 
+    def _enter_selected_room(self):
+        room = self.game.world_map.select_room()
+        if not room:
+            return
+        if room.type == "victory":
+            self.game.scene_manager.switch("victory")
+        else:
+            self.room = room
+            self.game.scene_manager.switch("gameplay")
+        self.game.sfx.play("menu_confirm")
+
     def handle_event(self, event):
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            room = self.game.world_map.get_room_at_pos(event.pos)
+            if room and self.game.world_map.set_player_room((room.col, room.row)):
+                if room.state in ("available", "completed"):
+                    self._enter_selected_room()
+                else:
+                    self.game.sfx.play("menu_select")
+            return
+
         if event.type != pygame.KEYDOWN:
             return
 
@@ -28,14 +48,7 @@ class MapScene(Scene):
             self.game.world_map.navigate("right")
             self.game.sfx.play("menu_select")
         elif event.key == pygame.K_RETURN:
-            room = self.game.world_map.select_room()
-            if room:
-                if room.type == "victory":
-                    self.game.scene_manager.switch("victory")
-                else:
-                    self.room = room
-                    self.game.scene_manager.switch("gameplay")
-                self.game.sfx.play("menu_confirm")
+            self._enter_selected_room()
         elif event.key == pygame.K_ESCAPE:
             self.game.sfx.play("menu_select")
             self.game.scene_manager.switch("menu")

@@ -215,7 +215,7 @@ class Player:
     def take_damage(self, amount):
         if self.invulnerable > 0:
             return False
-        self.hp -= amount
+        self.hp = max(0, self.hp - amount)
         self.invulnerable = 0.4
         self.flash_timer = 0.4
         return True
