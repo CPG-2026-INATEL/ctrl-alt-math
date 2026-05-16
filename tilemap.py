@@ -19,7 +19,7 @@ TILE_STAIRS_LEFT = 9+16 # escada esquerda (oeste)
 TILE_STAIRS_RIGHT = 8 +16# escada direita (leste)
 
 OBSTACLE_TILE_IDS = [
-    0, 1, 2, 3,
+    64
 ]
 
 WALKABLE_TILES = {TILE_LOW, TILE_HIGH, TILE_HIGH_EDGE,

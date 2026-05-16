@@ -14,7 +14,7 @@ class TilemapScene(Scene):
     HIGH_TERRAIN_RATIO = 0.45
     HIGH_TERRAIN_COUNT = 25
     STAIRS_PER_AREA = 5
-    OBSTACLE_DENSITY = 0.05
+    OBSTACLE_DENSITY = 0.01
     SEED = 42
 
     def __init__(self, game):
