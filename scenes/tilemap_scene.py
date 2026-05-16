@@ -5,8 +5,9 @@ from scenes.scene import Scene
 from tilemap import TileMap, MapGenerator, TILE_STAIRS_UP, TILE_STAIRS_DOWN, TILE_STAIRS_LEFT, TILE_STAIRS_RIGHT
 
 
+
 class TilemapScene(Scene):
-    # Configuração do mapa - edite estas variáveis
+    # Configuração do mapa - edite estas variáveis1)
     MAP_WIDTH = 40
     MAP_HEIGHT = 30
     HOLE_DENSITY = 0.12
@@ -17,7 +18,7 @@ class TilemapScene(Scene):
 
     def __init__(self, game):
         super().__init__(game)
-        self.tilemap = TileMap("assets/Tileset/tileset_arranged.png", tile_size=32)
+        self.tilemap = TileMap("assets/Tileset/tileset_arranged.png", tile_size=16)
 
         gen = MapGenerator(
             width=self.MAP_WIDTH,

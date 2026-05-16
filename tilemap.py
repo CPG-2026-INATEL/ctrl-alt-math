@@ -7,13 +7,17 @@ import random
 # Edite aqui para mapear aos tiles do seu tileset (0-63).
 # Cada ID corresponde a um tile no tileset 8x8 (256x256, 32x32 cada).
 # ============================================================
+ROW_SIZE = 16
+
 TILE_HOLE = -1       # buraco (sem tile)
-TILE_LOW = 0         # terreno baixo
+TILE_LOW = ROW_SIZE * 1         # terreno baixo
 TILE_HIGH = 1        # terreno alto
-TILE_STAIRS_UP = 2   # escada subindo (norte)
-TILE_STAIRS_DOWN = 3 # escada descendo (sul)
-TILE_STAIRS_LEFT = 4 # escada esquerda (oeste)
-TILE_STAIRS_RIGHT = 5 # escada direita (leste)
+TILE_STAIRS_UP = 11   # escada subindo (norte)
+TILE_STAIRS_DOWN = 11+ROW_SIZE # escada descendo (sul)
+TILE_STAIRS_LEFT = 8+ROW_SIZE # escada esquerda (oeste)
+TILE_STAIRS_RIGHT = 8 # escada direita (leste)
+
+
 
 
 class TileMap:
@@ -228,14 +232,17 @@ class MapGenerator:
 
     def _place_stairs(self, grid):
         CARDINAL = [(-1, 0), (1, 0), (0, -1), (0, 1)]
-        CARDINAL_NAMES = {(-1, 0): "up", (1, 0): "down", (0, -1): "left", (0, 1): "right"}
+        # Escada fica no LOW, aponta na direção do LOW para o HIGH:
+        # STAIRS_UP:    LOW está ABAIXO do HIGH, escada aponta pra CIMA
+        # STAIRS_DOWN:  LOW está ACIMA do HIGH, escada aponta pra BAIXO
+        # STAIRS_RIGHT: LOW está à ESQUERDA do HIGH, escada aponta pra DIREITA
+        # STAIRS_LEFT:  LOW está à DIREITA do HIGH, escada aponta pra ESQUERDA
         CARDINAL_TILES = {
             (-1, 0): TILE_STAIRS_UP,
             (1, 0): TILE_STAIRS_DOWN,
             (0, -1): TILE_STAIRS_LEFT,
             (0, 1): TILE_STAIRS_RIGHT,
         }
-        ALL_STAIRS = set(CARDINAL_TILES.values())
 
         visited = set()
         for r in range(self.height):
@@ -258,24 +265,28 @@ class MapGenerator:
                     for ar, ac in area:
                         for dr, dc in CARDINAL:
                             nr, nc = ar + dr, ac + dc
+                            # nr,nc = LOW tile; ar,ac = HIGH tile
+                            # dr,dc aponta do HIGH para o LOW
+                            # escada fica no LOW (nr,nc) e aponta do LOW para o HIGH
+                            # ou seja, a direção da escada é (-dr, -dc)
                             if 0 <= nr < self.height and 0 <= nc < self.width:
                                 if grid[nr][nc] == TILE_LOW:
-                                    border_candidates.append((ar, ac, dr, dc))
-                                    break
+                                    stair_dir = (-dr, -dc)
+                                    border_candidates.append((nr, nc, stair_dir))
 
                     random.shuffle(border_candidates)
                     placed = 0
                     used_positions = set()
-                    for br, bc, dr, dc in border_candidates:
+                    for lr, lc, stair_dir in border_candidates:
                         if placed >= self.stairs_per_area:
                             break
-                        if (br, bc) in used_positions:
+                        if (lr, lc) in used_positions:
                             continue
-                        if grid[br][bc] == TILE_HIGH:
-                            grid[br][bc] = CARDINAL_TILES[(dr, dc)]
-                            used_positions.add((br, bc))
+                        if grid[lr][lc] == TILE_LOW:
+                            grid[lr][lc] = CARDINAL_TILES[stair_dir]
+                            used_positions.add((lr, lc))
                             placed += 1
 
                     if placed == 0 and border_candidates:
-                        br, bc, dr, dc = border_candidates[0]
-                        grid[br][bc] = CARDINAL_TILES[(dr, dc)]
+                        lr, lc, stair_dir = border_candidates[0]
+                        grid[lr][lc] = CARDINAL_TILES[stair_dir]
