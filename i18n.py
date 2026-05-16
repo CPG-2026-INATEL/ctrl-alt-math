@@ -103,6 +103,10 @@ STRINGS = {
     "crit": {LANG_EN: "CRIT!", LANG_PT: "CRÍT!"},
     "blocked": {LANG_EN: "BLOCKED", LANG_PT: "BLOQUEADO"},
     "no_hit": {LANG_EN: "NO HIT", LANG_PT: "NÃO ACERTOU"},
+    "out_of_reach": {LANG_EN: "OUT OF REACH", LANG_PT: "FORA DE ALCANCE"},
+    "out_of_range": {LANG_EN: "OUT OF RANGE", LANG_PT: "FORA DE ALCANCE"},
+    "not_enough_rigor": {LANG_EN: "NOT ENOUGH RIGOR", LANG_PT: "RIGOR INSUFICIENTE"},
+    "wait": {LANG_EN: "Wait", LANG_PT: "Aguardar"},
 
     # Enemies
     "enemy_censor": {LANG_EN: "Censor Linear", LANG_PT: "Censor Linear"},
