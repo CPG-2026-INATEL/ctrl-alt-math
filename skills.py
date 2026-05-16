@@ -55,7 +55,9 @@ class SkillTree:
 
     def get_node_rect(self, skill):
         w, h = 160, 46
-        return pygame.Rect(skill["x"] - w // 2, skill["y"] - h // 2, w, h)
+        # Design width is 800, center the nodes if window is wider
+        offset_x = (settings.WINDOW_WIDTH - 800) // 2
+        return pygame.Rect(skill["x"] + offset_x - w // 2, skill["y"] - h // 2, w, h)
 
     def update_hover(self, pos):
         self.hovered_id = None
@@ -84,12 +86,13 @@ class SkillTree:
         draw_text(screen, t("skill_tree_title"), (settings.WINDOW_WIDTH // 2, 20),
                   settings.WHITE, 36)
 
+        offset_x = (settings.WINDOW_WIDTH - 800) // 2
         for sid, skill in self.skills.items():
             for prereq in skill["prereqs"]:
                 if prereq in self.skills:
                     p = self.skills[prereq]
-                    start = (p["x"], p["y"] + 23)
-                    end = (skill["x"], skill["y"] - 23)
+                    start = (p["x"] + offset_x, p["y"] + 23)
+                    end = (skill["x"] + offset_x, skill["y"] - 23)
 
                     if skill["unlocked"]:
                         color = settings.GREEN

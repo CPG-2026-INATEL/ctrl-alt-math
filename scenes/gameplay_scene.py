@@ -29,6 +29,8 @@ class GameplayScene(Scene):
         self.tilemap = None
         self.tile_offset_x = 0
         self.tile_offset_y = 0
+        self.camera_x = 0
+        self.camera_y = 0
 
         self.cursor_col = 8
         self.cursor_row = 6
@@ -78,19 +80,36 @@ class GameplayScene(Scene):
         if prev_scene and hasattr(prev_scene, "room"):
             room = prev_scene.room
             self.game.current_room = room
+            
+            # Randomize map size from 2x to 4x current size (area)
+            # Current area is 16*12 = 192.
+            # We use a factor on dimensions between sqrt(2) and sqrt(4)
+            size_factor = random.uniform(1.41, 2.0)
+            new_cols = int(settings.GRID_COLS * size_factor)
+            new_rows = int(settings.GRID_ROWS * size_factor)
+            self.grid = Grid(new_cols, new_rows)
+            
             self.obstacles_data = room.obstacles
-            self.game.obstacles = self.grid.obstacle_rects(room.obstacles)
+            # For dynamic map, we might need to adjust obstacle positions or just use generated ones
+            # For now, we'll use the generated obstacles from _generate_tilemap
+            
             self.game.enemies = []
+            # Increase amount of enemies proportional to area increase
+            enemy_multiplier = (new_cols * new_rows) / (settings.GRID_COLS * settings.GRID_ROWS)
+            # Give it a bit more punch
+            enemy_multiplier *= 1.2
+            
             for enemy_type, count in room.enemies:
-                for _ in range(count):
+                increased_count = max(1, int(count * enemy_multiplier))
+                for _ in range(increased_count):
                     ex, ey = self._get_spawn_position()
                     enemy = Enemy(ex, ey, enemy_type)
                     if enemy_type == "boss":
-                        enemy.max_hp = room.boss_hp
-                        enemy.hp = room.boss_hp
+                        enemy.max_hp = int(room.boss_hp * (1.0 + (size_factor - 1.0) * 0.5))
+                        enemy.hp = enemy.max_hp
                     self.game.enemies.append(enemy)
 
-            if len(room.enemies) == 0:
+            if len(self.game.enemies) == 0:
                 self.state = "NO_COMBAT"
             
             # Speak room narrative
@@ -119,8 +138,8 @@ class GameplayScene(Scene):
         margin = 30
         ox = settings.ARENA_OFFSET_X
         oy = settings.ARENA_OFFSET_Y
-        aw = settings.ARENA_WIDTH
-        ah = settings.ARENA_HEIGHT
+        aw = int(self.grid.width)
+        ah = int(self.grid.height)
         if side == 0:
             x = random.randint(ox + margin, ox + aw - margin)
             y = oy + 10
@@ -268,12 +287,18 @@ class GameplayScene(Scene):
         arena_rect = pygame.Rect(
             settings.ARENA_OFFSET_X,
             settings.ARENA_OFFSET_Y,
-            settings.ARENA_WIDTH,
-            settings.ARENA_HEIGHT,
+            self.grid.width,
+            self.grid.height,
         )
         if not arena_rect.collidepoint(pos):
-            return False
-        self.cursor_col, self.cursor_row = self.grid.to_grid(*pos)
+            # We also need to check outside the arena_rect if the camera moved
+            pass
+        
+        # Adjust mouse pos by camera offset
+        world_x = pos[0] + self.camera_x
+        world_y = pos[1] + self.camera_y
+        
+        self.cursor_col, self.cursor_row = self.grid.to_grid(world_x, world_y)
         return True
 
     def _toggle_skill(self, skill_id):
@@ -333,7 +358,7 @@ class GameplayScene(Scene):
     def _confirm_player_cursor(self):
         pc = self.game.player.col
         pr = self.game.player.row
-        reachable = self.grid.get_reachable_cells(pc, pr, settings.PLAYER_MOVE_RANGE)
+        reachable = self.grid.get_reachable_cells(pc, pr, self.game.player.move_range)
 
         if (self.cursor_col, self.cursor_row) == (pc, pr):
             self._enter_action_select()
@@ -557,7 +582,7 @@ class GameplayScene(Scene):
         if hit_enemies:
             is_crit = self.game.player.check_crit()
             for enemy in hit_enemies:
-                base_dmg = settings.PLAYER_ATTACK_DAMAGE
+                base_dmg = self.game.player.base_damage
                 if is_crit:
                     dmg = int(base_dmg * settings.PLAYER_CRIT_MULTIPLIER)
                 else:
@@ -678,6 +703,13 @@ class GameplayScene(Scene):
                 (int(c), int(r)) for c, r in target["barrier_cells"]
             )
 
+        # Apply Bonus Regeneration (15% of Max HP)
+        heal_amount = int(self.game.player.max_hp * 0.15)
+        self.game.player.hp = min(self.game.player.max_hp, self.game.player.hp + heal_amount)
+        self.game.floating_text.add_info(self.game.player.x, self.game.player.y - 40, 
+                                        f"+{heal_amount} HP (OPTIMIZED)", settings.GREEN)
+
+        # Correctly increase Entropy cost
         self.game.entropy = target["entropy"] + settings.REWIND_ENTROPY_INCREASE
         self.game.entropy = min(self.game.entropy, settings.MAX_ENTROPY)
         self.game.particles.emit_burst(
@@ -703,6 +735,20 @@ class GameplayScene(Scene):
         self.game.shake_intensity = 4
         self.game.sfx.play("enemy_die")
         self.last_enemy_death_pos = (enemy.x, enemy.y)
+        
+        # Award EXP
+        exp_reward = 0
+        if enemy.type == "censor": exp_reward = settings.ENEMY_EXP_CENSOR
+        elif enemy.type == "strawman": exp_reward = settings.ENEMY_EXP_STRAWMAN
+        elif enemy.type == "bayesian": exp_reward = settings.ENEMY_EXP_BAYESIAN
+        elif enemy.type == "boss": exp_reward = settings.ENEMY_EXP_BOSS
+        
+        if self.game.player.add_exp(exp_reward):
+            self.game.floating_text.add_info(self.game.player.x, self.game.player.y - 60,
+                                            f"LEVEL UP! ({self.game.player.level})", settings.GOLD)
+            self.game.sfx.play("victory")
+            self.game.particles.emit_burst(self.game.player.x, self.game.player.y, settings.GOLD, 20, 100, 0.5)
+
         self._check_victory()
 
     def _check_victory(self):
@@ -712,6 +758,12 @@ class GameplayScene(Scene):
             self.victory_timer = 0
             pos = self.last_enemy_death_pos or (self.game.player.x, self.game.player.y)
             self.game.particles.emit_burst(pos[0], pos[1], settings.GOLD, 30, 100, 0.8)
+            
+            # Award Skill Point per wave/room completion
+            self.game.skill_tree.add_points(1)
+            self.game.floating_text.add_info(pos[0], pos[1] - 40, 
+                                            t("earned_skill_point"), settings.GOLD)
+            self.game.tts.speak(t("earned_skill_point"), lang=settings.LANGUAGE)
 
     def _start_enemy_turn(self):
         if self.state == "VICTORY_TRANSITION":
@@ -724,6 +776,17 @@ class GameplayScene(Scene):
 
     def update(self, dt):
         self.cursor_timer += dt
+        
+        # Update Camera to follow player first, so hover checks use current frame's camera
+        target_cam_x = self.game.player.x - settings.WINDOW_WIDTH / 2
+        target_cam_y = self.game.player.y - (settings.WINDOW_HEIGHT - settings.UI_BAR_HEIGHT) / 2
+        
+        max_cam_x = max(0, self.grid.width + settings.ARENA_OFFSET_X * 2 - settings.WINDOW_WIDTH)
+        max_cam_y = max(0, self.grid.height + settings.ARENA_OFFSET_Y * 2 - (settings.WINDOW_HEIGHT - settings.UI_BAR_HEIGHT))
+        
+        self.camera_x = max(0, min(max_cam_x, target_cam_x))
+        self.camera_y = max(0, min(max_cam_y, target_cam_y))
+
         self.game.player.update_animation(dt, self.grid)
         self.game.player.update(dt, {})
 
@@ -735,21 +798,72 @@ class GameplayScene(Scene):
             if enemy.type == "boss":
                 enemy.pulse_timer += dt * 2
 
+        # ── Separation physics ──────────────────────────────────────────
+        # Enemies should not pile on the same pixel. Apply a soft repulsion
+        # force between any two living enemies that are closer than the sum
+        # of their radii.  Force is only on visual x/y; grid col/row stays
+        # untouched so pathfinding and attack-range logic are unaffected.
+        alive_enemies = [e for e in self.game.enemies if not e.dead]
+        SEP_STRENGTH = 220.0   # push force (px / s²)
+        SEP_DAMP     = 0.75    # velocity damping per frame
+
+        for e in alive_enemies:
+            if not hasattr(e, '_vx'):
+                e._vx = 0.0
+                e._vy = 0.0
+
+        for i, a in enumerate(alive_enemies):
+            for b in alive_enemies[i + 1:]:
+                dx = a.x - b.x
+                dy = a.y - b.y
+                dist_sq = dx * dx + dy * dy
+                # minimum separation = sum of display radii + small gap
+                min_sep = (a.size + b.size) * 1.1
+                min_sep_sq = min_sep * min_sep
+                if 0 < dist_sq < min_sep_sq:
+                    dist = math.sqrt(dist_sq)
+                    # normalised direction from b → a
+                    nx, ny = dx / dist, dy / dist
+                    overlap = min_sep - dist
+                    # force magnitude proportional to overlap
+                    force = SEP_STRENGTH * overlap
+                    # apply equal-and-opposite impulses
+                    a._vx += nx * force * dt
+                    a._vy += ny * force * dt
+                    b._vx -= nx * force * dt
+                    b._vy -= ny * force * dt
+
+        # Integrate velocities and damp
+        for e in alive_enemies:
+            if not hasattr(e, '_vx'):
+                continue
+            e.x += e._vx * dt
+            e.y += e._vy * dt
+            e._vx *= SEP_DAMP
+            e._vy *= SEP_DAMP
+        # ────────────────────────────────────────────────────────────────
+
+
+
         self.game.particles.update(dt)
         self.game.floating_text.update(dt)
 
         # Mouse hover detection for enemies
+        # mouse_pos is screen-space; enemy hitboxes are world-space,
+        # so we must offset by the camera to compare correctly.
         old_hovered = getattr(self, 'hovered_enemy', None)
-        mouse_pos = pygame.mouse.get_pos()
+        screen_mouse = pygame.mouse.get_pos()
+        world_mouse = (screen_mouse[0] + self.camera_x,
+                       screen_mouse[1] + self.camera_y)
         self.hovered_enemy = None
         for enemy in self.game.enemies:
             if enemy.dead:
                 continue
-            # Use hitbox for hover detection
             hitbox = enemy.get_hitbox()
-            if hitbox.collidepoint(mouse_pos):
+            if hitbox.collidepoint(world_mouse):
                 self.hovered_enemy = enemy
                 break
+
         
         if self.hovered_enemy and self.hovered_enemy != old_hovered:
             text = f"{t(self.hovered_enemy.info_title)}. {t(self.hovered_enemy.lore)}"
@@ -776,7 +890,7 @@ class GameplayScene(Scene):
 
         arena_rect = pygame.Rect(
             settings.ARENA_OFFSET_X, settings.ARENA_OFFSET_Y,
-            settings.ARENA_WIDTH, settings.ARENA_HEIGHT
+            self.grid.width, self.grid.height
         )
         self.game.math_bg.update(dt, arena_rect)
 
@@ -978,7 +1092,7 @@ class GameplayScene(Scene):
         d = self.grid.grid_distance(enemy.col, enemy.row, pc, pr)
 
         if d <= enemy.attack_range and not self.grid.is_level_change(enemy.col, enemy.row, pc, pr):
-            dmg = enemy.roll_damage()
+            dmg = enemy.roll_damage(self.game.entropy)
             dx = abs(pc - enemy.col)
             dy = abs(pr - enemy.row)
             if self.game.player.take_damage(dmg):
@@ -1040,7 +1154,7 @@ class GameplayScene(Scene):
             phase = 2
 
         count = 3 if phase >= 3 else 2 if phase >= 2 else 1
-        dmg = enemy.roll_damage()
+        dmg = enemy.roll_damage(self.game.entropy)
         self.game.floating_text.add_formula(
             enemy.x, enemy.y - 30,
             f"Phase {['I','II','III'][phase-1]} -> |v|={count}",
@@ -1111,7 +1225,7 @@ class GameplayScene(Scene):
     def _enemy_area_attack(self, enemy, action):
         tc, tr = action["target_col"], action["target_row"]
         radius = 2
-        dmg = enemy.roll_damage()
+        dmg = enemy.roll_damage(self.game.entropy)
         hit = False
         self.game.floating_text.add_formula(
             enemy.x, enemy.y - 30,
@@ -1221,12 +1335,19 @@ class GameplayScene(Scene):
                 self.grid.draw(screen, highlight_cells=[(pc, pr)], highlight_color=settings.GREEN, highlight_outline=True)
 
     def draw(self, screen):
+        # Everything will be drawn to this large surface if needed, but 
+        # actually we just draw to a window-sized surface with an offset.
         temp = pygame.Surface((settings.WINDOW_WIDTH, settings.WINDOW_HEIGHT))
         temp.fill(self.game.math_bg.get_bg_color())
+        
+        # Offset for all world objects
+        world_offset = (-self.camera_x, -self.camera_y)
 
         arena_rect = pygame.Rect(
-            settings.ARENA_OFFSET_X, settings.ARENA_OFFSET_Y,
-            settings.ARENA_WIDTH, settings.ARENA_HEIGHT
+            settings.ARENA_OFFSET_X + world_offset[0], 
+            settings.ARENA_OFFSET_Y + world_offset[1],
+            self.grid.width, 
+            self.grid.height
         )
 
         if self.tilemap:
@@ -1242,6 +1363,8 @@ class GameplayScene(Scene):
                     sy = (tile_id // self.tilemap.tiles_per_row) * ts
                     tile_surf = self.tilemap.tileset.subsurface(sx, sy, ts, ts)
                     rect = self.grid.cell_rect(col, row)
+                    rect.x += world_offset[0]
+                    rect.y += world_offset[1]
                     scaled_w = rect.width
                     scaled_h = rect.height
                     if scale_x != 1.0 or scale_y != 1.0:
@@ -1254,39 +1377,70 @@ class GameplayScene(Scene):
 
         for (col, row) in self.grid.blocked:
             rect = self.grid.cell_rect(col, row)
+            rect.x += world_offset[0]
+            rect.y += world_offset[1]
             obs_surf = pygame.Surface((int(rect.width), int(rect.height)))
             obs_surf.set_alpha(120)
             obs_surf.fill((20, 20, 40))
             temp.blit(obs_surf, rect)
 
-        self.grid.draw_barriers(temp)
+        self.grid.draw_barriers(temp, offset=world_offset)
 
-        self.game.math_bg.draw(temp)
+        self.game.math_bg.draw(temp, offset=world_offset)
 
         if self.state == "PLAYER_INPUT" and self.show_move_range:
             pc = self.game.player.col
             pr = self.game.player.row
-            reachable = self.grid.get_reachable_cells(pc, pr, settings.PLAYER_MOVE_RANGE)
-            self.grid.draw(temp, highlight_cells=reachable, highlight_color=settings.BLUE)
+            reachable = self.grid.get_reachable_cells(pc, pr, self.game.player.move_range)
+            self.grid.draw(temp, highlight_cells=reachable, highlight_color=settings.BLUE, offset=world_offset)
 
         if self.state == "PLAYER_ACTION_SELECT" and self.show_action_range:
             if self.selected_skill == "pitagoras":
-                cells = self._get_action_cells()
-                self.grid.draw(temp, highlight_cells=cells, highlight_color=settings.YELLOW)
+                cells = self.grid.get_cells_in_radius(
+                    self.game.player.col, self.game.player.row,
+                    settings.PITAGORAS_RANGE
+                )
+                self.grid.draw(temp, highlight_cells=cells, highlight_color=settings.YELLOW, offset=world_offset)
                 self.grid.draw_triangle(temp,
                     self.game.player.col, self.game.player.row,
                     self.cursor_col, self.game.player.row,
                     self.cursor_col, self.cursor_row,
-                    settings.YELLOW, 1)
+                    settings.YELLOW, 1, offset=world_offset)
             elif self.selected_skill == "reflexao":
-                cells = self._get_action_cells()
-                self.grid.draw(temp, highlight_cells=cells, highlight_color=settings.CYAN)
+                cells = self.grid.get_cells_in_radius(
+                    self.game.player.col, self.game.player.row,
+                    settings.REFLEXAO_RANGE
+                )
+                self.grid.draw(temp, highlight_cells=cells, highlight_color=settings.CYAN, offset=world_offset)
             else:
-                cells = self._get_action_cells()
-                self.grid.draw(temp, highlight_cells=cells, highlight_color=settings.RED)
+                cells = self.grid.get_cells_in_range(
+                    self.game.player.col, self.game.player.row,
+                    settings.BASIC_ATTACK_RANGE
+                )
+                self.grid.draw(temp, highlight_cells=cells, highlight_color=settings.RED, offset=world_offset)
 
         if self.game.skill_tree.is_unlocked("derivada"):
-            self._draw_derivada_preview(temp)
+            for enemy in self.game.enemies:
+                if enemy.dead:
+                    continue
+                if enemy.type == "bayesian":
+                    pred = enemy.get_predicted_grid_position(
+                        self.game.player.col, self.game.player.row, self.grid
+                    )
+                    px, py = self.grid.to_pixel(pred[0], pred[1])
+                    self.grid.draw_vector_arrow(temp, enemy.col, enemy.row,
+                                               pred[0], pred[1], settings.GREEN, 2, offset=world_offset)
+                else:
+                    dc = self.game.player.col - enemy.col
+                    dr = self.game.player.row - enemy.row
+                    if dc != 0 or dr != 0:
+                        length = math.sqrt(dc * dc + dr * dr)
+                        ndc = dc / length
+                        ndr = dr / length
+                        end_c = enemy.col + ndc * 1.5
+                        end_r = enemy.row + ndr * 1.5
+                        self.grid.draw_vector_arrow(temp, enemy.col, enemy.row,
+                                                   int(end_c), int(end_r), settings.GREEN, 1, offset=world_offset)
 
         if self.game.skill_tree.is_unlocked("bayes"):
             pc = self.game.player.col
@@ -1315,18 +1469,22 @@ class GameplayScene(Scene):
                     continue
                 if self.grid.grid_distance(enemy.col, enemy.row, pc, pr) <= enemy.attack_range:
                     self.grid.draw_vector_arrow(temp, enemy.col, enemy.row,
-                                                pc, pr, settings.GOLD, 1)
+                                               pc, pr, settings.GOLD, 1, offset=world_offset)
 
         if self.state in ("PLAYER_INPUT", "PLAYER_ACTION_SELECT", "LOCK_INDICATORS", "ENEMY_TURN"):
-            self.grid.draw_danger_indicators(temp, pulse_timer=self.cursor_timer)
-            self.grid.draw_intent_arrows(temp, self.enemy_intents, player_skills=self._get_player_skill_ids() if self.state in ("PLAYER_INPUT", "PLAYER_ACTION_SELECT") else None)
+            self.grid.draw_danger_indicators(temp, pulse_timer=self.cursor_timer, offset=world_offset)
+            self.grid.draw_intent_arrows(temp, self.enemy_intents, 
+                                        player_skills=self._get_player_skill_ids() if self.state in ("PLAYER_INPUT", "PLAYER_ACTION_SELECT") else None,
+                                        offset=world_offset)
 
         for enemy in self.game.enemies:
-            enemy.draw(temp)
+            enemy.draw(temp, offset=world_offset)
 
-        self.game.player.draw(temp)
+        self.game.player.draw(temp, offset=world_offset)
 
         cursor_rect = self.grid.cell_rect(self.cursor_col, self.cursor_row)
+        cursor_rect.x += world_offset[0]
+        cursor_rect.y += world_offset[1]
         cursor_alpha = int(100 + 80 * math.sin(self.cursor_timer * 4))
         s = pygame.Surface((cursor_rect.width, cursor_rect.height))
         s.set_alpha(cursor_alpha)
@@ -1334,8 +1492,8 @@ class GameplayScene(Scene):
         temp.blit(s, cursor_rect)
         pygame.draw.rect(temp, settings.WHITE, cursor_rect, 2)
 
-        self.game.particles.draw(temp)
-        self.game.floating_text.draw(temp)
+        self.game.particles.draw(temp, offset=world_offset)
+        self.game.floating_text.draw(temp, offset=world_offset)
 
         self._draw_cursor_info(temp)
         self._draw_turn_hud(temp)
@@ -1411,9 +1569,10 @@ class GameplayScene(Scene):
         dist = abs(dx) + abs(dy)
         eucl = math.sqrt(dx * dx + dy * dy)
 
-        info_x = settings.ARENA_OFFSET_X + settings.ARENA_WIDTH + 5
-        if info_x + 180 > settings.WINDOW_WIDTH:
-            info_x = settings.WINDOW_WIDTH - 180
+        # Position info box at the top right of the screen
+        info_x = settings.WINDOW_WIDTH - 180
+        if info_x < 0:
+            info_x = 10
 
         font = pygame.font.Font(None, 16)
         info_y = settings.ARENA_OFFSET_Y + 5
@@ -1439,7 +1598,7 @@ class GameplayScene(Scene):
             tile_name = "STAIRS"
         lines.append((f"Tile: {tile_name}", settings.LIGHT_GRAY))
 
-        reachable = self.grid.get_reachable_cells(pc, pr, settings.PLAYER_MOVE_RANGE)
+        reachable = self.grid.get_reachable_cells(pc, pr, self.game.player.move_range)
         if (cc, cr) in reachable or (cc, cr) == (pc, pr):
             can_reach = True
         else:
@@ -1479,6 +1638,8 @@ class GameplayScene(Scene):
             d = self.grid.grid_distance(enemy.col, enemy.row, pc, pr)
             if d <= 6:
                 ex, ey = self.grid.to_pixel(enemy.col, enemy.row)
+                ex += self.camera_x * -1 # Apply offset
+                ey += self.camera_y * -1
                 type_symbols = {
                     "censor": "NOT",
                     "strawman": "ARG",
@@ -1538,18 +1699,31 @@ class GameplayScene(Scene):
 
         self._draw_bar(screen, settings.UI_PADDING, bar_y + 31, 160, 14,
                        rigor_pct, settings.BLUE, (20, 20, 60))
-        draw_text(screen, f"Rigor: {self.game.player.rigor:.0f}/{self.game.player.max_rigor}",
+        draw_text(screen, f"{t('rigor')}: {self.game.player.rigor:.0f}/{self.game.player.max_rigor}",
                   (settings.UI_PADDING + 80, bar_y + 38),
                   settings.WHITE, 14)
 
+        # EXP Bar
+        exp_pct = self.game.player.exp / self.game.player.next_level_exp
         self._draw_bar(screen, settings.UI_PADDING + 180, bar_y + 10, 120, 14,
-                       entropy_pct, settings.COLOR_ENTROPY_BAR, (40, 10, 40))
-        draw_text(screen, f"Entropy: {self.game.entropy:.0f}",
+                       exp_pct, settings.GOLD, (40, 40, 10))
+        draw_text(screen, f"LVL {self.game.player.level} ({int(exp_pct*100)}%)",
                   (settings.UI_PADDING + 240, bar_y + 17),
                   settings.WHITE, 13)
-        draw_text(screen, f"Crit: {int(settings.PLAYER_CRIT_CHANCE * 100)}% x{settings.PLAYER_CRIT_MULTIPLIER:.0f}",
+
+        self._draw_bar(screen, settings.UI_PADDING + 180, bar_y + 31, 120, 14,
+                       entropy_pct, settings.COLOR_ENTROPY_BAR, (40, 10, 40))
+        draw_text(screen, f"Entropy: {self.game.entropy:.0f}",
                   (settings.UI_PADDING + 240, bar_y + 38),
-                  settings.GOLD, 13)
+                  settings.WHITE, 13)
+
+        # Crit display moved
+        draw_text(screen, f"Crit: {int(settings.PLAYER_CRIT_CHANCE * 100)}% x{settings.PLAYER_CRIT_MULTIPLIER:.0f}",
+                  (settings.UI_PADDING + 340, bar_y + 17),
+                  settings.GOLD, 12)
+        draw_text(screen, f"Dmg: {self.game.player.base_damage}",
+                  (settings.UI_PADDING + 340, bar_y + 38),
+                  settings.CYAN, 12)
 
         phase_text = "PLAYER MOVE"
         phase_symbol = "dx"

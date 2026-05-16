@@ -135,10 +135,11 @@ class FloatingFormula:
             self.alpha = self.max_alpha
         return self.age < self.lifetime
 
-    def draw(self, screen):
+    def draw(self, screen, offset=(0, 0)):
         if self.alpha <= 0:
             return
         
+        ox, oy = offset
         # Base image
         img = self.font.render(self.text, True, self.color)
         if self.rotation != 0:
@@ -150,7 +151,7 @@ class FloatingFormula:
             glow = pygame.transform.rotate(glow, self.rotation)
         glow.set_alpha(self.alpha // 2)
         
-        pos = (self.x - img.get_width() // 2, self.y - img.get_height() // 2)
+        pos = (self.x + ox - img.get_width() // 2, self.y + oy - img.get_height() // 2)
         screen.blit(glow, (pos[0] + 2, pos[1] + 2)) # Glow offset
         img.set_alpha(self.alpha)
         screen.blit(img, pos)
@@ -200,6 +201,6 @@ class MathBackground:
                 self.formulas.append(FloatingFormula(arena_rect, self.current_theme))
         self.formulas = [f for f in self.formulas if f.update(dt)]
 
-    def draw(self, screen):
+    def draw(self, screen, offset=(0, 0)):
         for f in self.formulas:
-            f.draw(screen)
+            f.draw(screen, offset=offset)

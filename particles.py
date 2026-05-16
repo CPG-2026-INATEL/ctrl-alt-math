@@ -24,11 +24,11 @@ class Particle:
         if self.age >= self.lifetime:
             self.alive = False
 
-    def draw(self, surface):
+    def draw(self, surface, offset=(0, 0)):
         alpha = 1.0 - (self.age / self.lifetime)
         size = max(1, int(self.size * alpha))
         color = tuple(int(c * alpha) for c in self.color)
-        pygame.draw.circle(surface, color, (int(self.x), int(self.y)), size)
+        pygame.draw.circle(surface, color, (int(self.x + offset[0]), int(self.y + offset[1])), size)
 
 
 class ParticleSystem:
@@ -64,9 +64,9 @@ class ParticleSystem:
             p.update(dt)
         self.particles = [p for p in self.particles if p.alive]
 
-    def draw(self, surface):
+    def draw(self, surface, offset=(0, 0)):
         for p in self.particles:
-            p.draw(surface)
+            p.draw(surface, offset=offset)
 
     def clear(self):
         self.particles.clear()

@@ -50,7 +50,8 @@ class FloatingText:
         if self.age >= self.lifetime:
             self.alive = False
 
-    def draw(self, screen):
+    def draw(self, screen, offset=(0, 0)):
+        ox, oy = offset
         alpha = 1.0 - (self.age / self.lifetime) ** 0.5
         alpha = max(0, min(1.0, alpha))
         actual_size = max(8, int(self.size * self.scale))
@@ -59,12 +60,12 @@ class FloatingText:
         if self.shadow:
             shadow_img = font.render(self.text, True, (0, 0, 0))
             shadow_img.set_alpha(int(alpha * 120))
-            shadow_rect = shadow_img.get_rect(center=(int(self.x) + 1, int(self.y) + 1))
+            shadow_rect = shadow_img.get_rect(center=(int(self.x + ox) + 1, int(self.y + oy) + 1))
             screen.blit(shadow_img, shadow_rect)
 
         img = font.render(self.text, True, self.color)
         img.set_alpha(int(alpha * 255))
-        rect = img.get_rect(center=(int(self.x), int(self.y)))
+        rect = img.get_rect(center=(int(self.x + ox), int(self.y + oy)))
         screen.blit(img, rect)
 
 
@@ -115,9 +116,9 @@ class FloatingTextSystem:
             t.update(dt)
         self.texts = [t for t in self.texts if t.alive]
 
-    def draw(self, screen):
+    def draw(self, screen, offset=(0, 0)):
         for t in self.texts:
-            t.draw(screen)
+            t.draw(screen, offset=offset)
 
     def clear(self):
         self.texts.clear()

@@ -6,15 +6,20 @@ import settings
 
 
 class Grid:
-    def __init__(self):
-        self.cols = settings.GRID_COLS
-        self.rows = settings.GRID_ROWS
+    def __init__(self, cols=None, rows=None):
+        self.cols = cols if cols is not None else settings.GRID_COLS
+        self.rows = rows if rows is not None else settings.GRID_ROWS
         self.offset_x = settings.ARENA_OFFSET_X
         self.offset_y = settings.ARENA_OFFSET_Y
-        self.width = settings.ARENA_WIDTH
-        self.height = settings.ARENA_HEIGHT
-        self.cell_w = self.width / self.cols
-        self.cell_h = self.height / self.rows
+        
+        # Use integer cell sizes derived from the base arena dimensions
+        self.cell_w = int(settings.ARENA_WIDTH / settings.GRID_COLS)
+        self.cell_h = int(settings.ARENA_HEIGHT / settings.GRID_ROWS)
+
+        self.width = self.cell_w * self.cols
+        self.height = self.cell_h * self.rows
+
+        
         self.blocked = set()
         self.barrier_cells = set()
         self.tile_types = {}
@@ -258,7 +263,8 @@ class Grid:
                 if self.is_valid(tile[0], tile[1]):
                     self.danger_tiles.add((tile[0], tile[1], intent.telegraph_type, intent.is_fake, intent.lock_mode))
 
-    def draw_danger_indicators(self, screen, pulse_timer=0):
+    def draw_danger_indicators(self, screen, pulse_timer=0, offset=(0, 0)):
+        ox, oy = offset
         pulse_alpha = 0.5 + 0.3 * math.sin(pulse_timer * 5)
         for entry in self.danger_tiles:
             if len(entry) == 5:
@@ -270,6 +276,8 @@ class Grid:
                 lock_mode = "fixed"
 
             rect = self.cell_rect(col, row)
+            rect.x += ox
+            rect.y += oy
 
             if self.danger_locked:
                 base_color = (255, 50, 50)
@@ -304,7 +312,8 @@ class Grid:
                 sz = min(rect.width, rect.height) // 3
                 pygame.draw.line(screen, border_color, (cx, cy - sz), (cx, cy + sz), 2)
 
-    def draw_intent_arrows(self, screen, intents, player_skills=None):
+    def draw_intent_arrows(self, screen, intents, player_skills=None, offset=(0, 0)):
+        ox, oy = offset
         for intent in intents:
             if intent is None or intent.enemy.dead:
                 continue
@@ -314,12 +323,16 @@ class Grid:
             if origin is None:
                 origin = (intent.enemy.col, intent.enemy.row)
             fx, fy = self.to_pixel(origin[0], origin[1])
+            fx += ox
+            fy += oy
 
             target_list = list(intent.danger_tiles)
             if not target_list:
                 continue
             mid_tile = target_list[len(target_list) // 2]
             tx, ty = self.to_pixel(mid_tile[0], mid_tile[1])
+            tx += ox
+            ty += oy
 
             if self.danger_locked:
                 arrow_color = (255, 80, 80)
@@ -345,27 +358,34 @@ class Grid:
                     continue
                 sx, sy = self.to_pixel(intent.enemy.col, intent.enemy.row)
                 ex, ey = self.to_pixel(intent.move_target[0], intent.move_target[1])
+                sx += ox
+                sy += oy
+                ex += ox
+                ey += oy
                 ghost_color = (100, 255, 100, 80)
                 s = pygame.Surface((16, 16), pygame.SRCALPHA)
                 s.fill(ghost_color)
                 screen.blit(s, (int(ex) - 8, int(ey) - 8))
 
     def draw(self, screen, highlight_cells=None, highlight_color=None,
-             show_grid=False, grid_color=None, highlight_outline=False):
+             show_grid=False, grid_color=None, highlight_outline=False, offset=(0, 0)):
+        ox, oy = offset
         if show_grid:
             gc = grid_color or (30, 30, 60, 40)
             for col in range(self.cols + 1):
-                x = self.offset_x + col * self.cell_w
-                pygame.draw.line(screen, gc, (x, self.offset_y),
-                               (x, self.offset_y + self.height))
+                x = self.offset_x + col * self.cell_w + ox
+                pygame.draw.line(screen, gc, (x, self.offset_y + oy),
+                               (x, self.offset_y + self.height + oy))
             for row in range(self.rows + 1):
-                y = self.offset_y + row * self.cell_h
-                pygame.draw.line(screen, gc, (self.offset_x, y),
-                               (self.offset_x + self.width, y))
+                y = self.offset_y + row * self.cell_h + oy
+                pygame.draw.line(screen, gc, (self.offset_x + ox, y),
+                               (self.offset_x + self.width + ox, y))
 
         if highlight_cells:
             for col, row in highlight_cells:
                 rect = self.cell_rect(col, row)
+                rect.x += ox
+                rect.y += oy
                 s = pygame.Surface((rect.width, rect.height))
                 s.set_alpha(60)
                 s.fill(highlight_color or settings.BLUE)
@@ -373,9 +393,12 @@ class Grid:
                 if highlight_outline:
                     pygame.draw.rect(screen, highlight_color or settings.BLUE, rect, 1)
 
-    def draw_barriers(self, screen):
+    def draw_barriers(self, screen, offset=(0, 0)):
+        ox, oy = offset
         for col, row in self.barrier_cells:
             rect = self.cell_rect(col, row)
+            rect.x += ox
+            rect.y += oy
             s = pygame.Surface((rect.width, rect.height))
             s.set_alpha(50)
             s.fill(settings.CYAN)
@@ -387,9 +410,14 @@ class Grid:
                             rect.centery - img.get_height() // 2))
 
     def draw_vector_arrow(self, screen, from_col, from_row, to_col, to_row,
-                           color, width=2):
+                           color, width=2, offset=(0, 0)):
+        ox, oy = offset
         fx, fy = self.to_pixel(from_col, from_row)
         tx, ty = self.to_pixel(to_col, to_row)
+        fx += ox
+        fy += oy
+        tx += ox
+        ty += oy
         pygame.draw.line(screen, color, (fx, fy), (tx, ty), width)
         angle = math.atan2(ty - fy, tx - fx)
         arrow_len = 8
@@ -399,10 +427,14 @@ class Grid:
             pygame.draw.line(screen, color, (tx, ty), (ax, ay), width)
 
     def draw_triangle(self, screen, col1, row1, col2, row2, col3, row3,
-                      color, width=1):
+                      color, width=1, offset=(0, 0)):
+        ox, oy = offset
         p1 = self.to_pixel(col1, row1)
         p2 = self.to_pixel(col2, row2)
         p3 = self.to_pixel(col3, row3)
+        p1 = (p1[0] + ox, p1[1] + oy)
+        p2 = (p2[0] + ox, p2[1] + oy)
+        p3 = (p3[0] + ox, p3[1] + oy)
         pygame.draw.line(screen, color, p1, p2, width)
         pygame.draw.line(screen, color, p2, p3, width)
         pygame.draw.line(screen, color, p3, p1, width)

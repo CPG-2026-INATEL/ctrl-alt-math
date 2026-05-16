@@ -174,14 +174,27 @@ class Enemy:
         self.telegraph_timer = 0
         self.last_crit = False
 
-    def roll_damage(self):
-        self.last_crit = random.random() < settings.ENEMY_CRIT_CHANCE
+    def roll_damage(self, entropy=0):
+        # entropy_ratio: 0.0 at calm → 1.0 at max chaos
+        entropy_ratio = max(0.0, min(1.0, entropy / settings.MAX_ENTROPY))
+
+        # Crit chance scales from base → 100% at full entropy
+        effective_crit_chance = settings.ENEMY_CRIT_CHANCE + entropy_ratio * (1.0 - settings.ENEMY_CRIT_CHANCE)
+        self.last_crit = random.random() < effective_crit_chance
+
         base = self.damage
         variance = max(1, int(base * settings.ENEMY_DAMAGE_VARIANCE))
         amount = base + random.randint(-variance, variance)
+
+        # Damage bonus: +0% at 0 entropy, +100% at max entropy
+        amount = int(amount * (1.0 + entropy_ratio))
+
+        # Crit is always ×2
         if self.last_crit:
-            amount = int(amount * settings.ENEMY_CRIT_MULTIPLIER)
+            amount *= 2
+
         return max(1, amount)
+
 
     def set_grid_position(self, col, row, grid):
         self.col = int(col)
@@ -240,8 +253,9 @@ class Enemy:
         self._begin_anim_step(grid)
 
     def get_hitbox(self):
-        return pygame.Rect(self.x - self.size, self.y - self.size,
-                           self.size * 2, self.size * 2)
+        # Use display_size for a more accurate hitbox that matches the visual
+        return pygame.Rect(self.x - self.display_size // 2, self.y - self.display_size // 2,
+                           self.display_size, self.display_size)
 
     def take_damage(self, amount):
         self.hp -= amount
@@ -743,9 +757,12 @@ class Enemy:
             return {"type": "move", "target_col": best_retreat[0], "target_row": best_retreat[1]}
         return {"type": "wait"}
 
-    def draw(self, screen):
+    def draw(self, screen, offset=(0, 0)):
         if self.dead:
             return
+
+        ox, oy = offset
+        vx, vy = self.x + ox, self.y + oy
 
         spawn_scale = 1.0
         spawn_alpha = 255
@@ -759,7 +776,7 @@ class Enemy:
             color = settings.WHITE
 
         bob_y = math.sin(self.bob_phase) * self.bob_amplitude
-        draw_y = self.y + bob_y
+        draw_y = vy + bob_y
 
         size = int(self.size * spawn_scale)
         if size < 1:
@@ -772,27 +789,27 @@ class Enemy:
             if self.flash_timer > 0:
                 flash_surf = sprite.copy()
                 flash_surf.fill((255, 255, 255, 255), special_flags=pygame.BLEND_RGBA_MULT)
-                screen.blit(flash_surf, (self.x - self.display_size // 2, draw_y - self.display_size // 2))
+                screen.blit(flash_surf, (vx - self.display_size // 2, draw_y - self.display_size // 2))
             else:
-                screen.blit(sprite, (self.x - self.display_size // 2, draw_y - self.display_size // 2))
+                screen.blit(sprite, (vx - self.display_size // 2, draw_y - self.display_size // 2))
         else:
             if self.type == "censor":
-                self._draw_censor(screen, self.x, draw_y, size, color, spawn_alpha)
+                self._draw_censor(screen, vx, draw_y, size, color, spawn_alpha)
             elif self.type == "strawman":
-                self._draw_strawman(screen, self.x, draw_y, size, color, spawn_alpha)
+                self._draw_strawman(screen, vx, draw_y, size, color, spawn_alpha)
             elif self.type == "bayesian":
-                self._draw_bayesian(screen, self.x, draw_y, size, color, spawn_alpha)
+                self._draw_bayesian(screen, vx, draw_y, size, color, spawn_alpha)
             elif self.type == "boss":
-                self._draw_boss(screen, self.x, draw_y, size, color, spawn_alpha)
+                self._draw_boss(screen, vx, draw_y, size, color, spawn_alpha)
             elif self.type == "ortogonal":
-                self._draw_ortogonal(screen, self.x, draw_y, size, color, spawn_alpha)
+                self._draw_ortogonal(screen, vx, draw_y, size, color, spawn_alpha)
             elif self.type == "atirador":
-                self._draw_atirador(screen, self.x, draw_y, size, color, spawn_alpha)
+                self._draw_atirador(screen, vx, draw_y, size, color, spawn_alpha)
             elif self.type == "granadeiro":
-                self._draw_granadeiro(screen, self.x, draw_y, size, color, spawn_alpha)
+                self._draw_granadeiro(screen, vx, draw_y, size, color, spawn_alpha)
 
         if self.type != "boss" and self.hp < self.max_hp:
-            self._draw_hp_bar(screen, self.x, draw_y - size - 6, size)
+            self._draw_hp_bar(screen, vx, draw_y - size - 6, size)
 
     def _draw_censor(self, screen, x, y, size, color, alpha):
         rect = pygame.Rect(x - size, y - size, size * 2, size * 2)

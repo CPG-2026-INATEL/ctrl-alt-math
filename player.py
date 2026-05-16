@@ -15,8 +15,14 @@ class Player:
         self.size = settings.PLAYER_SIZE
         self.hp = settings.PLAYER_MAX_HP
         self.max_hp = settings.PLAYER_MAX_HP
+        self.base_damage = settings.PLAYER_ATTACK_DAMAGE
         self.rigor = settings.PLAYER_MAX_RIGOR
         self.max_rigor = settings.PLAYER_MAX_RIGOR
+        
+        self.level = 1
+        self.exp = 0
+        self.next_level_exp = settings.PLAYER_EXP_BASE
+        self.move_range = settings.PLAYER_MOVE_RANGE
 
         self.dir_x = 0
         self.dir_y = -1
@@ -64,7 +70,7 @@ class Player:
         self.anim_timer = 0
         self.anim_speed = 0.2
         self.sprite_size = 16
-        self.display_size = 32
+        self.display_size = 64
 
         self.anim_map = {
             "idle": 0, "walk": 1, "crawl": 2, "fire": 3,
@@ -189,6 +195,26 @@ class Player:
         
         self.glow_phase += dt * 4
 
+    def add_exp(self, amount):
+        self.exp += amount
+        leveled_up = False
+        while self.exp >= self.next_level_exp:
+            self.exp -= self.next_level_exp
+            self.level_up()
+            leveled_up = True
+        return leveled_up
+
+    def level_up(self):
+        self.level += 1
+        self.max_hp += settings.PLAYER_HP_PER_LEVEL
+        self.hp = self.max_hp  # Heal on level up
+        self.base_damage += settings.PLAYER_DMG_PER_LEVEL
+        self.next_level_exp = int(self.next_level_exp * settings.PLAYER_EXP_GROWTH)
+        
+        # Increase move range every 2 levels
+        if self.level % 2 == 0:
+            self.move_range += 1
+
     def basic_attack(self):
         return True
 
@@ -227,7 +253,8 @@ class Player:
         self.hp = hp
         self.max_hp = max_hp
 
-    def draw(self, screen):
+    def draw(self, screen, offset=(0, 0)):
+        ox, oy = offset
         for tx, ty, t in self.trail:
             alpha = int((t / 0.3) * 100)
             trail_size = int(self.display_size * (t / 0.3))
@@ -238,13 +265,13 @@ class Player:
                         sprite = pygame.transform.flip(sprite, True, False)
                     s = pygame.transform.scale(sprite, (trail_size, trail_size))
                     s.set_alpha(alpha)
-                    screen.blit(s, (tx - trail_size // 2, ty - trail_size // 2))
+                    screen.blit(s, (tx + ox - trail_size // 2, ty + oy - trail_size // 2))
 
         # Subtle shadow
         shadow_size = int(self.size * 0.8)
         shadow_surf = pygame.Surface((shadow_size * 2, shadow_size // 2), pygame.SRCALPHA)
         pygame.draw.ellipse(shadow_surf, (0, 0, 0, 100), (0, 0, shadow_size * 2, shadow_size // 2))
-        screen.blit(shadow_surf, (self.x - shadow_size, self.y + self.size - 4))
+        screen.blit(shadow_surf, (self.x + ox - shadow_size, self.y + oy + self.size - 4))
 
         glow_size = int(5 + math.sin(self.glow_phase) * 3)
         glow_surf = pygame.Surface((self.display_size + glow_size * 2,
@@ -252,8 +279,8 @@ class Player:
         pygame.draw.circle(glow_surf, (settings.CYAN[0], settings.CYAN[1], settings.CYAN[2], 30),
                            (self.display_size // 2 + glow_size, self.display_size // 2 + glow_size),
                            self.display_size // 2 + glow_size)
-        screen.blit(glow_surf, (self.x - self.display_size // 2 - glow_size,
-                                 self.y - self.display_size // 2 - glow_size))
+        screen.blit(glow_surf, (self.x + ox - self.display_size // 2 - glow_size,
+                                 self.y + oy - self.display_size // 2 - glow_size))
 
         color = settings.COLOR_PLAYER
         if self.flash_timer > 0:
@@ -274,9 +301,9 @@ class Player:
                 # Flash effect for damage
                 flash_surf = sprite.copy()
                 flash_surf.fill((255, 255, 255, 255), special_flags=pygame.BLEND_RGBA_MULT)
-                screen.blit(flash_surf, (self.x - self.display_size // 2, self.y - self.display_size // 2))
+                screen.blit(flash_surf, (self.x + ox - self.display_size // 2, self.y + oy - self.display_size // 2))
             else:
-                screen.blit(sprite, (self.x - self.display_size // 2, self.y - self.display_size // 2))
+                screen.blit(sprite, (self.x + ox - self.display_size // 2, self.y + oy - self.display_size // 2))
 
             # Overlay effects
             if self.current_anim == "fire" and self.anim_frame == 0:
@@ -287,7 +314,7 @@ class Player:
                         m_surf = pygame.transform.scale(m_surf, (self.display_size, self.display_size // 2))
                         if self.dir_x < 0:
                             m_surf = pygame.transform.flip(m_surf, True, False)
-                        screen.blit(m_surf, (self.x - self.display_size // 2, self.y - self.display_size // 2))
+                        screen.blit(m_surf, (self.x + ox - self.display_size // 2, self.y + oy - self.display_size // 2))
                     except: pass
             elif self.current_anim in ("hit", "death") and self.anim_frame == 0:
                 blood = self.effects.get("blood")
@@ -297,18 +324,18 @@ class Player:
                         b_surf = pygame.transform.scale(b_surf, (self.display_size, self.display_size // 2))
                         if self.dir_x < 0:
                             b_surf = pygame.transform.flip(b_surf, True, False)
-                        screen.blit(b_surf, (self.x - self.display_size // 2, self.y - self.display_size // 2))
+                        screen.blit(b_surf, (self.x + ox - self.display_size // 2, self.y + oy - self.display_size // 2))
                     except: pass
         else:
-            rect = pygame.Rect(self.x - self.size, self.y - self.size,
+            rect = pygame.Rect(self.x + ox - self.size, self.y + oy - self.size,
                                self.size * 2, self.size * 2)
             pygame.draw.rect(screen, color, rect)
             pygame.draw.rect(screen, settings.WHITE, rect, 1)
 
-        tip_x = self.x + self.dir_x * self.size * 1.8
-        tip_y = self.y + self.dir_y * self.size * 1.8
+        tip_x = self.x + ox + self.dir_x * self.size * 1.8
+        tip_y = self.y + oy + self.dir_y * self.size * 1.8
         pygame.draw.line(screen, settings.WHITE,
-                         (self.x, self.y), (tip_x, tip_y), 3)
+                         (self.x + ox, self.y + oy), (tip_x, tip_y), 3)
 
         if abs(self.dir_x) + abs(self.dir_y) > 0:
             font = pygame.font.Font(None, 14)
@@ -319,5 +346,5 @@ class Player:
             else:
                 sym_color = settings.CYAN
             label = font.render(symbol, True, sym_color)
-            screen.blit(label, (self.x - label.get_width() // 2,
-                                self.y - self.size - 12))
+            screen.blit(label, (self.x + ox - label.get_width() // 2,
+                                self.y + oy - self.size - 12))

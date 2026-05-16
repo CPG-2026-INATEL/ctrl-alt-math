@@ -54,16 +54,31 @@ class Game:
 
     def _configure_display(self):
         display_info = pygame.display.Info()
+        mon_w = display_info.current_w
+        mon_h = display_info.current_h
+
         if settings.FULLSCREEN:
-            settings.WINDOW_WIDTH = display_info.current_w
-            settings.WINDOW_HEIGHT = display_info.current_h
+            # Exclusive fullscreen — kept as opt-in but BORDERLESS is preferred
+            settings.WINDOW_WIDTH = mon_w
+            settings.WINDOW_HEIGHT = mon_h
             self.screen = pygame.display.set_mode(
                 (settings.WINDOW_WIDTH, settings.WINDOW_HEIGHT),
-                pygame.FULLSCREEN,
+                pygame.FULLSCREEN | pygame.DOUBLEBUF,
+            )
+        elif getattr(settings, 'BORDERLESS', False):
+            # Borderless windowed: fills the monitor but does NOT change the
+            # display resolution, so other windows are unaffected and Alt-Tab
+            # works cleanly.
+            settings.WINDOW_WIDTH = mon_w
+            settings.WINDOW_HEIGHT = mon_h
+            self.screen = pygame.display.set_mode(
+                (settings.WINDOW_WIDTH, settings.WINDOW_HEIGHT),
+                pygame.NOFRAME | pygame.DOUBLEBUF,
             )
         else:
             self.screen = pygame.display.set_mode(
-                (settings.WINDOW_WIDTH, settings.WINDOW_HEIGHT)
+                (settings.WINDOW_WIDTH, settings.WINDOW_HEIGHT),
+                pygame.DOUBLEBUF,
             )
 
         settings.UI_SCALE = min(
@@ -177,15 +192,26 @@ class Game:
                 else:
                     if self.scene_manager.current:
                         self.scene_manager.current.handle_event(event)
+                
+                if event.type == pygame.ACTIVEEVENT:
+                    if event.state & pygame.APPACTIVE and event.gain:
+                        # Gained focus - could trigger a redraw or resume
+                        pass
+
             if self.scene_manager.current:
                 self.scene_manager.current.update(dt)
 
             self.tts.update()
-            self.screen.fill(self.math_bg.get_bg_color())
-            if self.scene_manager.current:
-                self.scene_manager.current.draw(self.screen)
-
-            pygame.display.flip()
+            
+            # Use get_active to check if window is visible/focused
+            # This helps preventing black screen glitches on some systems
+            if pygame.display.get_active():
+                self.screen.fill(self.math_bg.get_bg_color())
+                if self.scene_manager.current:
+                    self.scene_manager.current.draw(self.screen)
+                pygame.display.flip()
+            else:
+                pygame.time.delay(10)
 
         self.tts.stop()
         pygame.quit()
