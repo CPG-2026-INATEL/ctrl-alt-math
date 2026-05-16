@@ -1,4 +1,2 @@
-[Client] Connecting to 172.19.160.1:5555...
-[Client] Failed to connect to 172.19.160.1:5555
-[Client] Connection error:
-[Client] Disconnected from host.
+[Discovery] Starting LAN scan...
+[Discovery] Broadcasting UDP discovery to ['255.255.255.255'] (reply to port 5557)
