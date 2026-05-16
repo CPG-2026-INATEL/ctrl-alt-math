@@ -16,6 +16,7 @@ from scenes.scene import Scene
 class GameplayScene(Scene):
     TILESET_PATH = "assets/Tileset/tileset_arranged.png"
     TILE_SIZE = 16
+    ENEMY_ATTACK_DELAY = 0.25
 
     def __init__(self, game):
         super().__init__(game)
@@ -37,6 +38,9 @@ class GameplayScene(Scene):
 
         self.enemy_actions = []
         self.enemy_resolve_idx = 0
+        self.enemy_phase = None
+        self.enemy_pending_attack = None
+        self.enemy_attack_delay_timer = 0
 
         self.victory_timer = 0
         self.qed_position = None
@@ -53,6 +57,9 @@ class GameplayScene(Scene):
         self.turn_manager = TurnManager()
         self.enemy_actions = []
         self.enemy_resolve_idx = 0
+        self.enemy_phase = None
+        self.enemy_pending_attack = None
+        self.enemy_attack_delay_timer = 0
         self.victory_timer = 0
         self.show_move_range = False
         self.show_action_range = False
@@ -507,6 +514,9 @@ class GameplayScene(Scene):
         self.state = "ENEMY_TURN"
         self.enemy_actions = []
         self.enemy_resolve_idx = 0
+        self.enemy_phase = "MOVE"
+        self.enemy_pending_attack = None
+        self.enemy_attack_delay_timer = 0
 
         pc = self.game.player.col
         pr = self.game.player.row
@@ -604,11 +614,30 @@ class GameplayScene(Scene):
 
     def _resolve_enemy_turn(self, dt):
         if self.enemy_resolve_idx >= len(self.enemy_actions):
+            self.enemy_phase = None
             self.state = "TURN_END"
             return
 
         if self.game.player.hp <= 0:
+            self.enemy_phase = None
             self.state = "TURN_END"
+            return
+
+        if self.enemy_pending_attack is not None:
+            self.enemy_phase = "ATTACK"
+            self.enemy_attack_delay_timer += dt
+            if self.enemy_attack_delay_timer < self.ENEMY_ATTACK_DELAY:
+                return
+            enemy, attack_type, action = self.enemy_pending_attack
+            self.enemy_pending_attack = None
+            self.enemy_attack_delay_timer = 0
+            if attack_type == "attack":
+                self._enemy_attack(enemy)
+            elif attack_type == "line_attack":
+                self._enemy_line_attack(enemy, action)
+            elif attack_type == "area_attack":
+                self._enemy_area_attack(enemy, action)
+            self.enemy_resolve_idx += 1
             return
 
         enemy, action = self.enemy_actions[self.enemy_resolve_idx]
@@ -623,8 +652,10 @@ class GameplayScene(Scene):
         self.turn_manager.resolve_timer = 0
 
         if action["type"] == "wait":
+            self.enemy_phase = "MOVE"
             self.turn_log.append(f"{enemy.type} waits")
         elif action["type"] == "move":
+            self.enemy_phase = "MOVE"
             tc, tr = action["target_col"], action["target_row"]
             if self.grid.is_valid(tc, tr) and not self.grid.is_blocked(tc, tr):
                 if not self.grid.is_level_change(enemy.col, enemy.row, tc, tr):
@@ -640,6 +671,7 @@ class GameplayScene(Scene):
                 self.turn_log.append(f"{enemy.type} blocked")
 
         elif action["type"] == "move_then_attack":
+            self.enemy_phase = "MOVE"
             tc, tr = action["target_col"], action["target_row"]
             if self.grid.is_valid(tc, tr) and not self.grid.is_blocked(tc, tr):
                 if not self.grid.is_level_change(enemy.col, enemy.row, tc, tr):
@@ -647,17 +679,26 @@ class GameplayScene(Scene):
                     enemy.col = tc
                     enemy.row = tr
                     enemy.x, enemy.y = self.grid.to_pixel(tc, tr)
-                    self._enemy_attack(enemy)
+                    self.turn_log.append(f"{enemy.type} moved")
                 else:
-                    self._enemy_attack(enemy)
+                    self.turn_log.append(f"{enemy.type} moved into range")
+            else:
+                self.turn_log.append(f"{enemy.type} blocked")
+            self.enemy_pending_attack = (enemy, "attack", action)
+            self.enemy_attack_delay_timer = 0
+            self.enemy_phase = "ATTACK"
+            return
 
         elif action["type"] == "attack":
+            self.enemy_phase = "ATTACK"
             self._enemy_attack(enemy)
 
         elif action["type"] == "line_attack":
+            self.enemy_phase = "ATTACK"
             self._enemy_line_attack(enemy, action)
 
         elif action["type"] == "area_attack":
+            self.enemy_phase = "ATTACK"
             self._enemy_area_attack(enemy, action)
 
         self.enemy_resolve_idx += 1
@@ -831,13 +872,12 @@ class GameplayScene(Scene):
                     sx = (tile_id % self.tilemap.tiles_per_row) * ts
                     sy = (tile_id // self.tilemap.tiles_per_row) * ts
                     tile_surf = self.tilemap.tileset.subsurface(sx, sy, ts, ts)
-                    scaled_w = int(self.grid.cell_w)
-                    scaled_h = int(self.grid.cell_h)
+                    rect = self.grid.cell_rect(col, row)
+                    scaled_w = rect.width
+                    scaled_h = rect.height
                     if scale_x != 1.0 or scale_y != 1.0:
                         tile_surf = pygame.transform.scale(tile_surf, (scaled_w, scaled_h))
-                    dx = settings.ARENA_OFFSET_X + col * scaled_w
-                    dy = settings.ARENA_OFFSET_Y + row * scaled_h
-                    temp.blit(tile_surf, (dx, dy))
+                    temp.blit(tile_surf, rect)
         else:
             pygame.draw.rect(temp, settings.COLOR_ARENA, arena_rect)
 
@@ -850,7 +890,6 @@ class GameplayScene(Scene):
             obs_surf.fill((20, 20, 40))
             temp.blit(obs_surf, rect)
 
-        self.grid.draw(temp, show_grid=True, grid_color=(25, 25, 50))
         self.grid.draw_barriers(temp)
 
         self.game.math_bg.draw(temp)
@@ -1163,28 +1202,39 @@ class GameplayScene(Scene):
         crit_label = font_small.render(f"CRIT: {crit_pct}%  \u00d7{settings.PLAYER_CRIT_MULTIPLIER:.0f}", True, settings.GOLD)
         screen.blit(crit_label, (settings.UI_PADDING + 180, bar_y + 28))
 
-        phase_text = "YOUR MOVE"
-        phase_symbol = "f(x)"
-        if self.state == "PLAYER_ACTION_SELECT":
-            phase_text = "YOUR ACTION"
+        phase_text = "PLAYER MOVE"
+        phase_symbol = "\u0394x"
+        phase_color = settings.CYAN
+        if self.state in ("PLAYER_ACTION_SELECT", "RESOLVE_ACTION"):
+            phase_text = "PLAYER ATTACK"
             phase_symbol = "f'(x)"
-        elif self.state == "ENEMY_TURN":
-            phase_text = "ENEMY TURN"
-            phase_symbol = "\u2200x"
         elif self.state == "RESOLVE_MOVE":
-            phase_text = "MOVING..."
+            phase_text = "PLAYER MOVE"
             phase_symbol = "\u0394x"
+        elif self.state == "ENEMY_TURN":
+            phase_color = settings.RED
+            if self.enemy_phase == "ATTACK":
+                phase_text = "ENEMY ATTACK"
+                phase_symbol = "!x"
+            else:
+                phase_text = "ENEMY MOVE"
+                phase_symbol = "\u2200x"
+        elif self.state == "TURN_END":
+            phase_text = "TURN END"
+            phase_symbol = "="
+            phase_color = settings.ORANGE
         elif self.state == "VICTORY_TRANSITION":
             phase_text = "Q.E.D."
             phase_symbol = "\u25a1"
+            phase_color = settings.GOLD
 
         draw_text(screen, f"T{self.turn_manager.turn_number} {phase_symbol}",
                   (settings.WINDOW_WIDTH // 2 - 60, bar_y + 10),
-                  settings.YELLOW if self.state in ("PLAYER_INPUT", "PLAYER_ACTION_SELECT") else settings.RED,
+                  phase_color,
                   12)
         draw_text(screen, phase_text,
                   (settings.WINDOW_WIDTH // 2, bar_y + 22),
-                  settings.CYAN if self.state in ("PLAYER_INPUT", "PLAYER_ACTION_SELECT") else settings.RED,
+                  phase_color,
                   16)
 
         move_status = "\u2713" if self.turn_manager.player_moved else "\u25cb"
