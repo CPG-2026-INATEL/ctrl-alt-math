@@ -292,8 +292,9 @@ class NetworkClient:
             daemon=True
         ).start()
 
-        # Wait for ID assignment from host
-        deadline = time.time() + settings.LAN_TIMEOUT
+        # Wait for ID assignment from host (longer timeout for localtunnel WAN)
+        timeout = 20.0 if "loca.lt" in url else 10.0
+        deadline = time.time() + timeout
         while time.time() < deadline:
             if error_container:
                 self.disconnect()
@@ -303,7 +304,7 @@ class NetworkClient:
             time.sleep(0.05)
 
         self.disconnect()
-        raise ConnectionError(f"Connection to {url} timed out or no ID assigned")
+        raise ConnectionError(f"Connection to {url} timed out or no ID assigned after {timeout}s")
 
     def _run_client(self, url, connected_event, error_container):
         self.loop = asyncio.new_event_loop()
