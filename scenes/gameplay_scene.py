@@ -46,6 +46,7 @@ class GameplayScene(Scene):
 
         self.pending_player_col = None
         self.pending_player_row = None
+        self.hovered_enemy = None
 
     def enter(self, prev_scene=None):
         self.state = "WAVE_INTRO"
@@ -532,6 +533,18 @@ class GameplayScene(Scene):
         self.game.particles.update(dt)
         self.game.floating_text.update(dt)
 
+        # Mouse hover detection for enemies
+        mouse_pos = pygame.mouse.get_pos()
+        self.hovered_enemy = None
+        for enemy in self.game.enemies:
+            if enemy.dead:
+                continue
+            # Use hitbox for hover detection
+            hitbox = enemy.get_hitbox()
+            if hitbox.collidepoint(mouse_pos):
+                self.hovered_enemy = enemy
+                break
+
         arena_rect = pygame.Rect(
             settings.ARENA_OFFSET_X, settings.ARENA_OFFSET_Y,
             settings.ARENA_WIDTH, settings.ARENA_HEIGHT
@@ -945,6 +958,9 @@ class GameplayScene(Scene):
         self._draw_enemy_info(temp)
 
         self._draw_turn_hud(temp)
+
+        if self.hovered_enemy:
+            self.game.ui.draw_enemy_tooltip(temp, self.hovered_enemy, pygame.mouse.get_pos())
 
         if self.game.screen_shake > 0:
             sx = random.randint(-int(self.game.shake_intensity),
