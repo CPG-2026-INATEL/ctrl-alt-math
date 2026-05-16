@@ -150,7 +150,7 @@ class GameplayScene(Scene):
             stairs_per_area=1,
             seed=seed,
         )
-        map_data = gen.generate()
+        map_data, obstacles = gen.generate()
 
         ALL_STAIRS = {TILE_STAIRS_UP, TILE_STAIRS_DOWN, TILE_STAIRS_LEFT, TILE_STAIRS_RIGHT}
         HIGH_TILES = {TILE_HIGH, TILE_HIGH_EDGE}
@@ -199,6 +199,14 @@ class GameplayScene(Scene):
 
     def handle_event(self, event):
         if event.type != pygame.KEYDOWN:
+            return
+
+        mods = pygame.key.get_mods()
+        if (mods & pygame.KMOD_CTRL) and (mods & pygame.KMOD_ALT):
+            self.game.player.toggle_skin()
+            skin_name = self.game.player.skin_names[self.game.player.skin_index]
+            self.game.floating_text.add_info(self.game.player.x, self.game.player.y - 40, 
+                                            f"Class: {skin_name}", settings.CYAN)
             return
 
         if self.state == "WAVE_INTRO":
