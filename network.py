@@ -63,9 +63,17 @@ class NetworkHost:
         sock.settimeout(1.0)
         while self.running:
             try:
-                data, addr = sock.recvfrom(1024)
-                if data == b"DISCOVER_REQUEST":
-                    sock.sendto(b"DISCOVER_RESPONSE", addr)
+                data, addr = sock.recvfrom(256)
+                text = data.decode("utf-8", errors="ignore")
+                # New format: "DISCOVER_REQUEST:{reply_port}"
+                if text.startswith("DISCOVER_REQUEST"):
+                    reply_port = settings.LAN_DISCOVERY_PORT + 1  # default fallback
+                    if ":" in text:
+                        try:
+                            reply_port = int(text.split(":", 1)[1])
+                        except ValueError:
+                            pass
+                    sock.sendto(b"DISCOVER_RESPONSE", (addr[0], reply_port))
             except socket.timeout:
                 continue
             except OSError:
@@ -235,39 +243,81 @@ class LANDiscovery:
         self.scan_thread = threading.Thread(target=self._scan, daemon=True)
         self.scan_thread.start()
 
+    def _get_broadcast_addresses(self):
+        """Return all directed broadcast addresses for every local interface."""
+        addrs = set()
+        try:
+            # Use socket.getaddrinfo to enumerate all local IPs
+            hostname = socket.gethostname()
+            for info in socket.getaddrinfo(hostname, None):
+                ip = info[4][0]
+                if ip.startswith("127.") or ":" in ip:
+                    continue
+                parts = ip.split(".")
+                # Directed broadcast: keep first 3 octets, last = 255
+                addrs.add(".".join(parts[:3]) + ".255")
+        except OSError:
+            pass
+        # Always include the generic broadcast as a fallback
+        addrs.add("255.255.255.255")
+        return list(addrs)
+
     def _scan(self):
-        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        sock.settimeout(1.0)
-        
-        # Try a few times to account for packet loss
-        for _ in range(3):
-            if not self.running: break
+        # Build the list of targets BEFORE opening sockets
+        targets = self._get_broadcast_addresses()
+
+        # Sending socket (broadcast-enabled)
+        send_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        send_sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+        send_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        try:
+            send_sock.bind(("", 0))  # OS picks an ephemeral source port
+        except OSError:
+            pass
+
+        # Receiving socket — bound to the discovery port to catch responses
+        recv_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        recv_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        recv_sock.settimeout(0.3)
+        try:
+            recv_sock.bind(("", settings.LAN_DISCOVERY_PORT + 1))
+        except OSError:
+            # Port already in use — fall back to any port
             try:
-                sock.sendto(b"DISCOVER_REQUEST", ("<broadcast>", settings.LAN_DISCOVERY_PORT))
+                recv_sock.bind(("", 0))
             except OSError:
-                # If broadcast fails, try the common subnet
+                pass
+
+        # The host's _discovery_loop replies to the *sender's* address, so we
+        # need to tell it where to reply.  We embed our IP + reply-port in the
+        # discovery payload instead of using the fixed discovery port.
+        reply_port = recv_sock.getsockname()[1]
+        payload = f"DISCOVER_REQUEST:{reply_port}".encode()
+
+        # 3 passes so a single lost packet doesn't kill the scan
+        for _ in range(3):
+            if not self.running:
+                break
+            for bcast in targets:
                 try:
-                    local_ip = self._get_local_ip()
-                    prefix = ".".join(local_ip.split(".")[:3])
-                    sock.sendto(b"DISCOVER_REQUEST", (f"{prefix}.255", settings.LAN_DISCOVERY_PORT))
+                    send_sock.sendto(payload, (bcast, settings.LAN_DISCOVERY_PORT))
                 except OSError:
                     pass
-            
-            # Collect responses
-            start_time = time.time()
-            while time.time() - start_time < 0.5:
+
+            # Collect responses for 0.5 s per pass
+            deadline = time.time() + 0.5
+            while time.time() < deadline:
                 try:
-                    data, addr = sock.recvfrom(1024)
-                    if data == b"DISCOVER_RESPONSE":
-                        if addr[0] not in self.hosts:
-                            self.hosts.append(addr[0])
+                    data, addr = recv_sock.recvfrom(256)
+                    if data == b"DISCOVER_RESPONSE" and addr[0] not in self.hosts:
+                        self.hosts.append(addr[0])
                 except socket.timeout:
-                    break
+                    pass
                 except OSError:
                     break
-        sock.close()
+
+        send_sock.close()
+        recv_sock.close()
 
     def stop_scan(self):
         self.running = False
