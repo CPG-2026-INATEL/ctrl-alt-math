@@ -73,6 +73,16 @@ class Enemy:
         self.is_decoy = False
         self.intended_action = None
         self.telegraph_timer = 0
+        self.last_crit = False
+
+    def roll_damage(self):
+        self.last_crit = random.random() < settings.ENEMY_CRIT_CHANCE
+        base = self.damage
+        variance = max(1, int(base * settings.ENEMY_DAMAGE_VARIANCE))
+        amount = base + random.randint(-variance, variance)
+        if self.last_crit:
+            amount = int(amount * settings.ENEMY_CRIT_MULTIPLIER)
+        return max(1, amount)
 
     def set_grid_position(self, col, row, grid):
         self.col = int(col)
@@ -138,22 +148,39 @@ class Enemy:
         if self.type == "boss":
             return self._boss_decide(dist, player_col, player_row, grid)
 
-        if dist <= self.attack_range:
+        if dist <= self.attack_range and not grid.is_level_change(self.col, self.row, player_col, player_row):
             return {"type": "attack", "target_col": player_col, "target_row": player_row}
 
+        reachable = grid.get_reachable_cells(self.col, self.row, self.move_range)
+
         if dist <= self.attack_range + 2:
+            reachable_set = set(reachable)
             path = grid.pathfind(self.col, self.row, player_col, player_row)
             if path and len(path) <= self.move_range:
                 target = path[-1]
-                return {"type": "move_then_attack",
-                        "target_col": target[0], "target_row": target[1],
-                        "attack_after": True}
+                if target in reachable_set:
+                    return {"type": "move_then_attack",
+                            "target_col": target[0], "target_row": target[1],
+                            "attack_after": True}
 
         path = grid.pathfind(self.col, self.row, player_col, player_row)
         if path:
-            steps = min(self.move_range, len(path))
-            target = path[steps - 1]
-            return {"type": "move", "target_col": target[0], "target_row": target[1]}
+            reachable_set = set(reachable)
+            for i, step in enumerate(path):
+                if step in reachable_set:
+                    return {"type": "move", "target_col": step[0], "target_row": step[1]}
+
+        closest_reachable = None
+        closest_dist = float('inf')
+        player_tile = grid.tile_types.get((player_col, player_row), 0)
+        for cell in reachable:
+            cd = grid.grid_distance(cell[0], cell[1], player_col, player_row)
+            if cd < closest_dist:
+                closest_dist = cd
+                closest_reachable = cell
+
+        if closest_reachable:
+            return {"type": "move", "target_col": closest_reachable[0], "target_row": closest_reachable[1]}
 
         return {"type": "wait"}
 
@@ -239,6 +266,10 @@ class Enemy:
         pygame.draw.line(screen, (255, 255, 255),
                          (x + size - 2, y - size + 2),
                          (x - size + 2, y + size - 2), 2)
+        font = pygame.font.Font(None, 12)
+        label = font.render("\u00acP", True, settings.WHITE)
+        label.set_alpha(alpha)
+        screen.blit(label, (x - label.get_width() // 2, y - size - 14))
 
     def _draw_strawman(self, screen, x, y, size, color, alpha):
         s = pygame.Surface((size * 2, size * 2))
@@ -249,6 +280,10 @@ class Enemy:
         eye_size = max(2, size // 3)
         pygame.draw.circle(screen, settings.WHITE, (x - size // 2, y - size // 3), eye_size)
         pygame.draw.circle(screen, settings.WHITE, (x + size // 2, y - size // 3), eye_size)
+        font = pygame.font.Font(None, 12)
+        label = font.render("\u21d2?", True, settings.WHITE)
+        label.set_alpha(alpha)
+        screen.blit(label, (x - label.get_width() // 2, y - size - 14))
 
     def _draw_bayesian(self, screen, x, y, size, color, alpha):
         s = pygame.Surface((size * 2, size * 2))
@@ -259,6 +294,10 @@ class Enemy:
         eye_size = max(2, size // 3)
         pygame.draw.circle(screen, settings.YELLOW, (x, y - size // 3), eye_size + 1)
         pygame.draw.circle(screen, settings.WHITE, (x, y - size // 3), eye_size - 1)
+        font = pygame.font.Font(None, 12)
+        label = font.render("P(A|B)", True, settings.YELLOW)
+        label.set_alpha(alpha)
+        screen.blit(label, (x - label.get_width() // 2, y - size - 14))
 
     def _draw_boss(self, screen, x, y, size, color, alpha):
         pulse = math.sin(self.pulse_timer) * 3
@@ -303,5 +342,11 @@ class Enemy:
         bar_y = y
         hp_ratio = self.hp / self.max_hp
         pygame.draw.rect(screen, (60, 20, 20), (bar_x, bar_y, bar_w, bar_h))
-        pygame.draw.rect(screen, settings.RED, (bar_x, bar_y, int(bar_w * hp_ratio), bar_h))
+        if hp_ratio > 0.5:
+            bar_color = settings.GREEN
+        elif hp_ratio > 0.25:
+            bar_color = settings.ORANGE
+        else:
+            bar_color = settings.RED
+        pygame.draw.rect(screen, bar_color, (bar_x, bar_y, int(bar_w * hp_ratio), bar_h))
         pygame.draw.rect(screen, settings.LIGHT_GRAY, (bar_x, bar_y, bar_w, bar_h), 1)

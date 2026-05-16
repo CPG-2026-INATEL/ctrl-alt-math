@@ -48,7 +48,7 @@ class Game:
         self.scene_manager.add("victory", VictoryScene)
         self.scene_manager.add("map", MapScene)
         self.scene_manager.add("tilemap", TilemapScene)
-        self.scene_manager.switch("tilemap")
+        self.scene_manager.switch("menu")
 
     def _init_shared_state(self):
         self.player = Player()
