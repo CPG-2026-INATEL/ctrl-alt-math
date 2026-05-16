@@ -167,6 +167,36 @@ class NetworkHost:
         except OSError:
             return "127.0.0.1"
 
+    def get_all_local_ips(self):
+        """Return all non-loopback IPv4 addresses, sorted so 192.168.x.x comes first."""
+        ips = set()
+        try:
+            for info in socket.getaddrinfo(socket.gethostname(), None):
+                ip = info[4][0]
+                if ip.startswith("127.") or ":" in ip:
+                    continue
+                ips.add(ip)
+        except OSError:
+            pass
+        # Also grab the default-route IP
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.connect(("8.8.8.8", 80))
+            ips.add(s.getsockname()[0])
+            s.close()
+        except OSError:
+            pass
+        # Sort: 192.168.x.x first, then 10.x.x.x, then others
+        def _rank(ip):
+            if ip.startswith("192.168."):
+                return 0
+            if ip.startswith("10."):
+                return 1
+            if ip.startswith("172."):
+                return 2
+            return 3
+        return sorted(ips, key=_rank) or ["127.0.0.1"]
+
 
 class NetworkClient:
     def __init__(self):
@@ -263,61 +293,89 @@ class LANDiscovery:
         return list(addrs)
 
     def _scan(self):
-        # Build the list of targets BEFORE opening sockets
         targets = self._get_broadcast_addresses()
+        local_ip = self._get_local_ip()
+        prefix = ".".join(local_ip.split(".")[:3])
+        lock = threading.Lock()
 
-        # Sending socket (broadcast-enabled)
-        send_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        send_sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-        send_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        try:
-            send_sock.bind(("", 0))  # OS picks an ephemeral source port
-        except OSError:
-            pass
-
-        # Receiving socket — bound to the discovery port to catch responses
-        recv_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        recv_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        recv_sock.settimeout(0.3)
-        try:
-            recv_sock.bind(("", settings.LAN_DISCOVERY_PORT + 1))
-        except OSError:
-            # Port already in use — fall back to any port
+        # ---- Strategy 1: UDP broadcast (fast on home networks) ----
+        def udp_scan():
+            send_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            send_sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+            send_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             try:
-                recv_sock.bind(("", 0))
+                send_sock.bind(("", 0))
             except OSError:
                 pass
-
-        # The host's _discovery_loop replies to the *sender's* address, so we
-        # need to tell it where to reply.  We embed our IP + reply-port in the
-        # discovery payload instead of using the fixed discovery port.
-        reply_port = recv_sock.getsockname()[1]
-        payload = f"DISCOVER_REQUEST:{reply_port}".encode()
-
-        # 3 passes so a single lost packet doesn't kill the scan
-        for _ in range(3):
-            if not self.running:
-                break
-            for bcast in targets:
+            recv_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            recv_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            recv_sock.settimeout(0.3)
+            try:
+                recv_sock.bind(("", settings.LAN_DISCOVERY_PORT + 1))
+            except OSError:
                 try:
-                    send_sock.sendto(payload, (bcast, settings.LAN_DISCOVERY_PORT))
+                    recv_sock.bind(("", 0))
                 except OSError:
                     pass
-
-            # Collect responses for 0.5 s per pass
-            deadline = time.time() + 0.5
-            while time.time() < deadline:
-                try:
-                    data, addr = recv_sock.recvfrom(256)
-                    if data == b"DISCOVER_RESPONSE" and addr[0] not in self.hosts:
-                        self.hosts.append(addr[0])
-                except socket.timeout:
-                    pass
-                except OSError:
+            reply_port = recv_sock.getsockname()[1]
+            payload = f"DISCOVER_REQUEST:{reply_port}".encode()
+            for _ in range(3):
+                if not self.running:
                     break
+                for bcast in targets:
+                    try:
+                        send_sock.sendto(payload, (bcast, settings.LAN_DISCOVERY_PORT))
+                    except OSError:
+                        pass
+                deadline = time.time() + 0.5
+                while time.time() < deadline:
+                    try:
+                        data, addr = recv_sock.recvfrom(256)
+                        if data == b"DISCOVER_RESPONSE":
+                            with lock:
+                                if addr[0] not in self.hosts:
+                                    self.hosts.append(addr[0])
+                    except socket.timeout:
+                        pass
+                    except OSError:
+                        break
+            send_sock.close()
+            recv_sock.close()
 
-        send_sock.close()
-        recv_sock.close()
+        # ---- Strategy 2: Parallel TCP scan (works when AP isolation blocks UDP) ----
+        def tcp_check(ip):
+            if not self.running:
+                return
+            try:
+                s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                s.settimeout(0.15)
+                s.connect((ip, self.port))
+                s.close()
+                with lock:
+                    if ip not in self.hosts:
+                        self.hosts.append(ip)
+            except (socket.timeout, ConnectionRefusedError, OSError):
+                pass
+
+        def tcp_scan():
+            ips = [f"{prefix}.{i}" for i in range(1, 255) if f"{prefix}.{i}" != local_ip]
+            # Scan in batches of 64 parallel threads
+            for i in range(0, len(ips), 64):
+                if not self.running:
+                    break
+                batch = [threading.Thread(target=tcp_check, args=(ip,), daemon=True)
+                         for ip in ips[i:i + 64]]
+                for th in batch:
+                    th.start()
+                for th in batch:
+                    th.join(timeout=0.5)
+
+        t_udp = threading.Thread(target=udp_scan, daemon=True)
+        t_tcp = threading.Thread(target=tcp_scan, daemon=True)
+        t_udp.start()
+        t_tcp.start()
+        t_udp.join()
+        t_tcp.join()
 
     def stop_scan(self):
         self.running = False

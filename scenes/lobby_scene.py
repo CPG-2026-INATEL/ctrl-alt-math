@@ -80,9 +80,10 @@ class LobbyScene(Scene):
         self.host = NetworkHost()
         try:
             self.host.start()
-            ip = self.host.get_local_ip()
-            self.host_ip = ip
-            self.status = t("lobby_waiting", ip=ip)
+            all_ips = self.host.get_all_local_ips()
+            self.host_ip = all_ips[0] if all_ips else "?.?.?.?"
+            self.host_all_ips = all_ips
+            self.status = t("lobby_waiting", ip=self.host_ip)
             self.status_color = settings.GREEN
             self.mode = "hosting"
             self.player_index = 1
@@ -347,17 +348,21 @@ class LobbyScene(Scene):
 
         elif self.mode == "hosting":
             draw_text(screen, t("lobby_hosting"),
-                      (settings.WINDOW_WIDTH // 2, 180), settings.GREEN, 28)
-            if self.host_ip:
-                draw_text(screen, self.host_ip,
-                          (settings.WINDOW_WIDTH // 2, 240), settings.WHITE, 22)
-            draw_text(screen, self.status,
-                      (settings.WINDOW_WIDTH // 2, 300), self.status_color, 20)
+                      (settings.WINDOW_WIDTH // 2, 160), settings.GREEN, 28)
+            # Show all local IPs so the user can pick the right one
+            ips = getattr(self, "host_all_ips", [self.host_ip] if self.host_ip else [])
             draw_text(screen, t("lobby_share_ip"),
-                      (settings.WINDOW_WIDTH // 2, 335), settings.LIGHT_GRAY, 16)
+                      (settings.WINDOW_WIDTH // 2, 195), settings.LIGHT_GRAY, 14)
+            for idx, ip in enumerate(ips):
+                color = settings.WHITE if idx > 0 else settings.CYAN
+                draw_text(screen, ip,
+                          (settings.WINDOW_WIDTH // 2, 215 + idx * 24), color, 20)
+            status_y = 215 + len(ips) * 24 + 10
+            draw_text(screen, self.status,
+                      (settings.WINDOW_WIDTH // 2, status_y), self.status_color, 18)
             if self.connected:
                 draw_text(screen, t("lobby_start_prompt"),
-                          (settings.WINDOW_WIDTH // 2, 380), settings.GOLD, 24)
+                          (settings.WINDOW_WIDTH // 2, status_y + 40), settings.GOLD, 24)
             draw_text(screen, t("lobby_esc_cancel"),
                       (settings.WINDOW_WIDTH // 2, settings.WINDOW_HEIGHT - 40), settings.GRAY, 14)
 
