@@ -29,3 +29,16 @@ class EnemyIntent:
                 return self.danger_tiles, True
             return self.danger_tiles, False
         return self.danger_tiles, False
+
+    def to_action(self):
+        if self.attack_type in ("move_then_attack",):
+            tc, tr = self.move_target or self.attack_origin or (self.enemy.col, self.enemy.row)
+            return {"type": "move_then_attack", "target_col": tc, "target_row": tr, "attack_after": True}
+        elif self.attack_type == "move" and self.move_target:
+            return {"type": "move", "target_col": self.move_target[0], "target_row": self.move_target[1]}
+        elif self.attack_type in ("attack", "line_attack", "area_attack"):
+            tc, tr = self.target_tile or (self.enemy.col, self.enemy.row)
+            return {"type": self.attack_type, "target_col": tc, "target_row": tr}
+        elif self.attack_type == "wait" or self.attack_type is None:
+            return {"type": "wait"}
+        return {"type": "wait"}

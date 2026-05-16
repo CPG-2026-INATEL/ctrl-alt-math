@@ -46,6 +46,7 @@ class GameplayScene(Scene):
 
         self.victory_timer = 0
         self.qed_position = None
+        self.game_over_timer = 0
 
         self.turn_log = []
         self.last_enemy_death_pos = None
@@ -492,6 +493,9 @@ class GameplayScene(Scene):
             self._handle_action_input(event)
         elif self.state == "VICTORY_TRANSITION":
             pass
+        elif self.state == "GAME_OVER_TRANSITION":
+            if event.type == pygame.KEYDOWN:
+                self.game.scene_manager.switch("game_over")
 
     def _handle_player_input(self, event):
         k = event.key
@@ -643,8 +647,6 @@ class GameplayScene(Scene):
     def _try_rewind(self):
         if not self.turn_manager.can_undo():
             return
-        gs = self._get_game_state()
-        self.turn_manager.snapshot(gs)
         target = self.turn_manager.undo()
         if target is None:
             return
@@ -806,14 +808,10 @@ class GameplayScene(Scene):
                 self.enemy_pending_attack = None
                 self.enemy_attack_delay_timer = 0
 
-                pc = self.game.player.col
-                pr = self.game.player.row
-                alive_enemies = [e for e in self.game.enemies if not e.dead]
-
                 for intent in self.enemy_intents:
                     if intent is None or intent.enemy.dead:
                         continue
-                    action = intent.enemy.decide_action(pc, pr, self.grid, self.game.enemies)
+                    action = intent.to_action()
                     if action:
                         self.enemy_actions.append((intent.enemy, action))
 
@@ -842,6 +840,12 @@ class GameplayScene(Scene):
                         self.game.scene_manager.switch("map")
                 else:
                     self.game.scene_manager.switch("victory")
+
+        elif self.state == "GAME_OVER_TRANSITION":
+            self.game_over_timer += dt
+            self.game.player.flash_timer = max(0, self.game.player.flash_timer - dt)
+            if self.game_over_timer >= settings.GAME_OVER_TRANSITION_DURATION:
+                self.game.scene_manager.switch("game_over")
 
         if self.state == "PLAYER_INPUT" or self.state == "PLAYER_ACTION_SELECT":
             self.game.entropy = min(settings.MAX_ENTROPY,
@@ -1156,7 +1160,14 @@ class GameplayScene(Scene):
             return
 
         if self.game.player.hp <= 0:
-            self.game.scene_manager.switch("game_over")
+            self.state = "GAME_OVER_TRANSITION"
+            self.game_over_timer = 0
+            self.game.particles.emit_burst(
+                self.game.player.x, self.game.player.y, settings.RED, 20, 80, 0.5
+            )
+            self.game.screen_shake = 0.3
+            self.game.shake_intensity = 10
+            self.game.sfx.play("player_hit")
             return
 
         self.state = "PLAYER_INPUT"
@@ -1379,6 +1390,13 @@ class GameplayScene(Scene):
                          (settings.WINDOW_WIDTH // 2, settings.WINDOW_HEIGHT // 2 + 80),
                          settings.GREEN, 16)
 
+        if self.state == "GAME_OVER_TRANSITION":
+            progress = min(1.0, self.game_over_timer / settings.GAME_OVER_TRANSITION_DURATION)
+            fade = pygame.Surface((settings.WINDOW_WIDTH, settings.WINDOW_HEIGHT))
+            fade.set_alpha(int(200 * progress))
+            fade.fill(settings.BLACK)
+            screen.blit(fade, (0, 0))
+
     def _draw_cursor_info(self, screen):
         if self.state not in ("PLAYER_INPUT", "PLAYER_ACTION_SELECT"):
             return
@@ -1561,6 +1579,10 @@ class GameplayScene(Scene):
             phase_text = "Q.E.D."
             phase_symbol = "[QED]"
             phase_color = settings.GOLD
+        elif self.state == "GAME_OVER_TRANSITION":
+            phase_text = "FATAL ERROR"
+            phase_symbol = "0/0"
+            phase_color = settings.RED
 
         center_x = settings.WINDOW_WIDTH // 2
         draw_text(screen, f"Turn {self.turn_manager.turn_number} {phase_symbol}",

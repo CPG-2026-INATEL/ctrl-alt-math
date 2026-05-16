@@ -51,7 +51,7 @@ class WorldMap:
         # Smooth avatar movement
         start_room = self.rooms[start]
         self.avatar_x = start_room.rect.centerx
-        self.avatar_y = start_room.rect.bottom + 20
+        self.avatar_y = start_room.rect.top + 20
 
     def update(self, dt, player=None):
         self.anim_timer += dt
@@ -61,7 +61,7 @@ class WorldMap:
         # Update avatar position
         target_room = self.rooms[self.player_room]
         target_x = target_room.rect.centerx
-        target_y = target_room.rect.bottom + 20
+        target_y = target_room.rect.top + 20
         
         dx = target_x - self.avatar_x
         dy = target_y - self.avatar_y
@@ -151,7 +151,7 @@ class WorldMap:
         info_name_y = settings.WINDOW_HEIGHT - int(150 * settings.UI_SCALE)
         info_text_y = settings.WINDOW_HEIGHT - int(110 * settings.UI_SCALE)
         info_action_y = settings.WINDOW_HEIGHT - int(65 * settings.UI_SCALE)
-        avatar_size = max(12, int(16 * settings.UI_SCALE))
+        avatar_size = max(24, int(32 * settings.UI_SCALE))
         avatar_offset_y = int(20 * settings.UI_SCALE)
 
         draw_text(screen, t("archive_title"),

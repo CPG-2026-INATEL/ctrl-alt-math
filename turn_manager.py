@@ -104,15 +104,14 @@ class TurnManager:
             self.history.pop(0)
 
     def undo(self):
-        if len(self.history) < 2:
+        if not self.history:
             return None
-        target = self.history[-2]
-        self.history = self.history[:-2]
+        target = self.history.pop()
         self.turn_number = target["turn"]
         return target
 
     def can_undo(self):
-        return len(self.history) >= 2 and self.rewind_cooldown_turns <= 0
+        return len(self.history) > 0 and self.rewind_cooldown_turns <= 0
 
     def end_turn(self, game_state):
         self.snapshot(game_state)
