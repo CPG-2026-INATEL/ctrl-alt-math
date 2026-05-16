@@ -50,9 +50,15 @@ class NetworkHost:
     # ------------------------------------------------------------------ start
 
     def start(self):
-        self._log(f"Starting host on port {self.port}...")
+        self._log(f"Initializing host on port {self.port}...")
         self._ensure_firewall_rules()
         self.running = True
+        
+        # Log all available IPs for debugging
+        all_ips = self.get_all_local_ips()
+        self._log(f"Detected local IPs: {', '.join(all_ips)}")
+        self._log(f"Primary IP (suggested): {self.get_local_ip()}")
+
         # Start asyncio loop in a daemon thread
         self._loop = asyncio.new_event_loop()
         t = threading.Thread(target=self._run_loop, daemon=True)
@@ -60,6 +66,7 @@ class NetworkHost:
         # Discovery responder (UDP, no asyncio needed)
         dt = threading.Thread(target=self._discovery_loop, daemon=True)
         dt.start()
+        self._log("Host network threads are active.")
         self._log("Host threads started.")
 
     def _run_loop(self):
@@ -120,13 +127,14 @@ class NetworkHost:
         if not self._loop or not self.running:
             return
         raw = json.dumps(msg)
+        self._log(f"Broadcasting message type: {msg.get('type')} ({len(raw)} bytes)")
         async def _do():
             targets = set(self._websockets)
             for ws in targets:
                 try:
                     await ws.send(raw)
-                except Exception:
-                    pass
+                except Exception as e:
+                    self._log(f"Broadcast error to a client: {e}")
         asyncio.run_coroutine_threadsafe(_do(), self._loop)
 
     def send_to(self, cid, msg):
@@ -298,11 +306,12 @@ class NetworkClient:
         self._log("Connected successfully.")
 
     def _run_loop(self, host, port):
+        self._log(f"Async thread started for {host}")
         asyncio.set_event_loop(self._loop)
         try:
             self._loop.run_until_complete(self._recv_loop(host, port))
-        except Exception:
-            pass
+        except Exception as e:
+            self._log(f"Fatal error in client loop: {e}")
         self.running = False
 
     async def _recv_loop(self, host, port):
@@ -318,18 +327,22 @@ class NetworkClient:
                         msg = json.loads(raw)
                         if msg.get("type") == "assign_id":
                             self.my_id = msg["id"]
-                            self._log(f"Assigned ID: {self.my_id}")
+                            self._log(f"Handshake successful. Assigned ID: {self.my_id}")
                         else:
-                            self._log(f"Recv from host: {msg.get('type')}")
+                            self._log(f"Incoming msg: {msg.get('type')}")
                             with self.lock:
                                 self.inbox.append(msg)
                     except json.JSONDecodeError:
-                        self._log("JSON error from host")
+                        self._log("Received malformed JSON from host")
+        except asyncio.TimeoutError:
+            self._log(f"Connection TIMEOUT: Host at {host}:{port} is unreachable.")
+        except ConnectionRefusedError:
+            self._log(f"Connection REFUSED: Server not running at {host}:{port} or blocked by firewall.")
         except Exception as e:
-            self._log(f"Connection error: {e}")
+            self._log(f"Socket error: {type(e).__name__}: {e}")
         finally:
             self._ws = None
-            self._log("Disconnected from host.")
+            self._log("Client connection closed.")
 
     def send(self, msg):
         if not self._loop or not self.running or self._ws is None:
@@ -366,7 +379,12 @@ class LANDiscovery:
         self.running = False
         self.scan_thread = None
 
+    def _log(self, msg):
+        if getattr(settings, 'DEBUG_NETWORK', False):
+            print(f"[Discovery] {msg}")
+
     def start_scan(self):
+        self._log("Starting LAN scan...")
         self.running = True
         self.hosts = []
         self.scan_thread = threading.Thread(target=self._scan, daemon=True)
@@ -413,6 +431,7 @@ class LANDiscovery:
                     pass
             reply_port = recv_sock.getsockname()[1]
             payload = f"DISCOVER_REQUEST:{reply_port}".encode()
+            self._log(f"Broadcasting UDP discovery to {targets} (reply to port {reply_port})")
             for _ in range(3):
                 if not self.running:
                     break
@@ -426,12 +445,14 @@ class LANDiscovery:
                     try:
                         data, addr = recv_sock.recvfrom(256)
                         if data == b"DISCOVER_RESPONSE":
+                            self._log(f"Found host via UDP: {addr[0]}")
                             with lock:
                                 if addr[0] not in self.hosts:
                                     self.hosts.append(addr[0])
                     except socket.timeout:
                         pass
-                    except OSError:
+                    except OSError as e:
+                        self._log(f"UDP recv error: {e}")
                         break
             send_sock.close()
             recv_sock.close()
@@ -445,6 +466,7 @@ class LANDiscovery:
                 s.settimeout(0.2)
                 s.connect((ip, self.port))
                 s.close()
+                self._log(f"Found host via TCP: {ip}")
                 with lock:
                     if ip not in self.hosts:
                         self.hosts.append(ip)
