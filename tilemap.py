@@ -10,7 +10,10 @@ import random
 TILE_HOLE = -1       # buraco (sem tile)
 TILE_LOW = 0         # terreno baixo
 TILE_HIGH = 1        # terreno alto
-TILE_STAIRS = 2      # escada (funciona em qualquer direção)
+TILE_STAIRS_UP = 2   # escada subindo (norte)
+TILE_STAIRS_DOWN = 3 # escada descendo (sul)
+TILE_STAIRS_LEFT = 4 # escada esquerda (oeste)
+TILE_STAIRS_RIGHT = 5 # escada direita (leste)
 
 
 class TileMap:
@@ -158,7 +161,7 @@ class MapGenerator:
                 for c in range(1, self.width - 1):
                     if grid[r][c] == TILE_HOLE:
                         continue
-                    counts = {TILE_LOW: 0, TILE_HIGH: 0, TILE_STAIRS: 0}
+                    counts = {TILE_LOW: 0, TILE_HIGH: 0}
                     for dr, dc in self.DIRS:
                         neighbor = grid[r + dr][c + dc]
                         if neighbor in counts:
@@ -224,6 +227,16 @@ class MapGenerator:
                     grid[r][c] = TILE_LOW
 
     def _place_stairs(self, grid):
+        CARDINAL = [(-1, 0), (1, 0), (0, -1), (0, 1)]
+        CARDINAL_NAMES = {(-1, 0): "up", (1, 0): "down", (0, -1): "left", (0, 1): "right"}
+        CARDINAL_TILES = {
+            (-1, 0): TILE_STAIRS_UP,
+            (1, 0): TILE_STAIRS_DOWN,
+            (0, -1): TILE_STAIRS_LEFT,
+            (0, 1): TILE_STAIRS_RIGHT,
+        }
+        ALL_STAIRS = set(CARDINAL_TILES.values())
+
         visited = set()
         for r in range(self.height):
             for c in range(self.width):
@@ -241,24 +254,28 @@ class MapGenerator:
                                     visited.add((nr, nc))
                                     queue.append((nr, nc))
 
-                    border_tiles = []
+                    border_candidates = []
                     for ar, ac in area:
-                        for dr, dc in self.DIRS:
+                        for dr, dc in CARDINAL:
                             nr, nc = ar + dr, ac + dc
                             if 0 <= nr < self.height and 0 <= nc < self.width:
                                 if grid[nr][nc] == TILE_LOW:
-                                    border_tiles.append((ar, ac))
+                                    border_candidates.append((ar, ac, dr, dc))
                                     break
 
-                    random.shuffle(border_tiles)
+                    random.shuffle(border_candidates)
                     placed = 0
-                    for br, bc in border_tiles:
+                    used_positions = set()
+                    for br, bc, dr, dc in border_candidates:
                         if placed >= self.stairs_per_area:
                             break
+                        if (br, bc) in used_positions:
+                            continue
                         if grid[br][bc] == TILE_HIGH:
-                            grid[br][bc] = TILE_STAIRS
+                            grid[br][bc] = CARDINAL_TILES[(dr, dc)]
+                            used_positions.add((br, bc))
                             placed += 1
 
-                    if placed == 0 and border_tiles:
-                        br, bc = border_tiles[0]
-                        grid[br][bc] = TILE_STAIRS
+                    if placed == 0 and border_candidates:
+                        br, bc, dr, dc = border_candidates[0]
+                        grid[br][bc] = CARDINAL_TILES[(dr, dc)]

@@ -2,7 +2,7 @@ import pygame
 
 import settings
 from scenes.scene import Scene
-from tilemap import TileMap, MapGenerator
+from tilemap import TileMap, MapGenerator, TILE_STAIRS_UP, TILE_STAIRS_DOWN, TILE_STAIRS_LEFT, TILE_STAIRS_RIGHT
 
 
 class TilemapScene(Scene):
