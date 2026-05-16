@@ -33,6 +33,7 @@ class MenuScene(Scene):
             (t("menu_multiplayer"), ""),
             (t("menu_how_to"), ""),
             (t("menu_lore"), ""),
+            (t("menu_achievements"), ""),
             (f"{t('menu_language')}: {lang_str}", ""),
             (f"{t('menu_difficulty')}: {diff_str}", ""),
             (f"TTS: {tts_str}", ""),
@@ -61,24 +62,26 @@ class MenuScene(Scene):
         elif self.selected == 3:
             self.game.scene_manager.switch("lore")
         elif self.selected == 4:
+            self.game.scene_manager.switch("achievements")
+        elif self.selected == 5:
             if settings.LANGUAGE == LANG_EN:
                 settings.LANGUAGE = LANG_PT
             else:
                 settings.LANGUAGE = LANG_EN
             self._update_menu_items()
             self._speak_selection()
-        elif self.selected == 5:
+        elif self.selected == 6:
             diffs = [settings.DIFFICULTY_EASY, settings.DIFFICULTY_MEDIUM, settings.DIFFICULTY_HARD]
             curr_idx = diffs.index(settings.DIFFICULTY)
             settings.DIFFICULTY = diffs[(curr_idx + 1) % len(diffs)]
             self._update_menu_items()
             self._speak_selection()
-        elif self.selected == 6:
+        elif self.selected == 7:
             settings.TTS_ENABLED = not settings.TTS_ENABLED
             self.game.tts.enabled = settings.TTS_ENABLED
             self._update_menu_items()
             self._speak_selection()
-        elif self.selected == 7:
+        elif self.selected == 8:
             self.game.running = False
 
     def handle_event(self, event):

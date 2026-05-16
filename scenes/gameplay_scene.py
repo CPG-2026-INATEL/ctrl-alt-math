@@ -63,6 +63,9 @@ class GameplayScene(Scene):
         self.lore_toast = None
         self.players = []
         self.active_player_idx = 0
+        self.player_took_damage_this_room = False
+        self.crits_this_room = 0
+        self.tiles_moved_this_turn = 0
 
     def _is_true_coop(self):
         return bool(self.game.mp_is_multiplayer)
@@ -161,6 +164,7 @@ class GameplayScene(Scene):
         if not player:
             return False
         if player.take_damage(dmg):
+            self.player_took_damage_this_room = True
             self.game.floating_text.add_damage(player.x, player.y, dmg, enemy.last_crit)
             self.game.particles.emit_burst(player.x, player.y, settings.RED, 10, 60, 0.3)
             self.game.screen_shake = 0.15 if enemy.last_crit else 0.1
@@ -202,6 +206,9 @@ class GameplayScene(Scene):
         self.selected_skill = None
         self.turn_log = []
         self.mp_sync_timer = 0
+        self.player_took_damage_this_room = False
+        self.crits_this_room = 0
+        self.tiles_moved_this_turn = 0
 
         if prev_scene and hasattr(prev_scene, "room"):
             room = prev_scene.room
@@ -236,6 +243,7 @@ class GameplayScene(Scene):
 
             if len(self.game.enemies) == 0:
                 self.state = "NO_COMBAT"
+                self._check_victory()
             
             # Speak room narrative
             text = f"{t(room.name)}. {t(room.narrative)}"
@@ -404,6 +412,7 @@ class GameplayScene(Scene):
         self._generate_enemy_intents()
         self.danger_locked = False
         self._save_rewind_state()
+        self.tiles_moved_this_turn = 0
         self.game.sfx.play("wave_start")
         self.game.tts.speak(t("wave_count", wave=self.turn_manager.turn_number), lang=settings.LANGUAGE)
 
@@ -421,12 +430,10 @@ class GameplayScene(Scene):
 
     def _get_player_skill_ids(self):
         skills = []
-        if self.game.skill_tree.is_unlocked("derivada"):
-            skills.append("derivada")
-        if self.game.skill_tree.is_unlocked("bayes"):
-            skills.append("bayes")
-        if self.game.skill_tree.is_unlocked("teoria_jogos"):
-            skills.append("teoria_jogos")
+        st = self.game.skill_tree
+        for sid in ["derivada", "bayes", "teoria_jogos"]:
+            if st.is_unlocked(sid):
+                skills.append(sid)
         return skills
 
     def _leave_no_combat_room(self):
@@ -530,6 +537,7 @@ class GameplayScene(Scene):
             self.state = "RESOLVE_MOVE"
             self.turn_manager.resolve_timer = 0
             anim_path = self._build_anim_path(pc, pr, self.cursor_col, self.cursor_row, extra_blocked=occupied)
+            self.tiles_moved_this_turn = len(anim_path)
             self.game.player.start_move_anim(
                 pc, pr, self.cursor_col, self.cursor_row, self.grid, path=anim_path
             )
@@ -564,10 +572,13 @@ class GameplayScene(Scene):
     def _get_action_cells(self):
         pc = self.game.player.col
         pr = self.game.player.row
+        st = self.game.skill_tree
         if self.selected_skill == "pitagoras":
-            return self.grid.get_cells_in_radius(pc, pr, settings.PITAGORAS_RANGE)
+            radius = st.get_skill_value("pitagoras", "range", settings.PITAGORAS_RANGE)
+            return self.grid.get_cells_in_radius(pc, pr, radius)
         if self.selected_skill == "reflexao":
-            return self.grid.get_cells_in_radius(pc, pr, settings.REFLEXAO_RANGE)
+            radius = st.get_skill_value("reflexao", "range", settings.REFLEXAO_RANGE)
+            return self.grid.get_cells_in_radius(pc, pr, radius)
         return [
             cell for cell in self.grid.get_cells_in_range(pc, pr, settings.BASIC_ATTACK_RANGE)
             if cell != (pc, pr)
@@ -590,7 +601,7 @@ class GameplayScene(Scene):
         if is_self or (not target_enemies and self.selected_skill is None):
             self.turn_manager.player_acted = True
             self.show_action_range = False
-            self.selected_skill = None
+            self.tiles_moved_this_turn = 0
             self.turn_log.append("Wait")
             self._advance_after_player_turn()
             self.game.sfx.play("menu_select")
@@ -857,15 +868,23 @@ class GameplayScene(Scene):
 
         if hit_enemies:
             is_crit = self.game.player.check_crit()
+            st = self.game.skill_tree
+            axioma_bonus = st.get_skill_value("axioma", "damage_bonus", 0)
+            derivada_mult = st.get_skill_value("derivada", "move_damage_mult", 1.0)
+            move_bonus = 1.0 + (derivada_mult - 1.0) * self.tiles_moved_this_turn
+
             for enemy in hit_enemies:
-                base_dmg = self.game.player.base_damage
+                base_dmg = (self.game.player.base_damage + axioma_bonus) * move_bonus
                 if is_crit:
                     dmg = int(base_dmg * settings.PLAYER_CRIT_MULTIPLIER)
                 else:
-                    dmg = base_dmg
+                    dmg = int(base_dmg)
+                
                 dx = abs(enemy.col - pc)
                 dy = abs(enemy.row - pr)
                 dist_formula = f"d={dx}+{dy}={dx+dy}" if dx + dy < 5 else f"|v|={dx+dy}"
+                if self.tiles_moved_this_turn > 0:
+                    dist_formula = f"f'={self.tiles_moved_this_turn} -> " + dist_formula
                 self.game.floating_text.add_formula(
                     enemy.x, enemy.y - 30,
                     dist_formula, settings.YELLOW if not is_crit else settings.GOLD
@@ -878,6 +897,13 @@ class GameplayScene(Scene):
                 self.game.sfx.play("hit")
                 if enemy.dead:
                     self._on_enemy_death(enemy)
+            
+            if is_crit:
+                self.crits_this_room += 1
+                if self.crits_this_room >= 3:
+                    from achievement_manager import AchievementManager
+                    AchievementManager().unlock("crit_thinking", settings.DIFFICULTY)
+            
             self.turn_log.append(f"Attack{' (CRIT!)' if is_crit else ''}")
         else:
             self.game.floating_text.add_miss(self.game.player.x, self.game.player.y)
@@ -903,13 +929,19 @@ class GameplayScene(Scene):
             dx = abs(self.cursor_col - pc)
             dy = abs(self.cursor_row - pr)
             is_crit = self.game.player.check_crit()
+            st = self.game.skill_tree
+            dmg_base = st.get_skill_value("pitagoras", "damage", settings.PITAGORAS_DAMAGE)
+            derivada_mult = st.get_skill_value("derivada", "move_damage_mult", 1.0)
+            move_bonus = 1.0 + (derivada_mult - 1.0) * self.tiles_moved_this_turn
+            
             self.game.floating_text.add_formula(
                 self.game.player.x, self.game.player.y - 30,
                 f"a^2+b^2=c^2  ({dx}^2+{dy}^2={dx*dx+dy*dy})",
                 settings.GOLD if is_crit else settings.YELLOW
             )
             if not self.grid.is_level_change(pc, pr, target_enemy.col, target_enemy.row):
-                dmg = int(settings.PITAGORAS_DAMAGE * settings.PLAYER_CRIT_MULTIPLIER) if is_crit else settings.PITAGORAS_DAMAGE
+                dmg = int(dmg_base * move_bonus)
+                if is_crit: dmg = int(dmg * settings.PLAYER_CRIT_MULTIPLIER)
                 target_enemy.take_damage(dmg)
                 self.game.floating_text.add_enemy_damage(target_enemy.x, target_enemy.y, dmg, is_crit)
                 self.game.particles.emit_burst(target_enemy.x, target_enemy.y, settings.YELLOW, 12, 80, 0.4)
@@ -921,6 +953,13 @@ class GameplayScene(Scene):
                     self._on_enemy_death(target_enemy)
             else:
                 self.game.floating_text.add_evasion(target_enemy.x, target_enemy.y)
+            
+            if is_crit:
+                self.crits_this_room += 1
+                if self.crits_this_room >= 3:
+                    from achievement_manager import AchievementManager
+                    AchievementManager().unlock("crit_thinking", settings.DIFFICULTY)
+
             self.turn_log.append(f"Pitagoras{' (CRIT!)' if is_crit else ''}" if hit else "Pitagoras Miss")
             self.game.sfx.play("pitagoras")
 
@@ -929,22 +968,35 @@ class GameplayScene(Scene):
                 return False
             
             # Area damage
-            target_cells = self.grid.get_cells_in_radius(pc, pr, settings.REFLEXAO_RANGE)
+            st = self.game.skill_tree
+            radius = st.get_skill_value("reflexao", "range", settings.REFLEXAO_RANGE)
+            target_cells = self.grid.get_cells_in_radius(pc, pr, radius)
             hit_count = 0
-            dmg = settings.REFLEXAO_DAMAGE
+            dmg_base = st.get_skill_value("reflexao", "damage", settings.REFLEXAO_DAMAGE)
+            derivada_mult = st.get_skill_value("derivada", "move_damage_mult", 1.0)
+            move_bonus = 1.0 + (derivada_mult - 1.0) * self.tiles_moved_this_turn
+            
             is_crit = self.game.player.check_crit()
+            dmg = int(dmg_base * move_bonus)
             if is_crit: 
                 dmg = int(dmg * settings.PLAYER_CRIT_MULTIPLIER)
             
             for enemy in self.game.enemies:
                 if not enemy.dead and (enemy.col, enemy.row) in target_cells:
                     enemy.take_damage(dmg)
+                    self.game.floating_text.add_formula(enemy.x, enemy.y - 30, "theta_i=theta_r", settings.CYAN)
                     self.game.floating_text.add_enemy_damage(enemy.x, enemy.y, dmg, is_crit)
                     self.game.particles.emit_burst(enemy.x, enemy.y, settings.CYAN, 8, 60, 0.3)
                     hit_count += 1
                     if enemy.dead:
                         self._on_enemy_death(enemy)
             
+            if is_crit:
+                self.crits_this_room += 1
+                if self.crits_this_room >= 3:
+                    from achievement_manager import AchievementManager
+                    AchievementManager().unlock("crit_thinking", settings.DIFFICULTY)
+
             # Effects
             self.game.particles.emit_burst(
                 self.game.player.x, self.game.player.y, settings.CYAN, 30, 120, 0.5
@@ -982,7 +1034,7 @@ class GameplayScene(Scene):
         elif enemy.type == "strawman": exp_reward = settings.ENEMY_EXP_STRAWMAN
         elif enemy.type == "bayesian": exp_reward = settings.ENEMY_EXP_BAYESIAN
         elif enemy.type == "boss": exp_reward = settings.ENEMY_EXP_BOSS
-        
+
         if self.game.player.add_exp(exp_reward):
             self.game.floating_text.add_info(self.game.player.x, self.game.player.y - 60,
                                             f"LEVEL UP! ({self.game.player.level})", settings.GOLD)
@@ -999,11 +1051,23 @@ class GameplayScene(Scene):
             pos = self.last_enemy_death_pos or (self.game.player.x, self.game.player.y)
             self.game.particles.emit_burst(pos[0], pos[1], settings.GOLD, 30, 100, 0.8)
             
-            # Award Skill Point per wave/room completion
-            self.game.skill_tree.add_points(1)
             self.game.floating_text.add_info(pos[0], pos[1] - 40, 
                                             t("earned_skill_point"), settings.GOLD)
             self.game.tts.speak(t("earned_skill_point"), lang=settings.LANGUAGE)
+            self.game.skill_tree.add_points(1)
+
+            from achievement_manager import AchievementManager
+            mgr = AchievementManager()
+            mgr.unlock("first_room", settings.DIFFICULTY)
+            
+            if not self.player_took_damage_this_room:
+                mgr.unlock("no_damage", settings.DIFFICULTY)
+            
+            if self.turn_manager.turn_number < 10:
+                mgr.unlock("fast_win", settings.DIFFICULTY)
+                
+            if self.game.current_room and (self.game.current_room.type == "victory" or getattr(self.game.current_room, "is_final_gate", False)):
+                mgr.unlock("math_god", settings.DIFFICULTY)
 
     def _start_enemy_turn(self):
         if self.state == "VICTORY_TRANSITION":
@@ -1575,6 +1639,7 @@ class GameplayScene(Scene):
             "enemies": self.game.enemies,
             "entropy": self.game.entropy,
             "barrier_cells": self.grid.barrier_cells.copy(),
+            "player_obj": self.game.player,
         }
 
     def _save_rewind_state(self):

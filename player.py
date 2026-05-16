@@ -29,6 +29,8 @@ class Player:
 
         self.invulnerable = 0
         self.flash_timer = 0
+        self.pitagoras_cooldown = 0
+        self.reflexao_cooldown = 0
 
         self.glow_phase = 0
         self.trail = []
@@ -187,15 +189,15 @@ class Player:
                 self.x, self.y = grid.to_pixel(self.col, self.row)
 
     def update(self, dt, keys):
-        self.attack_cooldown = max(0, getattr(self, 'attack_cooldown', 0) - dt)
-        self.pitagoras_cooldown = max(0, getattr(self, 'pitagoras_cooldown', 0) - dt)
-        self.reflexao_cooldown = max(0, getattr(self, 'reflexao_cooldown', 0) - dt)
-
         self.invulnerable = max(0, self.invulnerable - dt)
         self.flash_timer = max(0, self.flash_timer - dt)
-
-        
         self.glow_phase += dt * 4
+
+    def decrement_cooldowns(self):
+        self.pitagoras_cooldown = getattr(self, 'pitagoras_cooldown', 0)
+        self.reflexao_cooldown = getattr(self, 'reflexao_cooldown', 0)
+        self.pitagoras_cooldown = max(0, self.pitagoras_cooldown - 1)
+        self.reflexao_cooldown = max(0, self.reflexao_cooldown - 1)
 
     def add_exp(self, amount):
         self.exp += amount
@@ -226,7 +228,7 @@ class Player:
         if self.rigor < settings.PITAGORAS_RIGOR_COST:
             return False
         self.rigor -= settings.PITAGORAS_RIGOR_COST
-        self.pitagoras_cooldown = 1.0
+        self.pitagoras_cooldown = 1
         return True
 
     def reflexao_attack(self):
@@ -235,7 +237,7 @@ class Player:
         if self.rigor < settings.REFLEXAO_RIGOR_COST:
             return False
         self.rigor -= settings.REFLEXAO_RIGOR_COST
-        self.reflexao_cooldown = 2.0
+        self.reflexao_cooldown = 3
         return True
 
     def take_damage(self, amount):

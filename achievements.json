@@ -1,0 +1,32 @@
+{
+    "first_room": {
+        "easy": true,
+        "medium": false,
+        "hard": true
+    },
+    "no_damage": {
+        "easy": false,
+        "medium": false,
+        "hard": false
+    },
+    "fast_win": {
+        "easy": true,
+        "medium": false,
+        "hard": false
+    },
+    "skill_master": {
+        "easy": false,
+        "medium": false,
+        "hard": false
+    },
+    "crit_thinking": {
+        "easy": false,
+        "medium": false,
+        "hard": false
+    },
+    "math_god": {
+        "easy": true,
+        "medium": false,
+        "hard": false
+    }
+}

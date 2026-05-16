@@ -24,6 +24,7 @@ from scenes.victory_scene import VictoryScene
 from scenes.map_scene import MapScene
 from scenes.lore_scene import LoreScene
 from scenes.lobby_scene import LobbyScene
+from scenes.achievement_scene import AchievementScene
 
 
 class Game:
@@ -40,6 +41,9 @@ class Game:
         self.tts = TTSManager()
 
         self._init_shared_state()
+        
+        from achievement_manager import AchievementManager
+        AchievementManager().ui = self.ui
 
         self.scene_manager = SceneManager(self)
         self.scene_manager.add("menu", MenuScene)
@@ -52,6 +56,7 @@ class Game:
         self.scene_manager.add("tilemap", TilemapScene)
         self.scene_manager.add("lore", LoreScene)
         self.scene_manager.add("lobby", LobbyScene)
+        self.scene_manager.add("achievements", AchievementScene)
         self.scene_manager.switch("menu")
 
     def _configure_display(self):
@@ -238,6 +243,15 @@ class Game:
                 self.screen.fill(self.math_bg.get_bg_color())
                 if self.scene_manager.current:
                     self.scene_manager.current.draw(self.screen)
+                
+                # Global UI overlays
+                if self.ui.achievement_queue:
+                    toast = self.ui.achievement_queue[0]
+                    toast.update(dt)
+                    self.ui.draw_achievement_notification(self.screen, toast)
+                    if toast.is_dead():
+                        self.ui.achievement_queue.pop(0)
+                
                 pygame.display.flip()
             else:
                 pygame.time.delay(10)
