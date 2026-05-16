@@ -107,6 +107,9 @@ class WorldMap:
         self.avatar_x = start_room.rect.centerx
         self.avatar_y = start_room.rect.top + 20
 
+        # Multiplayer: list of {x, y, label, color, player} for remote avatars
+        self.mp_avatars = []
+
     def update(self, dt, player=None):
         self.anim_timer += dt
         for room in self.rooms.values():
@@ -204,7 +207,11 @@ class WorldMap:
                 return False
         return True
 
-    def draw(self, screen, player=None):
+    def draw(self, screen, player=None, mp_info=None):
+        """Draw the world map.
+        mp_info: list of dicts with keys 'x', 'y', 'label', 'color', 'player'
+                 for remote players to render on top of the map.
+        """
         screen.fill(settings.DARK_BLUE)
 
         title_y = int(30 * settings.UI_SCALE)
@@ -276,6 +283,11 @@ class WorldMap:
             draw_text(screen, t("unknown"),
                      (settings.WINDOW_WIDTH // 2, info_text_y),
                      settings.GRAY, 16)
+
+        # Draw remote player avatars (multiplayer)
+        if mp_info:
+            for info in mp_info:
+                self._draw_mp_avatar(screen, info, avatar_size, bob_y)
 
         draw_text(screen, t("map_footer"),
                  (settings.WINDOW_WIDTH // 2, settings.WINDOW_HEIGHT - 15),
@@ -351,3 +363,36 @@ class WorldMap:
         if room.type == "victory":
             return "V"
         return "O"
+
+    def _draw_mp_avatar(self, screen, info, avatar_size, bob_y):
+        """Draw a remote player avatar with a colored label."""
+        ax = info.get("x", 0)
+        ay = info.get("y", 0) + bob_y
+        label = info.get("label", "P2")
+        color = info.get("color", settings.GOLD)
+        remote_player = info.get("player")
+
+        # Draw the sprite or a fallback colored square (only for remote players)
+        if remote_player is not None:
+            sprite = remote_player.get_current_sprite()
+            if sprite:
+                if remote_player.dir_x < 0:
+                    sprite = pygame.transform.flip(sprite, True, False)
+                sprite = pygame.transform.scale(sprite, (avatar_size, avatar_size))
+                screen.blit(sprite, (ax - avatar_size // 2, ay - avatar_size // 2))
+            else:
+                pygame.draw.rect(screen, color,
+                                 (ax - avatar_size // 2, ay - avatar_size // 2, avatar_size, avatar_size))
+                pygame.draw.rect(screen, settings.WHITE,
+                                 (ax - avatar_size // 2, ay - avatar_size // 2, avatar_size, avatar_size), 1)
+        # If player is None it means this is the local player — already drawn, just add the badge.
+
+        # Draw label badge above the avatar
+        font = pygame.font.Font(None, 20)
+        tag = font.render(label, True, settings.BLACK)
+        badge_w = tag.get_width() + 8
+        badge_h = tag.get_height() + 4
+        badge_x = ax - badge_w // 2
+        badge_y = ay - avatar_size // 2 - badge_h - 3
+        pygame.draw.rect(screen, color, (badge_x, badge_y, badge_w, badge_h), border_radius=4)
+        screen.blit(tag, (badge_x + 4, badge_y + 2))

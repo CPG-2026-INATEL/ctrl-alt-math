@@ -30,6 +30,8 @@ class NetworkHost:
         self.running = True
         self.accept_thread = threading.Thread(target=self._accept_loop, daemon=True)
         self.accept_thread.start()
+        self.discovery_thread = threading.Thread(target=self._discovery_loop, daemon=True)
+        self.discovery_thread.start()
 
     def _accept_loop(self):
         while self.running:
@@ -49,6 +51,26 @@ class NetworkHost:
                 continue
             except OSError:
                 break
+
+    def _discovery_loop(self):
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        try:
+            sock.bind(("", settings.LAN_DISCOVERY_PORT))
+        except OSError:
+            return
+
+        sock.settimeout(1.0)
+        while self.running:
+            try:
+                data, addr = sock.recvfrom(1024)
+                if data == b"DISCOVER_REQUEST":
+                    sock.sendto(b"DISCOVER_RESPONSE", addr)
+            except socket.timeout:
+                continue
+            except OSError:
+                break
+        sock.close()
 
     def _recv_loop(self, conn, cid):
         buf = ""
@@ -214,22 +236,38 @@ class LANDiscovery:
         self.scan_thread.start()
 
     def _scan(self):
-        local_ip = self._get_local_ip()
-        prefix = ".".join(local_ip.split(".")[:3])
-        for i in range(1, 255):
-            if not self.running:
-                break
-            ip = f"{prefix}.{i}"
-            if ip == local_ip:
-                continue
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        sock.settimeout(1.0)
+        
+        # Try a few times to account for packet loss
+        for _ in range(3):
+            if not self.running: break
             try:
-                s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                s.settimeout(0.1)
-                s.connect((ip, self.port))
-                s.close()
-                self.hosts.append(ip)
-            except (socket.timeout, ConnectionError, OSError):
-                continue
+                sock.sendto(b"DISCOVER_REQUEST", ("<broadcast>", settings.LAN_DISCOVERY_PORT))
+            except OSError:
+                # If broadcast fails, try the common subnet
+                try:
+                    local_ip = self._get_local_ip()
+                    prefix = ".".join(local_ip.split(".")[:3])
+                    sock.sendto(b"DISCOVER_REQUEST", (f"{prefix}.255", settings.LAN_DISCOVERY_PORT))
+                except OSError:
+                    pass
+            
+            # Collect responses
+            start_time = time.time()
+            while time.time() - start_time < 0.5:
+                try:
+                    data, addr = sock.recvfrom(1024)
+                    if data == b"DISCOVER_RESPONSE":
+                        if addr[0] not in self.hosts:
+                            self.hosts.append(addr[0])
+                except socket.timeout:
+                    break
+                except OSError:
+                    break
+        sock.close()
 
     def stop_scan(self):
         self.running = False

@@ -33,6 +33,7 @@ class LobbyScene(Scene):
         self.selected_option = 0
         self.ip_input = ""
         self.ip_editing = False
+        self._start_delay = 0.0  # timer to delay host scene switch after broadcast
 
     def enter(self, prev_scene=None):
         self.mode = "choose"
@@ -42,6 +43,7 @@ class LobbyScene(Scene):
         self.ip_input = ""
         self.ip_editing = False
         self.scan_hosts = []
+        self._start_delay = 0.0
 
     def _start_host(self):
         self.host = NetworkHost()
@@ -90,16 +92,33 @@ class LobbyScene(Scene):
 
     def _start_game(self):
         if self.host:
+            # Broadcast difficulty + seed so client uses same settings
             self.host.broadcast({
                 "type": "start_game",
                 "seed": int(pygame.time.get_ticks()),
+                "difficulty": settings.DIFFICULTY,
             })
-        self.game.mp_host = self.host
-        self.game.mp_client = self.client
-        self.game.mp_player_index = self.player_index
-        self.game.mp_is_multiplayer = True
+            self._start_delay = 0.25  # wait 250ms before switching
+        else:
+            # Client: transition immediately (driven by server message)
+            self._do_enter_game()
+
+    def _do_enter_game(self, difficulty=None):
+        # Apply host difficulty on client side
+        if difficulty:
+            settings.DIFFICULTY = difficulty
+        # Save mp references before reset wipes them
+        mp_host = self.host
+        mp_client = self.client
+        mp_player_index = self.player_index
         self.game.reset_game_state()
-        self.game.scene_manager.switch("gameplay")
+        # Restore mp references after reset
+        self.game.mp_host = mp_host
+        self.game.mp_client = mp_client
+        self.game.mp_player_index = mp_player_index
+        self.game.mp_is_multiplayer = True
+        # Go to the map so the normal room-selection flow works
+        self.game.scene_manager.switch("map")
 
     def handle_event(self, event):
         if event.type != pygame.KEYDOWN:
@@ -129,14 +148,9 @@ class LobbyScene(Scene):
                     self.host = None
                 self.mode = "choose"
                 self.status = ""
-            # Check for client connections
-            if self.host:
-                msgs = self.host.poll()
-                for msg in msgs:
-                    if msg.get("type") == "client_ready":
-                        self.connected = True
-                        self.status = t("lobby_player_joined")
-                        self.status_color = settings.GREEN
+            if event.key in (pygame.K_RETURN, pygame.K_SPACE):
+                if self.connected:
+                    self._start_game()
 
         elif self.mode == "join":
             if event.key == pygame.K_ESCAPE:
@@ -169,7 +183,8 @@ class LobbyScene(Scene):
             if event.key in (pygame.K_RETURN, pygame.K_SPACE):
                 if self.client:
                     self.client.send({"type": "client_ready"})
-                self._start_game()
+                    self.status = t("lobby_waiting_host")
+                    self.status_color = settings.YELLOW
             elif event.key == pygame.K_ESCAPE:
                 if self.client:
                     self.client.disconnect()
@@ -179,6 +194,13 @@ class LobbyScene(Scene):
                 self.status = ""
 
     def update(self, dt):
+        # Host: handle delayed scene switch so broadcast packet is flushed first
+        if self._start_delay > 0:
+            self._start_delay -= dt
+            if self._start_delay <= 0:
+                self._do_enter_game()
+            return
+
         if self.host:
             msgs = self.host.poll()
             for msg in msgs:
@@ -186,34 +208,24 @@ class LobbyScene(Scene):
                     self.connected = True
                     self.status = t("lobby_player_joined")
                     self.status_color = settings.GREEN
-                elif msg.get("type") == "start_game":
-                    self.game.mp_host = self.host
-                    self.game.mp_client = None
-                    self.game.mp_player_index = self.player_index
-                    self.game.mp_is_multiplayer = True
-                    self.game.reset_game_state()
-                    self.game.scene_manager.switch("gameplay")
 
         if self.client:
             msgs = self.client.poll()
             for msg in msgs:
                 if msg.get("type") == "start_game":
-                    self.game.mp_client = self.client
-                    self.game.mp_host = None
-                    self.game.mp_player_index = self.player_index
-                    self.game.mp_is_multiplayer = True
-                    self.game.reset_game_state()
-                    self.game.scene_manager.switch("gameplay")
+                    difficulty = msg.get("difficulty")
+                    self._do_enter_game(difficulty=difficulty)
 
-        if self.discovery and self.discovery.scan_thread and not self.discovery.scan_thread.is_alive():
+        if self.discovery:
             self.scan_hosts = list(set(self.discovery.hosts))
-            self.discovery = None
-            if self.scan_hosts:
-                self.status = t("lobby_found", n=len(self.scan_hosts))
-                self.status_color = settings.GREEN
-            else:
-                self.status = t("lobby_no_hosts")
-                self.status_color = settings.RED
+            if self.discovery.scan_thread and not self.discovery.scan_thread.is_alive():
+                self.discovery = None
+                if self.scan_hosts:
+                    self.status = t("lobby_found", n=len(self.scan_hosts))
+                    self.status_color = settings.GREEN
+                else:
+                    self.status = t("lobby_no_hosts")
+                    self.status_color = settings.RED
 
     def draw(self, screen):
         overlay = pygame.Surface((settings.WINDOW_WIDTH, settings.WINDOW_HEIGHT))
