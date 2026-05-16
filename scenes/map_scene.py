@@ -28,11 +28,8 @@ class MapScene(Scene):
         room = self.game.world_map.select_room()
         if not room:
             return
-        if room.type == "victory":
-            self.game.scene_manager.switch("victory")
-        else:
-            self.room = room
-            self.game.scene_manager.switch("gameplay")
+        self.room = room
+        self.game.scene_manager.switch("gameplay")
         self.game.sfx.play("menu_confirm")
 
     def handle_event(self, event):
