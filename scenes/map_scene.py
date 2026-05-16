@@ -1,5 +1,7 @@
 import pygame
 
+import settings
+from i18n import t
 from scenes.scene import Scene
 
 
@@ -10,6 +12,17 @@ class MapScene(Scene):
 
     def enter(self, prev_scene=None):
         self.room = None
+        self._speak_room()
+
+    def _speak_room(self):
+        room_pos = self.game.world_map.player_room
+        room = self.game.world_map.rooms.get(room_pos)
+        if room:
+            if room.state != "locked":
+                text = f"{t(room.name)}. {t(room.narrative)}"
+            else:
+                text = t("unknown")
+            self.game.tts.speak(text, lang=settings.LANGUAGE)
 
     def _enter_selected_room(self):
         room = self.game.world_map.select_room()
@@ -35,18 +48,36 @@ class MapScene(Scene):
         if event.type != pygame.KEYDOWN:
             return
 
+        mods = pygame.key.get_mods()
+        if (mods & pygame.KMOD_CTRL) and (mods & pygame.KMOD_ALT):
+            self.game.player.toggle_skin()
+            skin_name = self.game.player.skin_names[self.game.player.skin_index]
+            # Use self.avatar_x/y from world_map for floating text position
+            self.game.floating_text.add_info(
+                self.game.world_map.avatar_x, 
+                self.game.world_map.avatar_y - 40,
+                t("class_label", name=skin_name), 
+                settings.CYAN
+            )
+            self.game.sfx.play("menu_select")
+            return
+
         if event.key == pygame.K_UP:
-            self.game.world_map.navigate("up")
-            self.game.sfx.play("menu_select")
+            if self.game.world_map.navigate("up"):
+                self.game.sfx.play("menu_select")
+                self._speak_room()
         elif event.key == pygame.K_DOWN:
-            self.game.world_map.navigate("down")
-            self.game.sfx.play("menu_select")
+            if self.game.world_map.navigate("down"):
+                self.game.sfx.play("menu_select")
+                self._speak_room()
         elif event.key == pygame.K_LEFT:
-            self.game.world_map.navigate("left")
-            self.game.sfx.play("menu_select")
+            if self.game.world_map.navigate("left"):
+                self.game.sfx.play("menu_select")
+                self._speak_room()
         elif event.key == pygame.K_RIGHT:
-            self.game.world_map.navigate("right")
-            self.game.sfx.play("menu_select")
+            if self.game.world_map.navigate("right"):
+                self.game.sfx.play("menu_select")
+                self._speak_room()
         elif event.key == pygame.K_RETURN:
             self._enter_selected_room()
         elif event.key == pygame.K_ESCAPE:
@@ -54,7 +85,9 @@ class MapScene(Scene):
             self.game.scene_manager.switch("menu")
 
     def update(self, dt):
-        self.game.world_map.update(dt)
+        self.game.world_map.update(dt, self.game.player)
+        self.game.floating_text.update(dt)
 
     def draw(self, screen):
-        self.game.world_map.draw(screen)
+        self.game.world_map.draw(screen, self.game.player)
+        self.game.floating_text.draw(screen)

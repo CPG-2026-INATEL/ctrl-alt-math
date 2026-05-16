@@ -2,6 +2,7 @@ import pygame
 import math
 
 import settings
+from i18n import t
 
 
 class FloatingText:
@@ -77,14 +78,14 @@ class FloatingTextSystem:
     def add_damage(self, x, y, amount, crit=False):
         if crit:
             self.add(x, y - 15, f"-{amount}", settings.GOLD, 24, 1.2, bounce=True, shadow=True)
-            self.add(x + 15, y - 25, "CRIT!", settings.GOLD, 14, 0.8, bounce=True, shadow=False)
+            self.add(x + 15, y - 25, t("crit"), settings.GOLD, 14, 0.8, bounce=True, shadow=False)
         else:
             self.add(x, y - 10, f"-{amount}", settings.RED, 18, 0.9, bounce=True, shadow=True)
 
     def add_enemy_damage(self, x, y, amount, crit=False):
         if crit:
             self.add(x, y - 15, f"-{amount}", settings.YELLOW, 26, 1.2, bounce=True, shadow=True)
-            self.add(x + 15, y - 28, "CRIT!", settings.YELLOW, 14, 0.8, bounce=True, shadow=False)
+            self.add(x + 15, y - 28, t("crit"), settings.YELLOW, 14, 0.8, bounce=True, shadow=False)
         else:
             self.add(x, y - 10, f"-{amount}", settings.WHITE, 18, 0.9, bounce=True, shadow=True)
 
@@ -101,13 +102,13 @@ class FloatingTextSystem:
         self.add(x, y + 5, text, color, 16, 1.5, bounce=False, shadow=True)
 
     def add_miss(self, x, y):
-        self.add(x, y - 10, "MISS", settings.GRAY, 16, 0.7, bounce=True, shadow=False)
+        self.add(x, y - 10, t("miss"), settings.GRAY, 16, 0.7, bounce=True, shadow=False)
 
     def add_blocked(self, x, y):
-        self.add(x, y - 10, "BLOCKED", settings.LIGHT_GRAY, 14, 0.7, bounce=True, shadow=False)
+        self.add(x, y - 10, t("blocked"), settings.LIGHT_GRAY, 14, 0.7, bounce=True, shadow=False)
 
     def add_evasion(self, x, y):
-        self.add(x, y - 10, "NO HIT", settings.PURPLE, 14, 0.7, bounce=True, shadow=False)
+        self.add(x, y - 10, t("no_hit"), settings.PURPLE, 14, 0.7, bounce=True, shadow=False)
 
     def update(self, dt):
         for t in self.texts:

@@ -3,6 +3,9 @@ import pygame
 WINDOW_WIDTH = 800
 WINDOW_HEIGHT = 600
 FPS = 60
+LANGUAGE = "en"
+TTS_ENABLED = True
+TTS_RATE = 170
 
 BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
@@ -21,6 +24,9 @@ DARK_BLUE = (10, 10, 40)
 DARK_RED = (60, 10, 10)
 TEAL = (0, 128, 128)
 GOLD = (255, 215, 0)
+MAGENTA = (255, 0, 255)
+BROWN = (150, 75, 0)
+NAVY = (0, 0, 128)
 
 PLAYER_SIZE = 14
 PLAYER_SPEED = 220
@@ -118,27 +124,27 @@ ARENA_OBSTACLES = [
 WAVES = [
     {
         "enemies": [("censor", 1)],
-        "narrative": "Mathematics is forbidden.\nBut reality still obeys it.",
-        "post_narrative": "You recover a lost axiom\nfrom a censored archive."
+        "narrative": "wave_1_narr",
+        "post_narrative": "wave_1_post"
     },
     {
         "enemies": [("censor", 2)],
-        "narrative": "The regime sends more censors.\nThey cannot erase what is proven.",
-        "post_narrative": "Derivatives and integrals\nwhisper in the static."
+        "narrative": "wave_2_narr",
+        "post_narrative": "wave_2_post"
     },
     {
         "enemies": [("censor", 1), ("strawman", 1)],
-        "narrative": "Rhetorical tricksters enter the field.\nThey distort your theorems.",
-        "post_narrative": "You see through their\nlogical fallacies."
+        "narrative": "wave_3_narr",
+        "post_narrative": "wave_3_post"
     },
     {
         "enemies": [("censor", 1), ("strawman", 1), ("bayesian", 1)],
-        "narrative": "An Inquisidor Bayesiano joins.\nIt calculates your every move.",
-        "post_narrative": "Probability bends to your will.\nThe end approaches."
+        "narrative": "wave_4_narr",
+        "post_narrative": "wave_4_post"
     },
     {
         "enemies": [("boss", 1)],
-        "narrative": "O Grande Simplificador approaches.\nIt wants to reduce all thought\nto one dimension.",
+        "narrative": "wave_5_narr",
         "post_narrative": ""
     },
 ]
@@ -146,8 +152,8 @@ WAVES = [
 SKILL_TREE_DATA = [
     {
         "id": "axioma",
-        "name": "Axioma B\u00e1sico",
-        "desc": "The foundation of all\nmathematical thought.\nforall x: f(x) = f(x)",
+        "name": "skill_axioma_name",
+        "desc": "skill_axioma_desc",
         "cost": 0,
         "prereqs": [],
         "x": 400, "y": 60,
@@ -155,8 +161,8 @@ SKILL_TREE_DATA = [
     },
     {
         "id": "derivada",
-        "name": "Derivada",
-        "desc": "Predict enemy movement.\ndf/dx shows the\ndirection of change.",
+        "name": "skill_derivada_name",
+        "desc": "skill_derivada_desc",
         "cost": 1,
         "prereqs": ["axioma"],
         "x": 200, "y": 160,
@@ -164,8 +170,8 @@ SKILL_TREE_DATA = [
     },
     {
         "id": "pitagoras",
-        "name": "Pit\u00e1goras",
-        "desc": "Geometric attack (r<=3).\nd = sqrt(dx^2+dy^2)\nDeals 25 damage.",
+        "name": "skill_pitagoras_name",
+        "desc": "skill_pitagoras_desc",
         "cost": 1,
         "prereqs": ["axioma"],
         "x": 400, "y": 160,
@@ -173,8 +179,8 @@ SKILL_TREE_DATA = [
     },
     {
         "id": "ctrlz",
-        "name": "Ctrl+Z",
-        "desc": "Rewind 2 turns back.\nR^-1: undo(R) -> R^-2\nPress R to undo.",
+        "name": "skill_ctrlz_name",
+        "desc": "skill_ctrlz_desc",
         "cost": 1,
         "prereqs": ["axioma"],
         "x": 600, "y": 160,
@@ -182,8 +188,8 @@ SKILL_TREE_DATA = [
     },
     {
         "id": "bayes",
-        "name": "Bayes",
-        "desc": "Improved prediction.\nP(A|B) = P(B|A)\n* P(A) / P(B)",
+        "name": "skill_bayes_name",
+        "desc": "skill_bayes_desc",
         "cost": 2,
         "prereqs": ["derivada"],
         "x": 200, "y": 280,
@@ -191,8 +197,8 @@ SKILL_TREE_DATA = [
     },
     {
         "id": "reflexao",
-        "name": "Reflex\u00e3o",
-        "desc": "Barrier cells block enemies.\ntheta_i=theta_r: reflection\nsymmetry. Press 2.",
+        "name": "skill_reflexao_name",
+        "desc": "skill_reflexao_desc",
         "cost": 2,
         "prereqs": ["pitagoras"],
         "x": 400, "y": 280,
@@ -200,8 +206,8 @@ SKILL_TREE_DATA = [
     },
     {
         "id": "entropia",
-        "name": "Entropia Controlada",
-        "desc": "Reduce entropy gain\nfrom rewinding.\ndS -> 0",
+        "name": "skill_entropia_name",
+        "desc": "skill_entropia_desc",
         "cost": 2,
         "prereqs": ["ctrlz"],
         "x": 600, "y": 280,
@@ -209,8 +215,8 @@ SKILL_TREE_DATA = [
     },
     {
         "id": "teoria_jogos",
-        "name": "Teoria dos Jogos",
-        "desc": "Reveal enemy targets.\nNash equilibrium:\nno regrets strategy.",
+        "name": "skill_teoria_jogos_name",
+        "desc": "skill_teoria_jogos_desc",
         "cost": 3,
         "prereqs": ["bayes"],
         "x": 200, "y": 400,
@@ -236,16 +242,16 @@ MAP_OFFSET_Y = 80
 MAP_ROOMS = {
     (2, 1): {
         "type": "hub",
-        "name": "The Archive",
-        "narrative": "A safe haven where forbidden knowledge persists.",
+        "name": "room_archive_name",
+        "narrative": "room_archive_narr",
         "connections": [(1, 1), (3, 1), (2, 0), (2, 2)],
         "enemies": [],
         "obstacles": [],
     },
     (1, 1): {
         "type": "normal",
-        "name": "Censored Library",
-        "narrative": "Books burn themselves as you enter.",
+        "name": "room_library_name",
+        "narrative": "room_library_narr",
         "connections": [(2, 1), (0, 1), (1, 0)],
         "enemies": [("censor", 2)],
         "obstacles": [
@@ -255,8 +261,8 @@ MAP_ROOMS = {
     },
     (3, 1): {
         "type": "normal",
-        "name": "Logic Chamber",
-        "narrative": "Every argument here must be proven.",
+        "name": "room_logic_name",
+        "narrative": "room_logic_narr",
         "connections": [(2, 1), (4, 1), (3, 2)],
         "enemies": [("censor", 1), ("strawman", 1)],
         "obstacles": [
@@ -266,8 +272,8 @@ MAP_ROOMS = {
     },
     (2, 0): {
         "type": "normal",
-        "name": "Proof Gallery",
-        "narrative": "Theorems hang on walls like paintings.",
+        "name": "room_gallery_name",
+        "narrative": "room_gallery_narr",
         "connections": [(2, 1), (1, 0), (3, 0)],
         "enemies": [("censor", 1), ("strawman", 2)],
         "obstacles": [
@@ -277,8 +283,8 @@ MAP_ROOMS = {
     },
     (2, 2): {
         "type": "normal",
-        "name": "Derivative Hall",
-        "narrative": "Rates of change echo through corridors.",
+        "name": "room_hall_name",
+        "narrative": "room_hall_narr",
         "connections": [(2, 1), (1, 2), (3, 2)],
         "enemies": [("censor", 2), ("strawman", 1)],
         "obstacles": [
@@ -288,8 +294,8 @@ MAP_ROOMS = {
     },
     (0, 1): {
         "type": "challenge",
-        "name": "Fallacy Maze",
-        "narrative": "Every path leads to a logical trap.",
+        "name": "room_maze_name",
+        "narrative": "room_maze_narr",
         "connections": [(1, 1), (0, 0)],
         "enemies": [("censor", 2), ("strawman", 2)],
         "obstacles": [
@@ -300,8 +306,8 @@ MAP_ROOMS = {
     },
     (1, 0): {
         "type": "challenge",
-        "name": "Induction Tower",
-        "narrative": "Prove the base case to ascend.",
+        "name": "room_tower_name",
+        "narrative": "room_tower_narr",
         "connections": [(2, 0), (0, 1)],
         "enemies": [("censor", 1), ("strawman", 1), ("bayesian", 1)],
         "obstacles": [
@@ -311,8 +317,8 @@ MAP_ROOMS = {
     },
     (1, 2): {
         "type": "challenge",
-        "name": "Probability Dungeon",
-        "narrative": "Bayesian inference is your only light.",
+        "name": "room_dungeon_name",
+        "narrative": "room_dungeon_narr",
         "connections": [(2, 2), (0, 2)],
         "enemies": [("censor", 1), ("bayesian", 2)],
         "obstacles": [
@@ -322,8 +328,8 @@ MAP_ROOMS = {
     },
     (0, 0): {
         "type": "boss",
-        "name": "The Censor General",
-        "narrative": "The head of all censorship awaits.",
+        "name": "room_boss_censor_name",
+        "narrative": "room_boss_censor_narr",
         "connections": [(0, 1)],
         "enemies": [("boss", 1)],
         "obstacles": [
@@ -335,8 +341,8 @@ MAP_ROOMS = {
     },
     (3, 0): {
         "type": "boss",
-        "name": "The Reduction Engine",
-        "narrative": "It reduces complexity to nothing.",
+        "name": "room_boss_engine_name",
+        "narrative": "room_boss_engine_narr",
         "connections": [(2, 0), (4, 0)],
         "enemies": [("boss", 1)],
         "obstacles": [
@@ -347,8 +353,8 @@ MAP_ROOMS = {
     },
     (4, 1): {
         "type": "boss",
-        "name": "O Grande Simplificador",
-        "narrative": "The final boss. It wants one-dimensional thought.",
+        "name": "room_boss_final_name",
+        "narrative": "room_boss_final_narr",
         "connections": [(3, 1), (4, 2)],
         "enemies": [("boss", 1)],
         "obstacles": [
@@ -360,16 +366,16 @@ MAP_ROOMS = {
     },
     (4, 2): {
         "type": "victory",
-        "name": "The Unbound Theorem",
-        "narrative": "Mathematics cannot be contained.",
+        "name": "room_victory_name",
+        "narrative": "room_victory_narr",
         "connections": [(4, 1)],
         "enemies": [],
         "obstacles": [],
     },
     (0, 2): {
         "type": "normal",
-        "name": "Integral Sanctuary",
-        "narrative": "Accumulated knowledge flows here.",
+        "name": "room_sanctuary_name",
+        "narrative": "room_sanctuary_narr",
         "connections": [(1, 2)],
         "enemies": [("censor", 2), ("bayesian", 1)],
         "obstacles": [
@@ -378,8 +384,8 @@ MAP_ROOMS = {
     },
     (3, 2): {
         "type": "normal",
-        "name": "Matrix Vault",
-        "narrative": "Linear transformations guard this room.",
+        "name": "room_vault_name",
+        "narrative": "room_vault_narr",
         "connections": [(2, 2), (3, 1)],
         "enemies": [("censor", 1), ("strawman", 1), ("bayesian", 1)],
         "obstacles": [
@@ -389,8 +395,8 @@ MAP_ROOMS = {
     },
     (4, 0): {
         "type": "challenge",
-        "name": "Chaos Theory Lab",
-        "narrative": "Small changes have massive consequences.",
+        "name": "room_lab_name",
+        "narrative": "room_lab_narr",
         "connections": [(3, 0)],
         "enemies": [("censor", 3), ("strawman", 2), ("bayesian", 1)],
         "obstacles": [

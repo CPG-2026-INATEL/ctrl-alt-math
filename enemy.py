@@ -124,18 +124,18 @@ class Enemy:
             self.area_attack_telegraph = 0
 
         self.info_title = {
-            "censor": "Censor Linear",
-            "strawman": "Falacia Espantalho",
-            "bayesian": "Inquisidor Bayesiano",
-            "boss": "O Grande Simplificador"
-        }.get(enemy_type, "Unknown Entity")
+            "censor": "enemy_censor",
+            "strawman": "enemy_strawman",
+            "bayesian": "enemy_bayesian",
+            "boss": "enemy_boss"
+        }.get(enemy_type, "enemy_unknown")
 
         self.lore = {
-            "censor": "A relentless enforcer of mathematical purity. It seeks to eliminate any equation that doesn't fit the regime's narrow logic.",
-            "strawman": "Distorts reality by creating false targets. It avoids direct confrontation by manipulating the observer's perception.",
-            "bayesian": "Calculates every possibility. It doesn't just attack where you are, but where you are most likely to be.",
-            "boss": "The ultimate authority of the regime. It reduces the infinite complexity of the universe into a single, suffocating truth."
-        }.get(enemy_type, "A mysterious figure lurking in the mathematical shadows.")
+            "censor": "lore_censor",
+            "strawman": "lore_strawman",
+            "bayesian": "lore_bayesian",
+            "boss": "lore_boss"
+        }.get(enemy_type, "lore_unknown")
 
         self.decoy_lifetime = 0
         self.is_decoy = False

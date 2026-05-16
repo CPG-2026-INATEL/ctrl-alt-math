@@ -4,6 +4,7 @@ import math
 
 import settings
 from utils import draw_text, distance, angle_between
+from i18n import t
 from enemy import Enemy
 from grid import Grid
 from turn_manager import TurnManager
@@ -83,6 +84,10 @@ class GameplayScene(Scene):
 
             if len(room.enemies) == 0:
                 self.state = "NO_COMBAT"
+            
+            # Speak room narrative
+            text = f"{t(room.name)}. {t(room.narrative)}"
+            self.game.tts.speak(text, lang=settings.LANGUAGE)
         else:
             self.obstacles_data = settings.ARENA_OBSTACLES
             self.game.obstacles = self.grid.obstacle_rects(settings.ARENA_OBSTACLES)
@@ -223,6 +228,7 @@ class GameplayScene(Scene):
         self.turn_manager.start_turn()
         self.show_move_range = True
         self.game.sfx.play("wave_start")
+        self.game.tts.speak(t("wave_count", wave=self.turn_manager.turn_number), lang=settings.LANGUAGE)
 
     def _leave_no_combat_room(self):
         self.game.scene_manager.switch("map")
@@ -392,8 +398,34 @@ class GameplayScene(Scene):
             self.game.player.toggle_skin()
             skin_name = self.game.player.skin_names[self.game.player.skin_index]
             self.game.floating_text.add_info(self.game.player.x, self.game.player.y - 40,
-                                            f"Class: {skin_name}", settings.CYAN)
+                                            t("class_label", name=skin_name), settings.CYAN)
             return
+
+        if (mods & pygame.KMOD_CTRL):
+            theme_idx = None
+            if event.key == pygame.K_0: theme_idx = 0
+            elif event.key == pygame.K_1: theme_idx = 1
+            elif event.key == pygame.K_2: theme_idx = 2
+            elif event.key == pygame.K_3: theme_idx = 3
+            elif event.key == pygame.K_4: theme_idx = 4
+            elif event.key == pygame.K_5: theme_idx = 5
+            elif event.key == pygame.K_6: theme_idx = 6
+            elif event.key == pygame.K_7: theme_idx = 7
+            elif event.key == pygame.K_8: theme_idx = 8
+            elif event.key == pygame.K_9: theme_idx = 9
+            
+            if theme_idx is not None:
+                theme_name = self.game.math_bg.set_theme(theme_idx)
+                if theme_name:
+                    self.game.floating_text.add_info(self.game.player.x, self.game.player.y - 40,
+                                                    t("theme_label", name=theme_name), settings.GOLD)
+                    self.game.sfx.play("menu_select")
+                    
+                    # Add extra feedback: particle burst and shake
+                    self.game.particles.emit_burst(self.game.player.x, self.game.player.y, settings.WHITE, 20, 120, 0.5)
+                    self.game.screen_shake = 0.2
+                    self.game.shake_intensity = 5
+                return
 
         if self.state == "WAVE_INTRO":
             self._begin_room()
@@ -638,10 +670,10 @@ class GameplayScene(Scene):
     def _on_enemy_death(self, enemy):
         self.game.floating_text.add_formula(
             enemy.x, enemy.y,
-            "exists=0 (eliminated)", settings.GREEN
+            t("eliminated"), settings.GREEN
         )
         self.game.particles.emit_burst(enemy.x, enemy.y, enemy.color, 15, 80, 0.4)
-        self.game.floating_text.add_info(enemy.x, enemy.y, "QED", settings.GREEN)
+        self.game.floating_text.add_info(enemy.x, enemy.y, t("qed"), settings.GREEN)
         self.game.screen_shake = 0.1
         self.game.shake_intensity = 4
         self.game.sfx.play("enemy_die")
@@ -692,6 +724,7 @@ class GameplayScene(Scene):
         self.game.floating_text.update(dt)
 
         # Mouse hover detection for enemies
+        old_hovered = getattr(self, 'hovered_enemy', None)
         mouse_pos = pygame.mouse.get_pos()
         self.hovered_enemy = None
         for enemy in self.game.enemies:
@@ -702,6 +735,10 @@ class GameplayScene(Scene):
             if hitbox.collidepoint(mouse_pos):
                 self.hovered_enemy = enemy
                 break
+        
+        if self.hovered_enemy and self.hovered_enemy != old_hovered:
+            text = f"{t(self.hovered_enemy.info_title)}. {t(self.hovered_enemy.lore)}"
+            self.game.tts.speak(text, lang=settings.LANGUAGE)
 
         arena_rect = pygame.Rect(
             settings.ARENA_OFFSET_X, settings.ARENA_OFFSET_Y,
@@ -1034,7 +1071,7 @@ class GameplayScene(Scene):
 
     def draw(self, screen):
         temp = pygame.Surface((settings.WINDOW_WIDTH, settings.WINDOW_HEIGHT))
-        temp.fill(settings.COLOR_BG)
+        temp.fill(self.game.math_bg.get_bg_color())
 
         arena_rect = pygame.Rect(
             settings.ARENA_OFFSET_X, settings.ARENA_OFFSET_Y,
@@ -1060,7 +1097,7 @@ class GameplayScene(Scene):
                         tile_surf = pygame.transform.scale(tile_surf, (scaled_w, scaled_h))
                     temp.blit(tile_surf, rect)
         else:
-            pygame.draw.rect(temp, settings.COLOR_ARENA, arena_rect)
+            pygame.draw.rect(temp, self.game.math_bg.get_arena_color(), arena_rect)
 
         pygame.draw.rect(temp, settings.COLOR_WALL, arena_rect, 2)
 
@@ -1146,8 +1183,6 @@ class GameplayScene(Scene):
         self.game.floating_text.draw(temp)
 
         self._draw_cursor_info(temp)
-        self._draw_enemy_info(temp)
-
         self._draw_turn_hud(temp)
 
         if self.hovered_enemy:

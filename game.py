@@ -11,6 +11,7 @@ from floating_text import FloatingTextSystem
 from math_bg import MathBackground
 from map import WorldMap
 from rewind_fx import RewindEffects
+from tts_manager import TTSManager
 
 from scenes.scene_manager import SceneManager
 from scenes.menu_scene import MenuScene
@@ -18,9 +19,10 @@ from scenes.gameplay_scene import GameplayScene
 from scenes.skill_tree_scene import SkillTreeScene
 from scenes.pause_scene import PauseScene
 from scenes.game_over_scene import GameOverScene
+from scenes.tilemap_scene import TilemapScene
 from scenes.victory_scene import VictoryScene
 from scenes.map_scene import MapScene
-from scenes.tilemap_scene import TilemapScene
+from scenes.lore_scene import LoreScene
 
 
 class Game:
@@ -36,6 +38,7 @@ class Game:
         self.ui = UI()
         self.sfx = SFX()
         self.rewind_fx = RewindEffects()
+        self.tts = TTSManager()
 
         self._init_shared_state()
 
@@ -48,6 +51,7 @@ class Game:
         self.scene_manager.add("victory", VictoryScene)
         self.scene_manager.add("map", MapScene)
         self.scene_manager.add("tilemap", TilemapScene)
+        self.scene_manager.add("lore", LoreScene)
         self.scene_manager.switch("menu")
 
     def _init_shared_state(self):
@@ -135,15 +139,16 @@ class Game:
                 else:
                     if self.scene_manager.current:
                         self.scene_manager.current.handle_event(event)
-
             if self.scene_manager.current:
                 self.scene_manager.current.update(dt)
 
-            self.screen.fill(settings.COLOR_BG)
+            self.tts.update()
+            self.screen.fill(self.math_bg.get_bg_color())
             if self.scene_manager.current:
                 self.scene_manager.current.draw(self.screen)
 
             pygame.display.flip()
 
+        self.tts.stop()
         pygame.quit()
         sys.exit()

@@ -4,6 +4,7 @@ import math
 
 import settings
 from utils import draw_text, distance
+from i18n import t
 
 
 class UI:
@@ -23,27 +24,27 @@ class UI:
 
         self._draw_bar(screen, settings.UI_PADDING, bar_y + 8, 160, 14,
                        hp_pct, settings.RED, (60, 20, 20))
-        draw_text(screen, f"HP: {player.hp}/{player.max_hp}",
+        draw_text(screen, f"{t('hp')}: {player.hp}/{player.max_hp}",
                   (settings.UI_PADDING + 80, bar_y + 15),
                   settings.WHITE, 14)
 
         self._draw_bar(screen, settings.UI_PADDING, bar_y + 26, 160, 14,
                        rigor_pct, settings.BLUE, (20, 20, 60))
-        draw_text(screen, f"Rigor: {player.rigor:.0f}/{player.max_rigor}",
+        draw_text(screen, f"{t('rigor')}: {player.rigor:.0f}/{player.max_rigor}",
                   (settings.UI_PADDING + 80, bar_y + 33),
                   settings.WHITE, 14)
 
         self._draw_bar(screen, settings.UI_PADDING + 180, bar_y + 8, 120, 14,
                        entropy_pct, settings.COLOR_ENTROPY_BAR, (40, 10, 40))
-        draw_text(screen, f"Entropy: {entropy:.0f}",
+        draw_text(screen, f"{t('entropy')}: {entropy:.0f}",
                   (settings.UI_PADDING + 240, bar_y + 15),
                   settings.WHITE, 14)
 
-        draw_text(screen, f"Wave: {wave}/{wave_count}",
+        draw_text(screen, t("wave_count", wave=wave) + f"/{wave_count}",
                   (settings.WINDOW_WIDTH // 2, bar_y + 15),
                   settings.LIGHT_GRAY, 18)
 
-        draw_text(screen, f"Skill Points: {skill_points}",
+        draw_text(screen, f"{t('skill_points')}: {skill_points}",
                   (settings.WINDOW_WIDTH // 2, bar_y + 38),
                   settings.GOLD, 16)
 
@@ -104,14 +105,14 @@ class UI:
 
     def _draw_controls(self, screen, bar_y):
         controls = [
-            "WASD: Move",
-            "Space: Atk",
-            "1: Pitagoras",
-            "2: Reflexao",
-            "R: Rewind",
-            "Tab: Skills",
-            "Esc: Pause",
-            "Q: Quit Menu"
+            t("controls_move"),
+            t("controls_atk"),
+            t("controls_pitagoras"),
+            t("controls_reflexao"),
+            t("controls_rewind"),
+            t("controls_skills"),
+            t("controls_pause"),
+            t("controls_quit_menu")
         ]
         x = settings.WINDOW_WIDTH - 120
         y = bar_y + 4
@@ -144,21 +145,21 @@ class UI:
             img.set_alpha(alpha)
             screen.blit(img, (x, y))
 
-        draw_text(screen, "Ctrl + Alt + Math",
+        draw_text(screen, t("game_title"),
                   (settings.WINDOW_WIDTH // 2, 160),
                   settings.CYAN, 52)
 
-        draw_text(screen, "A Mathematical Rebellion",
+        draw_text(screen, t("game_subtitle"),
                   (settings.WINDOW_WIDTH // 2, 205),
                   settings.LIGHT_GRAY, 18)
 
-        draw_text(screen, "In a world where math is forbidden,",
+        draw_text(screen, t("intro_1"),
                   (settings.WINDOW_WIDTH // 2, 250),
                   settings.GRAY, 16)
-        draw_text(screen, "you are the last mathematician.",
+        draw_text(screen, t("intro_2"),
                   (settings.WINDOW_WIDTH // 2, 272),
                   settings.GRAY, 16)
-        draw_text(screen, "Fight the regime with forbidden theorems.",
+        draw_text(screen, t("intro_3"),
                   (settings.WINDOW_WIDTH // 2, 294),
                   settings.GRAY, 16)
 
@@ -172,40 +173,40 @@ class UI:
                 draw_text(screen, text, (settings.WINDOW_WIDTH // 2, y_start + i * 50),
                           color, 28)
 
-        draw_text(screen, "Use UP/DOWN to navigate, ENTER to select",
+        draw_text(screen, t("menu_nav"),
                   (settings.WINDOW_WIDTH // 2, settings.WINDOW_HEIGHT - 40),
                   settings.GRAY, 14)
 
     def draw_how_to_play(self, screen):
         screen.fill(settings.DARK_BLUE)
-        draw_text(screen, "HOW TO PLAY",
+        draw_text(screen, t("how_to_title"),
                   (settings.WINDOW_WIDTH // 2, 40), settings.CYAN, 36)
 
         lines = [
             "",
-            "You are a mathematician fighting the regime.",
-            "Use WASD or Arrow Keys to move around the arena.",
+            t("how_to_intro"),
+            t("how_to_move"),
             "",
-            "COMBAT:",
-            "  Space - Basic attack (melee range)",
-            "  1 - Pitagoras theorem attack (if unlocked)",
-            "  2 - Reflexao defensive burst (if unlocked)",
-            "  R - Ctrl+Z rewind (if unlocked, increases Entropy)",
+            t("how_to_combat"),
+            t("how_to_space"),
+            t("how_to_1"),
+            t("how_to_2"),
+            t("how_to_r"),
             "",
-            "SKILL TREE:",
-            "  Press Tab to open the skill tree.",
-            "  Spend skill points to unlock theorem abilities.",
-            "  Each skill has prerequisites that must be unlocked first.",
+            t("how_to_skills"),
+            t("how_to_tab"),
+            t("how_to_spend"),
+            t("how_to_prereq"),
             "",
-            "ENEMIES:",
-            "  Censor Linear - Moves directly toward you",
-            "  Falacia Espantalho - Erratic, creates decoys",
-            "  Inquisidor Bayesiano - Predicts your movement",
-            "  O Grande Simplificador - The final boss",
+            t("how_to_enemies"),
+            t("how_to_censor"),
+            t("how_to_strawman"),
+            t("how_to_bayesian"),
+            t("how_to_boss"),
             "",
-            "Survive all waves and defeat the boss to win!",
+            t("how_to_win"),
             "",
-            "Press Esc to return"
+            t("how_to_return")
         ]
 
         y = 80
@@ -221,39 +222,39 @@ class UI:
         overlay.set_alpha(160)
         overlay.fill(settings.BLACK)
         screen.blit(overlay, (0, 0))
-        draw_text(screen, "PAUSED",
+        draw_text(screen, t("paused"),
                   (settings.WINDOW_WIDTH // 2, settings.WINDOW_HEIGHT // 2 - 50),
                   settings.WHITE, 48)
-        draw_text(screen, "Press Esc to resume",
+        draw_text(screen, t("press_esc_resume"),
                   (settings.WINDOW_WIDTH // 2, settings.WINDOW_HEIGHT // 2),
                   settings.GRAY, 20)
-        draw_text(screen, "Press Q to quit to main menu",
+        draw_text(screen, t("press_q_quit"),
                   (settings.WINDOW_WIDTH // 2, settings.WINDOW_HEIGHT // 2 + 30),
                   settings.RED, 18)
-        draw_text(screen, "Press Q to quit to menu",
+        draw_text(screen, t("press_q_quit_short"),
                   (settings.WINDOW_WIDTH // 2, settings.WINDOW_HEIGHT // 2 + 50),
                   settings.GRAY, 16)
 
     def draw_game_over(self, screen, room_name):
         screen.fill(settings.DARK_RED)
-        draw_text(screen, "GAME OVER",
+        draw_text(screen, t("game_over"),
                   (settings.WINDOW_WIDTH // 2, 200),
                   settings.RED, 56)
         if room_name:
-            draw_text(screen, f"You fell at: {room_name}",
+            draw_text(screen, t("fell_at", room=t(room_name)),
                       (settings.WINDOW_WIDTH // 2, 270),
                       settings.LIGHT_GRAY, 24)
         else:
-            draw_text(screen, "You fell in battle",
+            draw_text(screen, t("fell_battle"),
                       (settings.WINDOW_WIDTH // 2, 270),
                       settings.LIGHT_GRAY, 24)
-        draw_text(screen, "The regime has silenced another mind.",
+        draw_text(screen, t("regime_silenced"),
                   (settings.WINDOW_WIDTH // 2, 310),
                   settings.GRAY, 18)
-        draw_text(screen, "All upgrades lost. Progress saved.",
+        draw_text(screen, t("upgrades_lost"),
                   (settings.WINDOW_WIDTH // 2, 340),
                   settings.ORANGE, 16)
-        draw_text(screen, "Press ENTER to return to map",
+        draw_text(screen, t("press_enter_return"),
                   (settings.WINDOW_WIDTH // 2, 380),
                   settings.WHITE, 18)
 
@@ -270,22 +271,22 @@ class UI:
             s.fill(random.choice(colors))
             screen.blit(s, (x, y))
 
-        draw_text(screen, "VICTORY!",
+        draw_text(screen, t("victory"),
                   (settings.WINDOW_WIDTH // 2, 150),
                   settings.GOLD, 60)
-        draw_text(screen, "You defeated O Grande Simplificador!",
+        draw_text(screen, t("defeated_boss"),
                   (settings.WINDOW_WIDTH // 2, 220),
                   settings.WHITE, 24)
-        draw_text(screen, "You proved that complexity survives.",
+        draw_text(screen, t("complexity_survives"),
                   (settings.WINDOW_WIDTH // 2, 260),
                   settings.CYAN, 20)
-        draw_text(screen, "Mathematics will never be forgotten.",
+        draw_text(screen, t("math_never_forgotten"),
                   (settings.WINDOW_WIDTH // 2, 290),
                   settings.LIGHT_GRAY, 18)
-        draw_text(screen, "\"The universe cannot be reduced to simple answers.\"",
+        draw_text(screen, t("victory_quote"),
                   (settings.WINDOW_WIDTH // 2, 350),
                   settings.GRAY, 16)
-        draw_text(screen, "Press ENTER to play again, Esc to quit to menu",
+        draw_text(screen, t("press_enter_play_again"),
                   (settings.WINDOW_WIDTH // 2, 420),
                   settings.GRAY, 18)
 
@@ -295,13 +296,13 @@ class UI:
         overlay.fill(settings.BLACK)
         screen.blit(overlay, (0, 0))
 
-        draw_text(screen, f"Wave {wave_num}",
+        draw_text(screen, t("wave_count", wave=wave_num),
                   (settings.WINDOW_WIDTH // 2, 180),
                   settings.RED, 40)
-        draw_text(screen, wave_data["narrative"],
+        draw_text(screen, t(wave_data["narrative"]),
                   (settings.WINDOW_WIDTH // 2, 260),
                   settings.WHITE, 20)
-        draw_text(screen, "Press any key to begin",
+        draw_text(screen, t("press_key_begin"),
                   (settings.WINDOW_WIDTH // 2, 360),
                   settings.GRAY, 16)
 
@@ -311,19 +312,19 @@ class UI:
         overlay.fill(settings.BLACK)
         screen.blit(overlay, (0, 0))
 
-        draw_text(screen, "WAVE COMPLETE",
+        draw_text(screen, t("wave_complete"),
                   (settings.WINDOW_WIDTH // 2, 180),
                   settings.GREEN, 40)
-        draw_text(screen, wave_data["post_narrative"],
+        draw_text(screen, t(wave_data["post_narrative"]),
                   (settings.WINDOW_WIDTH // 2, 250),
                   settings.WHITE, 20)
-        draw_text(screen, "You earned 1 Skill Point!",
+        draw_text(screen, t("earned_skill_point"),
                   (settings.WINDOW_WIDTH // 2, 310),
                   settings.GOLD, 22)
-        draw_text(screen, "Press Tab to open Skill Tree",
+        draw_text(screen, t("press_tab_skills"),
                   (settings.WINDOW_WIDTH // 2, 360),
                   settings.CYAN, 18)
-        draw_text(screen, "Press any key to continue",
+        draw_text(screen, t("press_key_continue"),
                   (settings.WINDOW_WIDTH // 2, 400),
                   settings.GRAY, 16)
 
@@ -448,23 +449,12 @@ class UI:
         hp_font = pygame.font.Font(None, 14)
 
         # Render elements to calculate size
-        title_surf = title_font.render(enemy.info_title, True, settings.GOLD)
-        hp_text = f"HP: {enemy.hp}/{enemy.max_hp}"
+        title_surf = title_font.render(t(enemy.info_title), True, settings.GOLD)
+        hp_text = f"{t('hp')}: {enemy.hp}/{enemy.max_hp}"
         hp_surf = hp_font.render(hp_text, True, settings.WHITE)
 
         # Wrap lore text
-        words = enemy.lore.split(' ')
-        lines = []
-        current_line = ""
-        for word in words:
-            test_line = current_line + word + " "
-            if lore_font.size(test_line)[0] < max_width - padding * 2:
-                current_line = test_line
-            else:
-                lines.append(current_line)
-                current_line = word + " "
-        lines.append(current_line)
-
+        lines = self._wrap_text(t(enemy.lore), lore_font, max_width - padding * 2)
         lore_surfs = [lore_font.render(line, True, settings.LIGHT_GRAY) for line in lines]
 
         # Calculate box size
@@ -509,3 +499,82 @@ class UI:
 
         curr_y += 5
         screen.blit(hp_surf, (x + padding, curr_y))
+
+    def _wrap_text(self, text, font, max_width):
+        paragraphs = text.split('\n')
+        lines = []
+        for p in paragraphs:
+            if not p:
+                lines.append("")
+                continue
+            words = p.split(' ')
+            current_line = ""
+            for word in words:
+                test_line = current_line + word + " "
+                if font.size(test_line)[0] < max_width:
+                    current_line = test_line
+                else:
+                    lines.append(current_line)
+                    current_line = word + " "
+            lines.append(current_line)
+        return lines
+
+    def draw_lore(self, screen, cat_key, content_key, scroll_y, index, total):
+        screen.fill(settings.DARK_BLUE)
+        
+        # Background effect
+        time_val = pygame.time.get_ticks() / 1000.0
+        for i in range(20):
+            x = int(400 + math.sin(time_val * 0.2 + i) * 380)
+            y = int(300 + math.cos(time_val * 0.15 + i) * 280)
+            pygame.draw.circle(screen, (20, 40, 80), (x, y), 2)
+
+        # Title
+        draw_text(screen, t("lore_title"), (settings.WINDOW_WIDTH // 2, 40), settings.CYAN, 32)
+        
+        # Category Selector
+        selector_y = 90
+        pygame.draw.line(screen, settings.GRAY, (50, selector_y - 15), (settings.WINDOW_WIDTH - 50, selector_y - 15), 1)
+        
+        cat_name = t(cat_key).upper()
+        draw_text(screen, f"< {cat_name} >", (settings.WINDOW_WIDTH // 2, selector_y), settings.GOLD, 24)
+        draw_text(screen, f"{index + 1} / {total}", (settings.WINDOW_WIDTH - 80, selector_y), settings.GRAY, 16)
+        
+        pygame.draw.line(screen, settings.GRAY, (50, selector_y + 15), (settings.WINDOW_WIDTH - 50, selector_y + 15), 1)
+
+        # Content Area
+        content_rect = pygame.Rect(60, 120, settings.WINDOW_WIDTH - 120, settings.WINDOW_HEIGHT - 200)
+        # pygame.draw.rect(screen, (10, 10, 30), content_rect) # Debug
+        
+        font = pygame.font.Font(None, 22)
+        wrapped_lines = self._wrap_text(t(content_key), font, content_rect.width)
+        
+        line_height = 24
+        total_height = len(wrapped_lines) * line_height
+        max_scroll = max(0, total_height - content_rect.height)
+        
+        # Clip area for scrolling
+        temp_surf = pygame.Surface((content_rect.width, content_rect.height), pygame.SRCALPHA)
+        
+        for i, line in enumerate(wrapped_lines):
+            y_pos = i * line_height - scroll_y
+            if -line_height < y_pos < content_rect.height:
+                color = settings.WHITE if line.strip() else settings.GRAY
+                if line.startswith("-") or line.startswith("'") or line.startswith("“"):
+                    color = settings.CYAN
+                txt_surf = font.render(line, True, color)
+                temp_surf.blit(txt_surf, (0, y_pos))
+        
+        screen.blit(temp_surf, (content_rect.x, content_rect.y))
+        
+        # Scrollbar
+        if max_scroll > 0:
+            bar_h = content_rect.height * (content_rect.height / total_height)
+            bar_y = content_rect.y + (scroll_y / max_scroll) * (content_rect.height - bar_h)
+            pygame.draw.rect(screen, settings.DARK_GRAY, (content_rect.right + 10, content_rect.y, 6, content_rect.height))
+            pygame.draw.rect(screen, settings.CYAN, (content_rect.right + 10, bar_y, 6, bar_h))
+
+        # Footer
+        draw_text(screen, t("lore_footer"), (settings.WINDOW_WIDTH // 2, settings.WINDOW_HEIGHT - 40), settings.GRAY, 14)
+        
+        return max_scroll
