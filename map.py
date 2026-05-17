@@ -49,6 +49,8 @@ class Room:
         if not self.connections:
             self.connections = list(set(self.connections_out + self.connections_in))
 
+        self.directional_connections = data.get("directional_connections", {})
+
         self.state = "locked"
         self.bob_phase = 0
 
@@ -132,12 +134,8 @@ class WorldMap:
         start_room = self.rooms[start_id]
         start_room.state = "available"
 
-        for conn_id in start_room.connections_out:
-            if conn_id in self.rooms:
-                self.rooms[conn_id].state = "available"
-
-        for conn_id in start_room.connections_in:
-            if conn_id in self.rooms:
+        for conn_id in start_room.directional_connections.values():
+            if conn_id and conn_id in self.rooms:
                 room = self.rooms[conn_id]
                 if room.state == "locked":
                     room.state = "available"
@@ -223,41 +221,17 @@ class WorldMap:
         if current_room is None:
             return False
 
-        target = None
-        if direction == "up":
-            candidates = [rid for rid in current_room.connections if rid in self.rooms]
-            for rid in candidates:
-                r = self.rooms[rid]
-                if r.row < current_room.row and r.state != "locked":
-                    target = rid
-                    break
-        elif direction == "down":
-            candidates = [rid for rid in current_room.connections if rid in self.rooms]
-            for rid in candidates:
-                r = self.rooms[rid]
-                if r.row > current_room.row and r.state != "locked":
-                    target = rid
-                    break
-        elif direction == "left":
-            candidates = [rid for rid in current_room.connections if rid in self.rooms]
-            for rid in candidates:
-                r = self.rooms[rid]
-                if r.col < current_room.col and r.state != "locked":
-                    target = rid
-                    break
-        elif direction == "right":
-            candidates = [rid for rid in current_room.connections if rid in self.rooms]
-            for rid in candidates:
-                r = self.rooms[rid]
-                if r.col > current_room.col and r.state != "locked":
-                    target = rid
-                    break
+        target_id = current_room.directional_connections.get(direction)
+        if target_id is None or target_id not in self.rooms:
+            return False
 
-        if target:
-            self.player_room = target
-            self._update_scroll_to_player()
-            return True
-        return False
+        target_room = self.rooms[target_id]
+        if target_room.state == "locked":
+            return False
+
+        self.player_room = target_id
+        self._update_scroll_to_player()
+        return True
 
     def get_room_at_pos(self, pos):
         adjusted_x = pos[0] + self.scroll_x
@@ -288,10 +262,11 @@ class WorldMap:
         room = self.rooms.get(room_id)
         if room:
             room.state = "completed"
-            for conn_id in room.connections:
-                conn_room = self.rooms.get(conn_id)
-                if conn_room and conn_room.state == "locked":
-                    conn_room.state = "available"
+            for conn_id in room.directional_connections.values():
+                if conn_id and conn_id in self.rooms:
+                    conn_room = self.rooms[conn_id]
+                    if conn_room.state == "locked":
+                        conn_room.state = "available"
 
     def all_required_rooms_completed(self):
         required_types = {"normal", "challenge", "boss", "victory"}
@@ -333,7 +308,9 @@ class WorldMap:
 
         rooms_in_draw_order = sorted(self.rooms.values(), key=lambda room: (room.screen_y, room.screen_x))
         for room in rooms_in_draw_order:
-            for conn_id in room.connections:
+            for conn_id in room.directional_connections.values():
+                if conn_id is None:
+                    continue
                 conn_room = self.rooms.get(conn_id)
                 if conn_room and conn_room.col >= room.col:
                     start_x = room.rect.centerx - sx
