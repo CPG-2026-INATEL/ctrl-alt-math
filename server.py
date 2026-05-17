@@ -106,7 +106,7 @@ class MatchServer:
         elif mtype == "join_room":
             self._join_room(client_id, msg.get("room", ""))
         elif mtype == "relay":
-            self._relay(client_id, msg.get("payload", {}))
+            self._relay(client_id, msg.get("payload", {}), compressed=msg.get("compressed", False))
 
     def _create_room(self, client_id):
         with self.lock:
@@ -144,7 +144,7 @@ class MatchServer:
             if other_id != client_id and other_id != host_id:
                 self._send(other_id, {"type": "peer_joined", "player_index": player_index, "peer_ip": peer_ip})
 
-    def _relay(self, client_id, payload):
+    def _relay(self, client_id, payload, compressed=False):
         with self.lock:
             room_code = self.client_rooms.get(client_id)
             if not room_code:
@@ -153,7 +153,10 @@ class MatchServer:
         from_player = room.index(client_id) + 1 if client_id in room else None
         for peer_id in room:
             if peer_id != client_id:
-                self._send(peer_id, {"type": "relay", "from_player": from_player, "payload": payload})
+                out = {"type": "relay", "from_player": from_player, "payload": payload}
+                if compressed:
+                    out["compressed"] = True
+                self._send(peer_id, out)
 
     def _remove_client(self, client_id):
         with self.lock:
