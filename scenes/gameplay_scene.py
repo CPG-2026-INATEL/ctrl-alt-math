@@ -36,6 +36,7 @@ class GameplayScene(Scene):
         self.grid = Grid()
         self.turn_manager = TurnManager()
         self.obstacles_data = settings.ARENA_OBSTACLES
+        self.tilemap = None
 
         self.active_player_idx = 0
         self.show_move_range = True
