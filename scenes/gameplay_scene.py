@@ -1347,7 +1347,6 @@ class GameplayScene(Scene):
         if self.state == "VICTORY_TRANSITION":
             return
 
-        self.game.sfx.play("enemy_turn")
         self.grid.lock_danger_indicators(self.enemy_intents)
         self.danger_locked = True
         self.lock_timer = 0
@@ -1911,7 +1910,6 @@ class GameplayScene(Scene):
             return
 
         # Prepare for next turn and take snapshot
-        self.game.sfx.play("your_turn")
         self.state = "PLAYER_INPUT"
         self.turn_manager.start_turn()
         self._set_active_player(0)
@@ -2336,7 +2334,6 @@ class GameplayScene(Scene):
         self.game.rewind_fx_timer = 1.0
         self.game.sfx.play("rewind")
 
-        self.game.sfx.play("your_turn")
         self.state = "PLAYER_INPUT"
         self.turn_manager.start_turn()
         self._set_active_player(0)
@@ -2448,55 +2445,11 @@ class GameplayScene(Scene):
                     settings.PITAGORAS_RANGE
                 )
                 self.grid.draw(temp, highlight_cells=cells, highlight_color=settings.YELLOW, offset=world_offset)
-                
-                pc_c, pc_r = self.game.player.col, self.game.player.row
-                cc_c, cc_r = self.cursor_col, self.cursor_row
-                corner_c, corner_r = cc_c, pc_r
-                
-                # Draw the neon right-triangle
                 self.grid.draw_triangle(temp,
-                    pc_c, pc_r,
-                    corner_c, corner_r,
-                    cc_c, cc_r,
-                    settings.YELLOW, 2, offset=world_offset)
-                
-                # Draw right-angle square indicator at corner
-                if pc_c != cc_c and pc_r != cc_r:
-                    cx, cy = self.grid.to_pixel(corner_c, corner_r)
-                    cx += world_offset[0]
-                    cy += world_offset[1]
-                    sgn_x = -1 if cc_c > pc_c else 1
-                    sgn_y = 1 if cc_r > pc_r else -1
-                    sq_sz = 8
-                    pygame.draw.line(temp, settings.YELLOW, (cx, cy + sgn_y * sq_sz), (cx + sgn_x * sq_sz, cy + sgn_y * sq_sz), 1)
-                    pygame.draw.line(temp, settings.YELLOW, (cx + sgn_x * sq_sz, cy), (cx + sgn_x * sq_sz, cy + sgn_y * sq_sz), 1)
-                
-                # Draw elegant formulas / side length labels
-                dx = cc_c - pc_c
-                dy = cc_r - pc_r
-                eucl = math.sqrt(dx * dx + dy * dy)
-                font = pygame.font.Font(None, 13)
-                
-                # Side a (horizontal) label
-                if dx != 0:
-                    px_a = (self.grid.to_pixel(pc_c, pc_r)[0] + self.grid.to_pixel(corner_c, corner_r)[0]) / 2 + world_offset[0]
-                    py_a = self.grid.to_pixel(pc_c, pc_r)[1] + world_offset[1] - 8
-                    lbl_a = font.render(f"a={abs(dx)}", True, settings.LIGHT_GRAY)
-                    temp.blit(lbl_a, (px_a - lbl_a.get_width() // 2, py_a))
-                
-                # Side b (vertical) label
-                if dy != 0:
-                    px_b = self.grid.to_pixel(corner_c, corner_r)[0] + world_offset[0] + 6
-                    py_b = (self.grid.to_pixel(corner_c, corner_r)[1] + self.grid.to_pixel(cc_c, cc_r)[1]) / 2 + world_offset[1]
-                    lbl_b = font.render(f"b={abs(dy)}", True, settings.LIGHT_GRAY)
-                    temp.blit(lbl_b, (px_b, py_b - lbl_b.get_height() // 2))
-                
-                # Side c (hypotenuse) label
-                if dx != 0 and dy != 0:
-                    px_c = (self.grid.to_pixel(pc_c, pc_r)[0] + self.grid.to_pixel(cc_c, cc_r)[0]) / 2 + world_offset[0] - 16
-                    py_c = (self.grid.to_pixel(pc_c, pc_r)[1] + self.grid.to_pixel(cc_c, cc_r)[1]) / 2 + world_offset[1] - 12
-                    lbl_c = font.render(f"c={eucl:.2f}", True, settings.GOLD)
-                    temp.blit(lbl_c, (px_c, py_c))
+                    self.game.player.col, self.game.player.row,
+                    self.cursor_col, self.game.player.row,
+                    self.cursor_col, self.cursor_row,
+                    settings.YELLOW, 1, offset=world_offset)
             elif self.selected_skill == "reflexao":
                 cells = self.grid.get_cells_in_radius(
                     self.game.player.col, self.game.player.row,
@@ -2522,30 +2475,18 @@ class GameplayScene(Scene):
                 )
                 self.grid.draw(temp, highlight_cells=cells, highlight_color=settings.RED, offset=world_offset)
 
-        # 🔹 Derivada: Predicted next move velocity vectors
         if self.game.skill_tree.is_unlocked("derivada"):
-            for intent in self.enemy_intents:
-                if intent is None or intent.enemy.dead:
+            for enemy in self.game.enemies:
+                if enemy.dead:
                     continue
-                enemy = intent.enemy
-                if intent.move_target and intent.move_target != (enemy.col, enemy.row):
-                    d_col = intent.move_target[0] - enemy.col
-                    d_row = intent.move_target[1] - enemy.row
-                    # Draw neon velocity vector line & arrow
+                if enemy.type == "bayesian":
+                    pred = enemy.get_predicted_grid_position(
+                        self.game.player.col, self.game.player.row, self.grid
+                    )
+                    px, py = self.grid.to_pixel(pred[0], pred[1])
                     self.grid.draw_vector_arrow(temp, enemy.col, enemy.row,
-                                               intent.move_target[0], intent.move_target[1], settings.GREEN, 2, offset=world_offset)
-                    # Midpoint coordinates for vector formula label
-                    fx, fy = self.grid.to_pixel(enemy.col, enemy.row)
-                    tx, ty = self.grid.to_pixel(intent.move_target[0], intent.move_target[1])
-                    mx = (fx + tx) / 2 + world_offset[0]
-                    my = (fy + ty) / 2 + world_offset[1] - 8
-                    
-                    font = pygame.font.Font(None, 12)
-                    lbl_val = f"v = ({d_col:+d}, {d_row:+d})"
-                    lbl_img = font.render(lbl_val, True, settings.GREEN)
-                    temp.blit(lbl_img, (mx - lbl_img.get_width() // 2, my - lbl_img.get_height() // 2))
+                                               pred[0], pred[1], settings.GREEN, 2, offset=world_offset)
                 else:
-                    # Fallback to direction indicator if no path found
                     dc = self.game.player.col - enemy.col
                     dr = self.game.player.row - enemy.row
                     if dc != 0 or dr != 0:
@@ -2557,11 +2498,9 @@ class GameplayScene(Scene):
                         self.grid.draw_vector_arrow(temp, enemy.col, enemy.row,
                                                    int(end_c), int(end_r), settings.GREEN, 1, offset=world_offset)
 
-        # 🔹 Bayes: Heatmap prediction of attack range probabilities
         if self.game.skill_tree.is_unlocked("bayes"):
             pc = self.game.player.col
             pr = self.game.player.row
-            font = pygame.font.Font(None, 11)
             for enemy in self.game.enemies:
                 if enemy.dead:
                     continue
@@ -2573,82 +2512,20 @@ class GameplayScene(Scene):
                     cells = self.grid.get_cells_in_radius(enemy.col, enemy.row, 2)
                     for col, row in cells:
                         rect = self.grid.cell_rect(col, row)
-                        rect.x += world_offset[0]
-                        rect.y += world_offset[1]
-                        
-                        # Glitch distortion when entropy > 50
-                        cell_intensity = intensity
-                        if self.game.entropy > 50 and random.random() < 0.2:
-                            rect.x += random.randint(-3, 3)
-                            rect.y += random.randint(-3, 3)
-                            cell_intensity = int(intensity * random.uniform(0.3, 1.8))
-                        
                         s = pygame.Surface((rect.width, rect.height))
-                        s.set_alpha(max(5, min(120, cell_intensity // 3)))
+                        s.set_alpha(intensity // 3)
                         s.fill(settings.PURPLE)
                         temp.blit(s, rect)
-                        
-                        # Draw P(T|E) percentage label on cells
-                        p_val = int(proximity * 100)
-                        lbl_bayes = font.render(f"P(T)={p_val}%", True, (220, 180, 255))
-                        temp.blit(lbl_bayes, (rect.centerx - lbl_bayes.get_width() // 2, rect.centery - lbl_bayes.get_height() // 2))
 
-        # 🔹 Teoria dos Jogos: Threat vectors and Nash Equilibrium safest tile
         if self.game.skill_tree.is_unlocked("teoria_jogos"):
             pc = self.game.player.col
             pr = self.game.player.row
-            
-            # Red threat vectors pointing to player
             for enemy in self.game.enemies:
                 if enemy.dead:
                     continue
                 if self.grid.grid_distance(enemy.col, enemy.row, pc, pr) <= enemy.attack_range:
                     self.grid.draw_vector_arrow(temp, enemy.col, enemy.row,
-                                               pc, pr, settings.RED, 1, offset=world_offset)
-            
-            # Evaluate all reachable player cells to identify the Nash Equilibrium (safest tile)
-            reachable = self.grid.get_reachable_cells(
-                pc, pr, self.game.player.move_range,
-                extra_blocked=self._other_player_occupied_cells(self.game.player)
-            )
-            candidates = [(pc, pr)] + reachable
-            safest_cell = None
-            min_threat = 999999
-            
-            for cc, cr in candidates:
-                threat_score = 0
-                for enemy in self.game.enemies:
-                    if enemy.dead:
-                        continue
-                    # Count threats that can hit this candidate cell
-                    if self.grid.grid_distance(enemy.col, enemy.row, cc, cr) <= enemy.attack_range:
-                        threat_score += 1
-                
-                # Tiebreaker: prefer cells closer to player to save movement, or further from enemies
-                dist_to_player = self.grid.grid_distance(pc, pr, cc, cr)
-                eval_score = threat_score * 1000 + dist_to_player
-                
-                if eval_score < min_threat:
-                    min_threat = eval_score
-                    safest_cell = (cc, cr)
-            
-            # Glow overlay on the Nash Equilibrium cell
-            if safest_cell:
-                sc_col, sc_row = safest_cell
-                rect = self.grid.cell_rect(sc_col, sc_row)
-                rect.x += world_offset[0]
-                rect.y += world_offset[1]
-                
-                glow_alpha = int(100 + 60 * math.sin(self.cursor_timer * 6))
-                s = pygame.Surface((rect.width, rect.height))
-                s.set_alpha(glow_alpha)
-                s.fill(settings.CYAN)
-                temp.blit(s, rect)
-                pygame.draw.rect(temp, settings.CYAN, rect, 2)
-                
-                font = pygame.font.Font(None, 11)
-                lbl_nash = font.render("NASH EQ", True, settings.WHITE)
-                temp.blit(lbl_nash, (rect.centerx - lbl_nash.get_width() // 2, rect.centery - lbl_nash.get_height() // 2))
+                                               pc, pr, settings.GOLD, 1, offset=world_offset)
 
         if self.state in ("PLAYER_INPUT", "PLAYER_ACTION_SELECT", "LOCK_INDICATORS", "ENEMY_TURN"):
             self.grid.draw_danger_indicators(temp, pulse_timer=self.cursor_timer, offset=world_offset)
@@ -2954,7 +2831,7 @@ class GameplayScene(Scene):
         pygame.draw.line(screen, (30, 180, 220), (0, bar_y), (settings.WINDOW_WIDTH, bar_y), 2)
         
         panel_y = bar_y + 6
-        panel_h = 96
+        panel_h = 98
 
         # --- DYNAMIC PANEL WIDTHS ---
         total_w = settings.WINDOW_WIDTH
@@ -2998,20 +2875,25 @@ class GameplayScene(Scene):
         
         # Level & Identity Header
         player_label = self._player_label(self.active_player_idx)
-        draw_text(screen, f"{player_label}  |  LVL {current_player.level}", (x1 + 8, panel_y + 8), settings.CYAN, 16, center=False)
+        draw_text(screen, f"{player_label}  |  LVL {current_player.level}", (x1 + 8, panel_y + 6), settings.CYAN, 15, center=False)
         
         # HP Bar
         hp_color = settings.GREEN if hp_pct > 0.5 else settings.ORANGE if hp_pct > 0.25 else settings.RED
-        self._draw_bar_sleek(screen, x1 + 8, panel_y + 26, w1 - 16, 13, hp_pct, hp_color, (45, 15, 15))
-        draw_text(screen, f"HP: {current_player.hp}/{current_player.get_max_hp()}", (x1 + w1 // 2, panel_y + 33), settings.WHITE, 15)
+        self._draw_bar_sleek(screen, x1 + 8, panel_y + 22, w1 - 16, 11, hp_pct, hp_color, (45, 15, 15))
+        draw_text(screen, f"HP: {current_player.hp}/{current_player.get_max_hp()}", (x1 + w1 // 2, panel_y + 28), settings.WHITE, 14)
 
         # Rigor Bar
-        self._draw_bar_sleek(screen, x1 + 8, panel_y + 47, w1 - 16, 13, rigor_pct, settings.BLUE, (15, 15, 45))
-        draw_text(screen, f"{t('rigor')}: {current_player.rigor:.0f}/{current_player.max_rigor}", (x1 + w1 // 2, panel_y + 54), settings.WHITE, 15)
+        self._draw_bar_sleek(screen, x1 + 8, panel_y + 41, w1 - 16, 11, rigor_pct, settings.BLUE, (15, 15, 45))
+        draw_text(screen, f"{t('rigor')}: {current_player.rigor:.0f}/{current_player.max_rigor}", (x1 + w1 // 2, panel_y + 47), settings.WHITE, 14)
 
         # EXP Bar
-        self._draw_bar_sleek(screen, x1 + 8, panel_y + 68, w1 - 16, 13, exp_pct, settings.GOLD, (30, 25, 10))
-        draw_text(screen, f"EXP: {current_player.exp}/{current_player.next_level_exp} ({int(exp_pct*100)}%)", (x1 + w1 // 2, panel_y + 75), settings.WHITE, 14)
+        self._draw_bar_sleek(screen, x1 + 8, panel_y + 60, w1 - 16, 11, exp_pct, settings.GOLD, (30, 25, 10))
+        draw_text(screen, f"EXP: {current_player.exp}/{current_player.next_level_exp} ({int(exp_pct*100)}%)", (x1 + w1 // 2, panel_y + 66), settings.WHITE, 13)
+
+        # Entropy Bar
+        entropy_color = settings.COLOR_ENTROPY_BAR if entropy_pct < 0.75 else settings.RED
+        self._draw_bar_sleek(screen, x1 + 8, panel_y + 79, w1 - 16, 11, entropy_pct, entropy_color, (40, 10, 40))
+        draw_text(screen, f"{t('entropy')}: {self.game.entropy:.0f}/{settings.MAX_ENTROPY}", (x1 + w1 // 2, panel_y + 85), settings.WHITE, 13)
 
 
         # --- PANEL 2: COMBAT STATS (X = x2, W = w2) ---
@@ -3021,23 +2903,23 @@ class GameplayScene(Scene):
         col1_x = x2 + 8
         col2_x = x2 + w2 // 2 + 4
         
-        draw_text(screen, f"ATK: {current_player.get_attack_damage()}", (col1_x, panel_y + 26), settings.CYAN, 16, center=False)
-        draw_text(screen, f"DEF: {current_player.get_defense()}", (col2_x, panel_y + 26), settings.CYAN, 16, center=False)
+        draw_text(screen, f"ATK: {current_player.get_attack_damage()}", (col1_x, panel_y + 22), settings.CYAN, 15, center=False)
+        draw_text(screen, f"DEF: {current_player.get_defense()}", (col2_x, panel_y + 22), settings.CYAN, 15, center=False)
         
-        draw_text(screen, f"CRIT: {int(settings.PLAYER_CRIT_CHANCE * 100)}%", (col1_x, panel_y + 44), settings.GOLD, 16, center=False)
-        draw_text(screen, f"MULT: x{settings.PLAYER_CRIT_MULTIPLIER:.1f}", (col2_x, panel_y + 44), settings.GOLD, 16, center=False)
+        draw_text(screen, f"CRIT: {int(settings.PLAYER_CRIT_CHANCE * 100)}%", (col1_x, panel_y + 39), settings.GOLD, 15, center=False)
+        draw_text(screen, f"MULT: x{settings.PLAYER_CRIT_MULTIPLIER:.1f}", (col2_x, panel_y + 39), settings.GOLD, 15, center=False)
         
-        draw_text(screen, f"GOLD: {current_player.gold}g", (col1_x, panel_y + 62), settings.GOLD, 16, center=False)
         sp_points = self.game.skill_tree.skill_points if self.game.skill_tree else 0
-        draw_text(screen, f"SP: {sp_points}", (col2_x, panel_y + 62), settings.CYAN, 16, center=False)
+        draw_text(screen, f"GOLD: {current_player.gold}g", (col1_x, panel_y + 56), settings.GOLD, 15, center=False)
+        draw_text(screen, f"SP: {sp_points}", (col2_x, panel_y + 56), settings.CYAN, 15, center=False)
         
         if len(self.players) > 1:
             p1 = self.players[0]
             p2 = self.players[1]
-            draw_text(screen, f"P1 HP: {p1.hp}/{p1.max_hp}", (col1_x, panel_y + 78), settings.CYAN, 14, center=False)
-            draw_text(screen, f"P2 HP: {p2.hp}/{p2.max_hp}", (col2_x, panel_y + 78), settings.PURPLE, 14, center=False)
+            draw_text(screen, f"P1 HP: {p1.hp}/{p1.max_hp}", (col1_x, panel_y + 76), settings.CYAN, 14, center=False)
+            draw_text(screen, f"P2 HP: {p2.hp}/{p2.max_hp}", (col2_x, panel_y + 76), settings.PURPLE, 14, center=False)
         else:
-            draw_text(screen, f"DIFFICULTY: {settings.DIFFICULTY.upper()}", (x2 + w2 // 2, panel_y + 78), settings.LIGHT_GRAY, 14)
+            draw_text(screen, f"DIFFICULTY: {settings.DIFFICULTY.upper()}", (x2 + w2 // 2, panel_y + 76), settings.LIGHT_GRAY, 14)
 
 
         # --- PANEL 3: GAME STATE & TURN (X = x3, W = w3) ---
@@ -3238,7 +3120,7 @@ class GameplayScene(Scene):
             turn_owner = "HOST" if self._current_player_owner() == "host" else "CLIENT"
             controls = f"{controls}   [ Turn: {turn_owner} {player_label} ]"
         controls_img = pygame.font.Font(None, 16).render(controls, True, settings.GRAY)
-        screen.blit(controls_img, (12, bar_y + 107))
+        screen.blit(controls_img, (12, bar_y + 104))
 
     def _draw_bar(self, screen, x, y, w, h, pct, fill_color, bg_color):
         pygame.draw.rect(screen, bg_color, (x, y, w, h))

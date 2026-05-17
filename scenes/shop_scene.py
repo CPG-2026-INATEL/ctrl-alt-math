@@ -221,21 +221,12 @@ class ShopScene(Scene):
         tab_w = settings.WINDOW_WIDTH // 3
         for i in range(3):
             tab_rect = pygame.Rect(i * tab_w, tab_y, tab_w, tab_h)
-            is_active = (i == self.active_tab)
-            bg_color = (35, 40, 70, 230) if is_active else (10, 10, 25, 180)
-            
-            tab_surf = pygame.Surface((tab_w, tab_h), pygame.SRCALPHA)
-            pygame.draw.rect(tab_surf, bg_color, (0, 0, tab_w, tab_h), border_radius=4)
-            screen.blit(tab_surf, tab_rect)
-            
-            border_color = SHOP_TAB_COLORS[i] if is_active else (50, 50, 70)
-            pygame.draw.rect(screen, border_color, tab_rect, 2 if is_active else 1, border_radius=4)
-            
-            if is_active:
-                pygame.draw.line(screen, SHOP_TAB_COLORS[i], (i * tab_w + 15, tab_y + tab_h - 3), ((i + 1) * tab_w - 15, tab_y + tab_h - 3), 3)
-
+            bg_color = (30, 30, 60) if i == self.active_tab else (15, 15, 35)
+            pygame.draw.rect(screen, bg_color, tab_rect, border_radius=4)
+            border_color = SHOP_TAB_COLORS[i] if i == self.active_tab else (60, 60, 80)
+            pygame.draw.rect(screen, border_color, tab_rect, 2, border_radius=4)
             label_font = pygame.font.Font(None, 18)
-            label = label_font.render(t(SHOP_TAB_LABELS[i]), True, SHOP_TAB_COLORS[i] if is_active else (120, 120, 140))
+            label = label_font.render(t(SHOP_TAB_LABELS[i]), True, SHOP_TAB_COLORS[i] if i == self.active_tab else (120, 120, 140))
             screen.blit(label, (tab_rect.centerx - label.get_width() // 2, tab_rect.centery - label.get_height() // 2))
 
     def _draw_list(self, screen, list_x, list_w):

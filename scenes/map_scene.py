@@ -352,98 +352,71 @@ class MapScene(Scene):
             return
 
         mx, my = self._mouse_pos
-        popup_w = 230
-        popup_h = 110
-        popup_x = mx + 18
-        popup_y = my - 15
+        popup_w = 220
+        popup_h = 90
+        popup_x = mx + 15
+        popup_y = my - 10
 
         if popup_x + popup_w > settings.WINDOW_WIDTH:
-            popup_x = mx - popup_w - 18
+            popup_x = mx - popup_w - 15
         if popup_y + popup_h > settings.WINDOW_HEIGHT:
             popup_y = settings.WINDOW_HEIGHT - popup_h - 5
         if popup_y < 5:
             popup_y = 5
 
-        # Glass background
         bg = pygame.Surface((popup_w, popup_h), pygame.SRCALPHA)
-        bg.fill((10, 12, 28, 230))
+        bg.fill((15, 15, 30, 220))
         screen.blit(bg, (popup_x, popup_y))
+        pygame.draw.rect(screen, settings.LIGHT_GRAY, (popup_x, popup_y, popup_w, popup_h), 1, border_radius=4)
 
-        type_labels = {"hub": "HUB", "normal": "ROOM", "challenge": "CHALLENGE",
-                       "side": "SIDE QUEST", "boss": "BOSS", "victory": "VICTORY"}
-        type_label = type_labels.get(room.type, "ROOM")
+        font = pygame.font.Font(None, 18)
+        title_font = pygame.font.Font(None, 24)
+        small_font = pygame.font.Font(None, 15)
+
+        type_labels = {"hub": "Hub", "normal": "Room", "challenge": "Challenge",
+                       "side": "Side Quest", "boss": "Boss", "victory": "Victory"}
+        type_label = type_labels.get(room.type, "Room")
         type_color = settings.GRAY
-        if room.type == "hub":
-            type_color = settings.CYAN
-        elif room.type == "side":
+        if room.type == "side":
             type_color = settings.GOLD
         elif room.type == "challenge":
             type_color = settings.ORANGE
         elif room.type == "boss":
             type_color = settings.RED
-        elif room.type == "victory":
-            type_color = settings.PURPLE
 
-        # Neon border color matches room type
-        pygame.draw.rect(screen, type_color, (popup_x, popup_y, popup_w, popup_h), 2, border_radius=6)
-        # Accent top strip
-        pygame.draw.rect(screen, type_color, (popup_x, popup_y, popup_w, 4), border_radius=6)
-
-        # Room name
-        title_font = pygame.font.Font(None, 22)
         title = title_font.render(t(room.name), True, settings.WHITE)
-        screen.blit(title, (popup_x + 10, popup_y + 10))
+        screen.blit(title, (popup_x + 10, popup_y + 8))
 
-        # Type badge
-        badge_font = pygame.font.Font(None, 14)
-        badge_txt = badge_font.render(type_label, True, type_color)
-        screen.blit(badge_txt, (popup_x + 10, popup_y + 32))
+        type_text = small_font.render(type_label, True, type_color)
+        screen.blit(type_text, (popup_x + 10, popup_y + 30))
 
-        # Separator
-        pygame.draw.line(screen, (40, 40, 60),
-                         (popup_x + 8, popup_y + 46),
-                         (popup_x + popup_w - 8, popup_y + 46), 1)
-
-        # Difficulty stars
-        diff_colors = {1: settings.CYAN, 2: settings.GOLD, 3: settings.ORANGE, 4: settings.RED}
-        diff_color = diff_colors.get(room.difficulty, settings.GRAY)
         diff_names = {1: "Easy", 2: "Medium", 3: "Hard", 4: "Extreme"}
+        diff_colors = {1: settings.CYAN, 2: settings.ORANGE, 3: settings.RED, 4: settings.PURPLE}
         diff_name = diff_names.get(room.difficulty, "???")
+        diff_color = diff_colors.get(room.difficulty, settings.GRAY)
 
-        diff_font = pygame.font.Font(None, 16)
-        diff_txt = diff_font.render(f"Difficulty: {diff_name}", True, diff_color)
-        screen.blit(diff_txt, (popup_x + 10, popup_y + 53))
-
-        # Draw small stars
-        star_y = popup_y + 54
-        star_x = popup_x + popup_w - 15 - room.difficulty * 14
+        cx_stars = popup_x + popup_w - 40
+        cy_stars = popup_y + 40
+        star_size = 5
+        spacing = 12
+        total_sw = room.difficulty * spacing
+        sx_start = cx_stars - total_sw // 2 + spacing // 2
         for i in range(room.difficulty):
-            pts = []
-            for ai in range(10):
-                ang = math.radians(ai * 36 - 90)
-                r = 5 if ai % 2 == 0 else 2
-                pts.append((star_x + i * 14 + r * math.cos(ang),
-                             star_y + r * math.sin(ang)))
-            pygame.draw.polygon(screen, diff_color, pts)
+            x = int(sx_start + i * spacing)
+            y = int(cy_stars)
+            points = []
+            for angle_idx in range(10):
+                angle = math.radians(angle_idx * 36 - 90)
+                r = star_size if angle_idx % 2 == 0 else star_size * 0.4
+                points.append((x + r * math.cos(angle), y + r * math.sin(angle)))
+            if len(points) >= 3:
+                pygame.draw.polygon(screen, diff_color, points)
 
-        # Gold reward
-        gold_font = pygame.font.Font(None, 16)
-        gold_txt = gold_font.render(f"+{room.gold_reward} gold", True, settings.GOLD)
-        screen.blit(gold_txt, (popup_x + 10, popup_y + 73))
+        diff_text = font.render(diff_name, True, diff_color)
+        screen.blit(diff_text, (popup_x + 10, popup_y + 48))
 
-        # State indicator
-        state_labels = {"available": "ENTER →", "completed": "REVISIT", "locked": "LOCKED"}
-        state_colors = {"available": settings.GREEN, "completed": settings.CYAN, "locked": settings.GRAY}
-        state_lbl = state_labels.get(room.state, room.state)
-        state_col = state_colors.get(room.state, settings.GRAY)
-        state_txt = gold_font.render(state_lbl, True, state_col)
-        screen.blit(state_txt, (popup_x + popup_w - state_txt.get_width() - 10, popup_y + 73))
-
-        # Narrative hint at bottom
-        narr_font = pygame.font.Font(None, 13)
-        narr_text = t(room.narrative)[:45] + "…" if len(t(room.narrative)) > 45 else t(room.narrative)
-        narr_surf = narr_font.render(narr_text, True, (130, 130, 150))
-        screen.blit(narr_surf, (popup_x + 10, popup_y + 92))
+        gold_text = font.render(f"+{room.gold_reward} gold", True, settings.GOLD)
+        screen.blit(gold_text, (popup_x + 10, popup_y + 68))
 
     def draw(self, screen):
         mp_info = self._build_mp_info()
