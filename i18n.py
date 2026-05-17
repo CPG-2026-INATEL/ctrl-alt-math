@@ -180,6 +180,31 @@ STRINGS = {
         LANG_EN: "Reveal enemy targets.\nNash equilibrium:\nno regrets strategy.",
         LANG_PT: "Revele os alvos inimigos.\nEquilíbrio de Nash:\nestratégia sem arrependimento."
     },
+    "skill_integral_name": {LANG_EN: "Integral", LANG_PT: "Integral"},
+    "skill_integral_desc": {
+        LANG_EN: "Lifesteal zone attack.\nRecovers 30% of damage\ndealt as HP. Key 3.",
+        LANG_PT: "Ataque em zona de dreno.\nRecupera 30% do dano\ncausado como HP. Tecla 3."
+    },
+    "skill_fractal_name": {LANG_EN: "Fractal", LANG_PT: "Fractal"},
+    "skill_fractal_desc": {
+        LANG_EN: "Summon a decoy clone.\nEnemies may target it\ninstead of you. Key 4.",
+        LANG_PT: "Invoca um clone chamariz.\nInimigos podem mirar nele\nem vez de voce. Tecla 4."
+    },
+    "skill_gauss_name": {LANG_EN: "Gauss", LANG_PT: "Gauss"},
+    "skill_gauss_desc": {
+        LANG_EN: "Chain attack.\nBasic attack bounces to\nnearest enemy for % dmg.",
+        LANG_PT: "Ataque em cadeia.\nAtaque basico ricocheteia\nno inimigo proximo."
+    },
+    "skill_simetria_name": {LANG_EN: "Simetria", LANG_PT: "Simetria"},
+    "skill_simetria_desc": {
+        LANG_EN: "Reflect damage back.\nThorns: X% of damage taken\nreturned to attacker.",
+        LANG_PT: "Reflete dano de volta.\nEspinhos: X% do dano recebido\nretornado ao atacante."
+    },
+    "skill_matriz_name": {LANG_EN: "Matriz", LANG_PT: "Matriz"},
+    "skill_matriz_desc": {
+        LANG_EN: "Capstone mastery.\nAll buffs last +1 turn.\nGain +1 SP on unlock.",
+        LANG_PT: "Maestria final.\nBuffs duram +1 turno.\nGanha +1 SP ao desbloquear."
+    },
 
     # Skill Flavor Lore
     "skill_axioma_flavor": {LANG_EN: "The first thing they tried to erase was the equal sign.", LANG_PT: "A primeira coisa que tentaram apagar foi o sinal de igual."},
@@ -190,6 +215,11 @@ STRINGS = {
     "skill_reflexao_flavor": {LANG_EN: "Your own hatred will be your downfall.", LANG_PT: "Seu próprio ódio será sua ruína."},
     "skill_entropia_flavor": {LANG_EN: "Order is a fragile illusion.", LANG_PT: "A ordem é uma ilusão frágil."},
     "skill_teoria_jogos_flavor": {LANG_EN: "We are playing a game they already lost.", LANG_PT: "Estamos jogando um jogo que eles já perderam."},
+    "skill_integral_flavor": {LANG_EN: "The area under the curve is the sum of all our victories.", LANG_PT: "A area sob a curva e a soma de todas as nossas vitorias."},
+    "skill_fractal_flavor": {LANG_EN: "Every part contains the whole rebellion.", LANG_PT: "Cada parte contem a rebeliao inteira."},
+    "skill_gauss_flavor": {LANG_EN: "The bell rings for the Regime's final hour.", LANG_PT: "O sino toca para a hora final do Regime."},
+    "skill_simetria_flavor": {LANG_EN: "What they do to you, they do to themselves.", LANG_PT: "O que eles fazem a voce, fazem a si mesmos."},
+    "skill_matriz_flavor": {LANG_EN: "The matrix has you. You have the matrix.", LANG_PT: "A matriz tem voce. Voce tem a matriz."},
 
     # Waves Narrative
     "wave_1_narr": {LANG_EN: "Mathematics is forbidden.\nBut reality still obeys it.", LANG_PT: "A matemática é proibida.\nMas a realidade ainda a obedece."},

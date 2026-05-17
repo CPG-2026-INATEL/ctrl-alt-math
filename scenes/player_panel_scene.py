@@ -110,14 +110,16 @@ class PlayerPanelScene(Scene):
         content_x = settings.WINDOW_WIDTH // 2 + 20
         content_w = settings.WINDOW_WIDTH // 2 - 40
         content_h = settings.WINDOW_HEIGHT - 100
-        scale = min(content_w / 600, content_h / 500)
-        origin_x = content_x + 20
-        origin_y = 80 - int(self.scroll_y)
+        scale = min(content_w / 800, content_h / 520)
+        node_w = int(160 * scale)
+        node_h = int(46 * scale)
+        offset_x = content_x + (content_w - int(800 * scale)) // 2
+        offset_y = 80 - int(self.scroll_y)
 
         for skill in skill_tree.skills.values():
-            sx = origin_x + int(skill["x"] * scale * 0.4) - 40
-            sy = origin_y + int(skill["y"] * scale * 0.4) - 20
-            node_rect = pygame.Rect(sx, sy, 80, 40)
+            sx = offset_x + int(skill["x"] * scale) - node_w // 2
+            sy = offset_y + int(skill["y"] * scale) - node_h // 2
+            node_rect = pygame.Rect(sx, sy, node_w, node_h)
             if node_rect.collidepoint(mx, my):
                 if skill_tree.can_unlock(skill["id"]):
                     skill_tree.unlock(skill["id"])
@@ -171,13 +173,15 @@ class PlayerPanelScene(Scene):
                 skill_tree = self.game.skill_tree
                 content_w = settings.WINDOW_WIDTH // 2 - 40
                 content_h = settings.WINDOW_HEIGHT - 100
-                scale = min(content_w / 600, content_h / 500)
-                origin_x = settings.WINDOW_WIDTH // 2 + 20 + 20
-                origin_y = 80 - int(self.scroll_y)
+                scale = min(content_w / 800, content_h / 520)
+                node_w = int(160 * scale)
+                node_h = int(46 * scale)
+                offset_x = settings.WINDOW_WIDTH // 2 + 20 + (content_w - int(800 * scale)) // 2
+                offset_y = 80 - int(self.scroll_y)
                 for skill in skill_tree.skills.values():
-                    sx = origin_x + int(skill["x"] * scale * 0.4) - 40
-                    sy = origin_y + int(skill["y"] * scale * 0.4) - 20
-                    node_rect = pygame.Rect(sx, sy, 80, 40)
+                    sx = offset_x + int(skill["x"] * scale) - node_w // 2
+                    sy = offset_y + int(skill["y"] * scale) - node_h // 2
+                    node_rect = pygame.Rect(sx, sy, node_w, node_h)
                     if node_rect.collidepoint(mx, my):
                         self.hovered_skill = skill["id"]
 
@@ -366,51 +370,84 @@ class PlayerPanelScene(Scene):
         content_w = settings.WINDOW_WIDTH // 2 - 40
         content_h = settings.WINDOW_HEIGHT - 100
 
-        scale = min(content_w / 600, content_h / 500)
-        origin_x = content_x + 20
-        origin_y = 80 - int(self.scroll_y)
+        scale = min(content_w / 800, content_h / 520)
+        node_w = int(160 * scale)
+        node_h = int(46 * scale)
+        offset_x = content_x + (content_w - int(800 * scale)) // 2
+        offset_y = 80 - int(self.scroll_y)
 
         draw_text(screen, "SKILLS", (content_x + 10, 55), settings.GOLD, 22, center=False)
         draw_text(screen, f"Points: {skill_tree.skill_points}", (content_x + content_w - 80, 55), settings.GOLD, 14, center=False)
 
         for skill in skill_tree.skills.values():
-            sx = origin_x + int(skill["x"] * scale * 0.4) - 40
-            sy = origin_y + int(skill["y"] * scale * 0.4) - 20
+            sx = offset_x + int(skill["x"] * scale) - node_w // 2
+            sy = offset_y + int(skill["y"] * scale) - node_h // 2
             level = skill_tree.get_level(skill["id"])
             unlocked = level > 0
             can_unlock = skill_tree.can_unlock(skill["id"])
 
-            node_rect = pygame.Rect(sx, sy, 80, 40)
+            node_rect = pygame.Rect(sx, sy, node_w, node_h)
             if unlocked:
                 bg = skill.get("color", settings.CYAN)
                 bg_dark = (bg[0] // 3, bg[1] // 3, bg[2] // 3)
-                pygame.draw.rect(screen, bg_dark, node_rect, border_radius=6)
-                pygame.draw.rect(screen, bg, node_rect, 2, border_radius=6)
+                pygame.draw.rect(screen, bg_dark, node_rect, border_radius=4)
+                pygame.draw.rect(screen, bg, node_rect, 2, border_radius=4)
             elif can_unlock:
-                pygame.draw.rect(screen, (30, 30, 50), node_rect, border_radius=6)
-                pygame.draw.rect(screen, settings.GRAY, node_rect, 1, border_radius=6)
+                pygame.draw.rect(screen, (30, 30, 50), node_rect, border_radius=4)
+                pygame.draw.rect(screen, settings.GRAY, node_rect, 1, border_radius=4)
             else:
-                pygame.draw.rect(screen, (15, 15, 25), node_rect, border_radius=6)
-                pygame.draw.rect(screen, (40, 40, 50), node_rect, 1, border_radius=6)
+                pygame.draw.rect(screen, (15, 15, 25), node_rect, border_radius=4)
+                pygame.draw.rect(screen, (40, 40, 50), node_rect, 1, border_radius=4)
 
-            font = pygame.font.Font(None, 14)
+            font = pygame.font.Font(None, int(12 * settings.UI_SCALE))
             label = font.render(t(skill["name"])[:12], True,
                                 settings.WHITE if unlocked else settings.GRAY)
             screen.blit(label, (node_rect.centerx - label.get_width() // 2,
-                                 node_rect.centery - 8))
-            lv_text = font.render(f"Lv.{level}", True, settings.GOLD if unlocked else settings.DARK_GRAY)
+                                 node_rect.centery - int(6 * settings.UI_SCALE)))
+            lv_text = pygame.font.Font(None, int(10 * settings.UI_SCALE)).render(f"Lv.{level}", True, settings.GOLD if unlocked else settings.DARK_GRAY)
             screen.blit(lv_text, (node_rect.centerx - lv_text.get_width() // 2,
-                                    node_rect.centery + 6))
+                                    node_rect.centery + int(3 * settings.UI_SCALE)))
 
             for prereq_id in skill.get("prereqs", []):
                 prereq = skill_tree.skills.get(prereq_id)
                 if prereq:
-                    px = origin_x + int(prereq["x"] * scale * 0.4)
-                    py = origin_y + int(prereq["y"] * scale * 0.4)
-                    nx = origin_x + int(skill["x"] * scale * 0.4)
-                    ny = origin_y + int(skill["y"] * scale * 0.4)
+                    px = offset_x + int(prereq["x"] * scale)
+                    py = offset_y + int(prereq["y"] * scale)
+                    nx = offset_x + int(skill["x"] * scale)
+                    ny = offset_y + int(skill["y"] * scale)
                     line_color = settings.GREEN if skill_tree.get_level(prereq_id) > 0 else (40, 40, 50)
                     pygame.draw.line(screen, line_color, (px, py), (nx, ny), 2)
+
+        if self.hovered_skill:
+            skill = skill_tree.skills.get(self.hovered_skill)
+            if skill:
+                self._draw_skill_popup(screen, skill, skill_tree, content_x, content_w)
+
+    def _draw_skill_popup(self, screen, skill, skill_tree, content_x, content_w):
+        popup_w = content_w
+        popup_h = 95
+        popup_x = content_x
+        popup_y = settings.WINDOW_HEIGHT - popup_h - 70
+
+        popup_surf = pygame.Surface((popup_w, popup_h), pygame.SRCALPHA)
+        popup_surf.fill((15, 15, 35, 240))
+        screen.blit(popup_surf, (popup_x, popup_y))
+        pygame.draw.rect(screen, settings.CYAN, (popup_x, popup_y, popup_w, popup_h), 1, border_radius=6)
+
+        level = skill_tree.get_level(skill["id"])
+        cost = skill_tree.get_upgrade_cost(self.hovered_skill)
+        can_afford = skill_tree.skill_points >= cost
+
+        draw_text(screen, t(skill["name"]), (popup_x + popup_w // 2, popup_y + 15), settings.WHITE, 15)
+        desc_text = t(skill["desc"]).replace("\n", "  ")
+        draw_text(screen, desc_text, (popup_x + popup_w // 2, popup_y + 38), settings.GRAY, 11)
+        cost_color = settings.GOLD if can_afford else settings.RED
+        line = f"Lv.{level}  |  Custo: {cost} SP"
+        if can_afford:
+            line += "  [Clique para upar]"
+        draw_text(screen, line, (popup_x + popup_w // 2, popup_y + 62), cost_color, 11)
+        if level == 0 and not can_afford:
+            draw_text(screen, "Faltam SP para desbloquear", (popup_x + popup_w // 2, popup_y + 80), settings.RED, 10)
 
     def _draw_inventory(self, screen):
         player = self.game.player

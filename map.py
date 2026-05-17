@@ -365,6 +365,9 @@ class WorldMap:
                  (settings.WINDOW_WIDTH - 100, title_y),
                  settings.GOLD, 18)
 
+        draw_text(screen, "[TAB] Player", (15, 12), settings.GRAY, 13, center=False)
+        draw_text(screen, "[S] Shop",    (15, 33), settings.GRAY, 13, center=False)
+
     def _get_gold(self):
         try:
             return self._game.gold

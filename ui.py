@@ -130,6 +130,8 @@ class UI:
         has_pitagoras = game.skill_tree.is_unlocked("pitagoras") if game else False
         has_reflexao = game.skill_tree.is_unlocked("reflexao") if game else False
         has_ctrlz = game.skill_tree.is_unlocked("ctrlz") if game else False
+        has_integral = game.skill_tree.is_unlocked("integral") if game else False
+        has_fractal = game.skill_tree.is_unlocked("fractal") if game else False
 
         if has_pitagoras:
             ready = player.pitagoras_cooldown <= 0 and player.rigor >= settings.PITAGORAS_RIGOR_COST
@@ -141,8 +143,22 @@ class UI:
         if has_reflexao:
             ready = player.reflexao_cooldown <= 0 and player.rigor >= settings.REFLEXAO_RIGOR_COST
             self._draw_cooldown_icon(screen, x, y, "2", ready,
-                                     player.reflexao_cooldown, 3,
-                                     player.rigor >= settings.REFLEXAO_RIGOR_COST)
+                                      player.reflexao_cooldown, 3,
+                                      player.rigor >= settings.REFLEXAO_RIGOR_COST)
+        x += 30
+
+        if has_integral:
+            ready = player.integral_cooldown <= 0 and player.rigor >= settings.INTEGRAL_RIGOR_COST
+            self._draw_cooldown_icon(screen, x, y, "3", ready,
+                                      player.integral_cooldown, 1,
+                                      player.rigor >= settings.INTEGRAL_RIGOR_COST)
+        x += 30
+
+        if has_fractal:
+            ready = player.fractal_cooldown <= 0 and player.rigor >= settings.FRACTAL_RIGOR_COST
+            self._draw_cooldown_icon(screen, x, y, "4", ready,
+                                      player.fractal_cooldown, 5,
+                                      player.rigor >= settings.FRACTAL_RIGOR_COST)
         x += 30
 
         if has_ctrlz:

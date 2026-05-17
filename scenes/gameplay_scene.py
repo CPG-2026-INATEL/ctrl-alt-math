@@ -432,13 +432,20 @@ class GameplayScene(Scene):
     def _generate_enemy_intents(self):
         alive_enemies = [e for e in self.game.enemies if not e.dead]
         self.enemy_intents = []
+        clones = [e for e in alive_enemies if getattr(e, 'is_decoy', False) and not e.dead]
         for enemy in alive_enemies:
             if any(se["effect"] == "stun" for se in enemy.status_effects):
+                continue
+            if getattr(enemy, 'is_decoy', False):
                 continue
             target_player = self._target_player_for_enemy(enemy)
             if target_player is None:
                 continue
-            new_intents = enemy.decide_intent(target_player.col, target_player.row, self.grid, self.game.enemies)
+            target_col, target_row = target_player.col, target_player.row
+            if clones and random.random() < 0.5:
+                clone = random.choice(clones)
+                target_col, target_row = clone.col, clone.row
+            new_intents = enemy.decide_intent(target_col, target_row, self.grid, self.game.enemies)
             self.enemy_intents.extend(new_intents)
         player_skills = self._get_player_skill_ids()
         self.grid.set_danger_tiles(self.enemy_intents, player_skills)
@@ -595,6 +602,13 @@ class GameplayScene(Scene):
         if self.selected_skill == "reflexao":
             radius = st.get_skill_value("reflexao", "range", settings.REFLEXAO_RANGE)
             return self.grid.get_cells_in_radius(pc, pr, radius)
+        if self.selected_skill == "integral":
+            radius = st.get_skill_value("integral", "range", settings.INTEGRAL_RANGE)
+            return self.grid.get_cells_in_radius(pc, pr, radius)
+        if self.selected_skill == "fractal":
+            radius = st.get_skill_value("fractal", "range", settings.FRACTAL_RANGE)
+            cells = self.grid.get_cells_in_radius(pc, pr, radius)
+            return [c for c in cells if c != (pc, pr) and not self.grid.is_blocked(c[0], c[1])]
         return [
             cell for cell in self.grid.get_cells_in_range(pc, pr, settings.BASIC_ATTACK_RANGE)
             if cell != (pc, pr)
@@ -606,6 +620,12 @@ class GameplayScene(Scene):
             return False
 
         if self.selected_skill == "reflexao":
+            return True
+
+        if self.selected_skill == "fractal":
+            return not self.grid.is_blocked(self.cursor_col, self.cursor_row)
+
+        if self.selected_skill == "integral":
             return True
 
         return self._get_enemy_at_cursor() is not None
@@ -723,6 +743,10 @@ class GameplayScene(Scene):
                         self._send_mp_command("select_skill", skill_id="pitagoras")
                     elif event.key == pygame.K_2:
                         self._send_mp_command("select_skill", skill_id="reflexao")
+                    elif event.key == pygame.K_3:
+                        self._send_mp_command("select_skill", skill_id="integral")
+                    elif event.key == pygame.K_4:
+                        self._send_mp_command("select_skill", skill_id="fractal")
                 return
 
             return
@@ -768,6 +792,17 @@ class GameplayScene(Scene):
             skin_name = self.game.player.skin_names[self.game.player.skin_index]
             self.game.floating_text.add_info(self.game.player.x, self.game.player.y - 40,
                                             t("class_label", name=skin_name), settings.CYAN)
+            return
+
+        if (mods & pygame.KMOD_CTRL) and (mods & pygame.KMOD_SHIFT) and event.key == pygame.K_d:
+            st = self.game.skill_tree
+            for sid in st.skills:
+                if st.skills[sid]["level"] == 0:
+                    st.skills[sid]["level"] = 1
+            st.skill_points = 99
+            self.game.floating_text.add_info(self.game.player.x, self.game.player.y - 40,
+                                            "DEBUG: All skills unlocked, 99 SP", settings.GOLD)
+            self.game.sfx.play("skill_unlock")
             return
 
         if (mods & pygame.KMOD_CTRL):
@@ -871,6 +906,12 @@ class GameplayScene(Scene):
         elif k == pygame.K_2:
             if self.game.skill_tree.is_unlocked("reflexao"):
                 self._toggle_skill("reflexao")
+        elif k == pygame.K_3:
+            if self.game.skill_tree.is_unlocked("integral"):
+                self._toggle_skill("integral")
+        elif k == pygame.K_4:
+            if self.game.skill_tree.is_unlocked("fractal"):
+                self._toggle_skill("fractal")
 
     def _execute_basic_attack(self, target_enemies=None):
         pc = self.game.player.col
@@ -1035,6 +1076,62 @@ class GameplayScene(Scene):
             self.game.sfx.play("reflexao")
             self.turn_log.append(f"Reflexao hit {hit_count} enemies")
 
+        elif skill == "integral":
+            if not self.game.player.integral_attack():
+                return False
+            st = self.game.skill_tree
+            radius = st.get_skill_value("integral", "range", settings.INTEGRAL_RANGE)
+            target_cells = self.grid.get_cells_in_radius(pc, pr, radius)
+            dmg_base = st.get_skill_value("integral", "damage", settings.INTEGRAL_DAMAGE)
+            lifesteal = st.get_skill_value("integral", "lifesteal", settings.INTEGRAL_LIFESTEAL)
+            total_dmg = 0
+            hit_count = 0
+            for enemy in self.game.enemies:
+                if not enemy.dead and (enemy.col, enemy.row) in target_cells:
+                    enemy.take_damage(dmg_base)
+                    self.game.floating_text.add_enemy_damage(enemy.x, enemy.y, dmg_base, False)
+                    self.game.particles.emit_burst(enemy.x, enemy.y, (100, 255, 100), 6, 40, 0.2)
+                    total_dmg += dmg_base
+                    hit_count += 1
+                    if enemy.dead:
+                        self._on_enemy_death(enemy)
+            if total_dmg > 0:
+                heal = int(total_dmg * lifesteal)
+                self.game.player.hp = min(self.game.player.hp + heal, self.game.player.get_max_hp())
+                self.game.floating_text.add_heal(self.game.player.x, self.game.player.y, heal)
+                self.game.particles.emit_burst(self.game.player.x, self.game.player.y, (100, 255, 100), 15, 80, 0.4)
+            self.game.sfx.play("menu_select")
+            self.turn_log.append(f"Integral hit {hit_count} for {total_dmg} dmg, healed {int(total_dmg * lifesteal)}")
+
+        elif skill == "fractal":
+            target_cell = (self.cursor_col, self.cursor_row)
+            if target_cell == (pc, pr):
+                return False
+            if self.grid.is_blocked(self.cursor_col, self.cursor_row) or self.grid.is_level_change(pc, pr, self.cursor_col, self.cursor_row):
+                return False
+            if not self.game.player.fractal_attack():
+                return False
+            from enemy import Enemy
+            st = self.game.skill_tree
+            clone_hp = st.get_skill_value("fractal", "hp", settings.FRACTAL_HP_PER_LEVEL)
+            level = st.get_level("fractal")
+            clone = Enemy(0, 0, "strawman")
+            clone.col = self.cursor_col
+            clone.row = self.cursor_row
+            clone.x, clone.y = self.grid.to_pixel(self.cursor_col, self.cursor_row)
+            clone.hp = clone_hp
+            clone.max_hp = clone_hp
+            clone.color = (100, 255, 180)
+            clone.is_decoy = True
+            clone.decoy_lifetime = level * 2 + 2
+            clone.robot_type = "Clone"
+            clone.size = settings.ENEMY_SIZE * 0.8
+            self.game.enemies.append(clone)
+            self.game.floating_text.add_info(clone.x, clone.y - 20, "CLONE", (100, 255, 180))
+            self.game.particles.emit_burst(clone.x, clone.y, (100, 255, 180), 20, 100, 0.5)
+            self.game.sfx.play("menu_select")
+            self.turn_log.append(f"Fractal clone spawned with {clone_hp} HP")
+
         self.turn_manager.player_acted = True
         self.show_action_range = False
         self.selected_skill = None
@@ -1119,6 +1216,15 @@ class GameplayScene(Scene):
                 enemy.status_effects.pop(i)
             if enemy.dead:
                 self._on_enemy_death(enemy)
+
+    def _tick_decoy_clones(self):
+        for i in range(len(self.game.enemies) - 1, -1, -1):
+            enemy = self.game.enemies[i]
+            if getattr(enemy, 'is_decoy', False) and not enemy.dead:
+                enemy.decoy_lifetime -= 1
+                if enemy.decoy_lifetime <= 0:
+                    self.game.particles.emit_burst(enemy.x, enemy.y, (100, 255, 180), 10, 50, 0.3)
+                    self.game.enemies.pop(i)
         self.last_enemy_death_pos = (enemy.x, enemy.y)
         
         # Award EXP
@@ -1704,6 +1810,7 @@ class GameplayScene(Scene):
 
         self.game.player.tick_buffs()
         self._tick_enemy_status_effects()
+        self._tick_decoy_clones()
 
         # Check for room completion or death before taking snapshot for next turn
         alive = [e for e in self.game.enemies if not e.dead]
@@ -1993,6 +2100,10 @@ class GameplayScene(Scene):
                 self._toggle_skill("pitagoras")
             elif skill_id == "reflexao" and self.game.skill_tree.is_unlocked("reflexao"):
                 self._toggle_skill("reflexao")
+            elif skill_id == "integral" and self.game.skill_tree.is_unlocked("integral"):
+                self._toggle_skill("integral")
+            elif skill_id == "fractal" and self.game.skill_tree.is_unlocked("fractal"):
+                self._toggle_skill("fractal")
         elif cmd == "rewind" and self.state in ("PLAYER_INPUT", "PLAYER_ACTION_SELECT"):
             self._try_rewind()
 
@@ -2186,6 +2297,18 @@ class GameplayScene(Scene):
                     settings.REFLEXAO_RANGE
                 )
                 self.grid.draw(temp, highlight_cells=cells, highlight_color=settings.CYAN, offset=world_offset)
+            elif self.selected_skill == "integral":
+                st = self.game.skill_tree
+                radius = st.get_skill_value("integral", "range", settings.INTEGRAL_RANGE)
+                cells = self.grid.get_cells_in_radius(
+                    self.game.player.col, self.game.player.row, radius
+                )
+                self.grid.draw(temp, highlight_cells=cells, highlight_color=(100, 255, 100), offset=world_offset)
+            elif self.selected_skill == "fractal":
+                cells = self.grid.get_cells_in_radius(
+                    self.game.player.col, self.game.player.row, 1
+                )
+                self.grid.draw(temp, highlight_cells=cells, highlight_color=(255, 180, 100), offset=world_offset)
             else:
                 cells = self.grid.get_cells_in_range(
                     self.game.player.col, self.game.player.row,
@@ -2583,7 +2706,7 @@ class GameplayScene(Scene):
         screen.blit(log_title, (log_x, bar_y + 10))
         self._draw_combat_log(screen, log_x, bar_y + 22)
 
-        controls = "WASD/click move + confirm  1/2 skills  R rewind  Esc pause"
+        controls = "WASD/click move + confirm  1/2/3/4 skills  R rewind  Esc pause"
         if self._is_true_coop():
             turn_owner = "HOST" if self._current_player_owner() == "host" else "CLIENT"
             controls = f"{controls}  Turn: {turn_owner} {self._player_label(self.active_player_idx)}"

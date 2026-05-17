@@ -38,6 +38,8 @@ class Player:
         self.flash_timer = 0
         self.pitagoras_cooldown = 0
         self.reflexao_cooldown = 0
+        self.integral_cooldown = 0
+        self.fractal_cooldown = 0
 
         self.glow_phase = 0
         self.trail = []
@@ -203,8 +205,12 @@ class Player:
     def decrement_cooldowns(self):
         self.pitagoras_cooldown = getattr(self, 'pitagoras_cooldown', 0)
         self.reflexao_cooldown = getattr(self, 'reflexao_cooldown', 0)
+        self.integral_cooldown = getattr(self, 'integral_cooldown', 0)
+        self.fractal_cooldown = getattr(self, 'fractal_cooldown', 0)
         self.pitagoras_cooldown = max(0, self.pitagoras_cooldown - 1)
         self.reflexao_cooldown = max(0, self.reflexao_cooldown - 1)
+        self.integral_cooldown = max(0, self.integral_cooldown - 1)
+        self.fractal_cooldown = max(0, self.fractal_cooldown - 1)
 
     def add_exp(self, amount):
         self.exp += amount
@@ -322,6 +328,24 @@ class Player:
             return False
         self.rigor -= settings.REFLEXAO_RIGOR_COST
         self.reflexao_cooldown = 3
+        return True
+
+    def integral_attack(self):
+        if getattr(self, 'integral_cooldown', 0) > 0:
+            return False
+        if self.rigor < settings.INTEGRAL_RIGOR_COST:
+            return False
+        self.rigor -= settings.INTEGRAL_RIGOR_COST
+        self.integral_cooldown = 1
+        return True
+
+    def fractal_attack(self):
+        if getattr(self, 'fractal_cooldown', 0) > 0:
+            return False
+        if self.rigor < settings.FRACTAL_RIGOR_COST:
+            return False
+        self.rigor -= settings.FRACTAL_RIGOR_COST
+        self.fractal_cooldown = 5
         return True
 
     def take_damage(self, amount):
