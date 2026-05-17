@@ -695,12 +695,12 @@ class GameplayScene(Scene):
                 self.game.scene_manager.push("pause")
                 return
 
-            if event.key == pygame.K_TAB and self.state not in ("VICTORY_TRANSITION", "GAME_OVER_TRANSITION"):
-                self.game.scene_manager.push("player_panel")
-                return
-
             if event.key == pygame.K_s and self.state not in ("VICTORY_TRANSITION", "GAME_OVER_TRANSITION"):
                 self.game.scene_manager.push("skill_tree")
+                return
+
+            if event.key == pygame.K_u and self.state not in ("VICTORY_TRANSITION", "GAME_OVER_TRANSITION"):
+                self.game.scene_manager.push("upgrades")
                 return
 
             if event.key == pygame.K_i and self.state in ("PLAYER_INPUT", "PLAYER_ACTION_SELECT"):
@@ -821,12 +821,12 @@ class GameplayScene(Scene):
             self.game.scene_manager.push("pause")
             return
 
-        if event.key == pygame.K_TAB and self.state not in ("VICTORY_TRANSITION", "GAME_OVER_TRANSITION"):
-            self.game.scene_manager.push("player_panel")
-            return
-
         if event.key == pygame.K_s and self.state not in ("VICTORY_TRANSITION", "GAME_OVER_TRANSITION"):
             self.game.scene_manager.push("skill_tree")
+            return
+
+        if event.key == pygame.K_u and self.state not in ("VICTORY_TRANSITION", "GAME_OVER_TRANSITION"):
+            self.game.scene_manager.push("upgrades")
             return
 
         if event.key == pygame.K_i and self.state in ("PLAYER_INPUT", "PLAYER_ACTION_SELECT"):

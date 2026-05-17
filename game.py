@@ -28,6 +28,7 @@ from scenes.achievement_scene import AchievementScene
 from scenes.player_panel_scene import PlayerPanelScene
 from scenes.shop_scene import ShopScene
 from scenes.inventory_dock_scene import InventoryDockScene
+from scenes.upgrades_scene import UpgradesScene
 
 
 class Game:
@@ -63,6 +64,7 @@ class Game:
         self.scene_manager.add("player_panel", PlayerPanelScene)
         self.scene_manager.add("shop", ShopScene)
         self.scene_manager.add("inventory_dock", InventoryDockScene)
+        self.scene_manager.add("upgrades", UpgradesScene)
         self.scene_manager.switch("menu")
 
     def _configure_display(self):

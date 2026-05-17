@@ -43,7 +43,7 @@ class PlayerPanelScene(Scene):
                 self._sync_gold()
                 self.game.scene_manager.pop()
                 return
-            if event.key == pygame.K_1:
+            if event.key == pygame.K_1 or event.key == pygame.K_u:
                 self.active_tab = TAB_UPGRADES
                 self.scroll_y = 0
             elif event.key == pygame.K_2:
