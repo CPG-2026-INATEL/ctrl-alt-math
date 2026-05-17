@@ -670,15 +670,15 @@ class WorldMap:
         elif room.type == "boss":
             bg_color = (50, 15, 15)
             border_color = settings.RED
+        elif room.objective == "capture_flag":
+            bg_color = (30, 35, 20)
+            border_color = (0, 220, 0)
         elif room.type == "challenge":
             bg_color = diff_colors.get(room.difficulty, diff_colors[1])[0]
             border_color = diff_colors.get(room.difficulty, diff_colors[1])[1]
         elif room.type == "side":
             bg_color = (30, 40, 20)
             border_color = settings.GOLD
-        elif room.objective == "capture_flag":
-            bg_color = (30, 35, 20)
-            border_color = (0, 220, 0)
         else:
             bg_color = diff_colors.get(room.difficulty, diff_colors[1])[0]
             border_color = diff_colors.get(room.difficulty, diff_colors[1])[1]
@@ -699,6 +699,9 @@ class WorldMap:
         elif is_hovered:
             border_color = settings.GOLD
             border_width = 3
+        elif room.objective == "capture_flag" and room.state == "available":
+            border_color = (0, 255, 80)
+            border_width = 3
 
         pygame.draw.rect(screen, border_color, draw_rect, border_width, border_radius=10)
 
@@ -711,6 +714,8 @@ class WorldMap:
         icon_color = settings.WHITE if room.state != "locked" else (60, 60, 60)
         if room.state == "completed":
             icon_color = settings.GREEN
+        elif room.objective == "capture_flag" and room.state == "available":
+            icon_color = (255, 220, 40)
         draw_text(screen, icon, (draw_rect.centerx, draw_rect.centery - 8), icon_color, 20)
 
         star_color = settings.GOLD if room.state != "locked" else (50, 50, 50)
@@ -723,6 +728,12 @@ class WorldMap:
                  (draw_rect.centerx, draw_rect.bottom - int(10 * settings.UI_SCALE)),
                  name_color, 8)
 
+        if room.objective == "capture_flag" and room.state != "locked":
+            obj_color = (255, 220, 40) if room.state == "available" else settings.GREEN
+            draw_text(screen, "[FLAG]",
+                     (draw_rect.centerx, draw_rect.bottom - 2),
+                     obj_color, 7)
+
     def _get_room_icon(self, room):
         if room.state == "completed":
             return "OK"
@@ -732,14 +743,14 @@ class WorldMap:
             return "H"
         if room.type == "boss":
             return "B"
+        if room.objective == "capture_flag":
+            return "F"
         if room.type == "challenge":
             return "C"
         if room.type == "side":
             return "$"
         if room.type == "victory":
             return "V"
-        if room.objective == "capture_flag":
-            return "F"
         return "O"
 
     def draw(self, screen, player=None, mp_info=None):
