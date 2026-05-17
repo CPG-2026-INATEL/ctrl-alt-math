@@ -30,7 +30,10 @@ class PlayerPanelScene(Scene):
         self.hovered_equip_slot = None
 
     def enter(self, prev_scene=None):
-        self.active_tab = TAB_UPGRADES
+        if prev_scene and prev_scene.__class__.__name__ == "MapScene":
+            self.active_tab = TAB_INVENTORY
+        else:
+            self.active_tab = TAB_UPGRADES
         self.scroll_y = 0
         self._sync_gold()
 

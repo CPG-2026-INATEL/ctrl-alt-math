@@ -204,7 +204,7 @@ class MapScene(Scene):
             moved = wmap.navigate("right")
         elif event.key == pygame.K_s:
             self.game.sfx.play("menu_select")
-            self.game.scene_manager.push("skill_tree")
+            self.game.scene_manager.push("shop")
             return
         elif event.key == pygame.K_u:
             self.game.sfx.play("menu_select")
@@ -213,6 +213,10 @@ class MapScene(Scene):
         elif event.key == pygame.K_e:
             self.game.sfx.play("menu_select")
             self.game.scene_manager.push("equip_dock")
+            return
+        elif event.key == pygame.K_TAB:
+            self.game.sfx.play("menu_select")
+            self.game.scene_manager.push("player_panel")
             return
 
         if moved:
