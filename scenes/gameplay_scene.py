@@ -205,7 +205,7 @@ class GameplayScene(Scene):
             self.state = "WAIT_REMOTE_SYNC"
             return
         # If there are no enemies, immediately restart the player turn without phase shifts
-        alive_enemies = [e for e in self.game.enemies if not e.dead]
+        alive_enemies = [e for e in self.game.enemies if not e.dead and not getattr(e, 'is_decoy', False)]
         if len(alive_enemies) == 0:
             self.turn_manager.start_turn()
             self.state = "PLAYER_INPUT"
@@ -1311,7 +1311,7 @@ class GameplayScene(Scene):
         self._check_victory()
 
     def _check_victory(self):
-        alive = [e for e in self.game.enemies if not e.dead]
+        alive = [e for e in self.game.enemies if not e.dead and not getattr(e, 'is_decoy', False)]
         if len(alive) == 0 and self.state != "VICTORY_TRANSITION":
             self.state = "VICTORY_TRANSITION"
             self.victory_timer = 0
@@ -1890,7 +1890,7 @@ class GameplayScene(Scene):
         self._tick_decoy_clones()
 
         # Check for room completion or death before taking snapshot for next turn
-        alive = [e for e in self.game.enemies if not e.dead]
+        alive = [e for e in self.game.enemies if not e.dead and not getattr(e, 'is_decoy', False)]
         if len(alive) == 0:
             self.state = "VICTORY_TRANSITION"
             self.victory_timer = 0
