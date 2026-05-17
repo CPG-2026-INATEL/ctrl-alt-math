@@ -1,6 +1,8 @@
 import json
 import os
+
 import settings
+from utils import app_path
 
 class AchievementManager:
     _instance = None
@@ -51,7 +53,7 @@ class AchievementManager:
                 "easy": False, "medium": False, "hard": False
             }
         }
-        self.save_file = "achievements.json"
+        self.save_file = os.path.join(app_path(), "achievements.json")
         self.load()
 
     def load(self):

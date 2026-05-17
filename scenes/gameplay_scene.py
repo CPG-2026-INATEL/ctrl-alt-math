@@ -3,7 +3,7 @@ import random
 import math
 
 import settings
-from utils import draw_text, distance, angle_between
+from utils import draw_text, distance, angle_between, resource_path
 from i18n import t
 from enemy import Enemy
 from enemy_intent import EnemyIntent
@@ -16,7 +16,7 @@ from scenes.scene import Scene
 
 
 class GameplayScene(Scene):
-    TILESET_PATH = "assets/Tileset/tileset_arranged.png"
+    TILESET_PATH = resource_path("assets/Tileset/tileset_arranged.png")
     TILE_SIZE = 16
     ENEMY_ATTACK_DELAY = 0.25
 

@@ -3,7 +3,7 @@ import math
 import random
 
 import settings
-from utils import clamp, distance
+from utils import clamp, distance, resource_path
 
 
 class Player:
@@ -67,13 +67,13 @@ class Player:
             "MachineGunner", "RadioOperator", "Sniper"
         ]
         self.skin_paths = {
-            "Assault": "assets/Soldiers/Assault-Class.png",
-            "SquadLeader": "assets/Soldiers/SquadLeader.png",
-            "AntiTank": "assets/Soldiers/AntiTank-Class.png",
-            "Grenadier": "assets/Soldiers/Grenadier-Class.png",
-            "MachineGunner": "assets/Soldiers/MachineGunner-Class.png",
-            "RadioOperator": "assets/Soldiers/RadioOperator-Class.png",
-            "Sniper": "assets/Soldiers/Sniper-Class.png"
+            "Assault": resource_path("assets/Soldiers/Assault-Class.png"),
+            "SquadLeader": resource_path("assets/Soldiers/SquadLeader.png"),
+            "AntiTank": resource_path("assets/Soldiers/AntiTank-Class.png"),
+            "Grenadier": resource_path("assets/Soldiers/Grenadier-Class.png"),
+            "MachineGunner": resource_path("assets/Soldiers/MachineGunner-Class.png"),
+            "RadioOperator": resource_path("assets/Soldiers/RadioOperator-Class.png"),
+            "Sniper": resource_path("assets/Soldiers/Sniper-Class.png")
         }
         self.spritesheets = {}
         self.load_skins()
@@ -99,8 +99,8 @@ class Player:
 
     def load_effects(self):
         try:
-            self.effects["blood"] = pygame.image.load("assets/Effects/hit-spatters.png").convert_alpha()
-            self.effects["muzzle"] = pygame.image.load("assets/Effects/muzzle-flashes.png").convert_alpha()
+            self.effects["blood"] = pygame.image.load(resource_path("assets/Effects/hit-spatters.png")).convert_alpha()
+            self.effects["muzzle"] = pygame.image.load(resource_path("assets/Effects/muzzle-flashes.png")).convert_alpha()
         except Exception as e:
             print(f"Error loading effects: {e}")
 

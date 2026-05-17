@@ -1,6 +1,22 @@
+import os
+import sys
 import pygame
 import math
 import settings
+
+
+def resource_path(relative_path):
+    if getattr(sys, 'frozen', False):
+        base_path = sys._MEIPASS
+    else:
+        base_path = os.path.abspath(".")
+    return os.path.join(base_path, relative_path)
+
+
+def app_path():
+    if getattr(sys, 'frozen', False):
+        return os.path.dirname(sys.executable)
+    return os.path.abspath(".")
 
 def draw_text(surf, text, pos, color, size=24, center=True):
     scaled_size = max(12, int(size * settings.UI_SCALE))

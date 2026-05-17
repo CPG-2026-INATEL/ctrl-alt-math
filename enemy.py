@@ -3,7 +3,7 @@ import math
 import random
 
 import settings
-from utils import distance, angle_between, clamp
+from utils import distance, angle_between, clamp, resource_path
 from enemy_intent import EnemyIntent
 
 
@@ -24,7 +24,7 @@ class Enemy:
 
     def load_spritesheet(self):
         try:
-            path = f"assets/Robots/{self.robot_type}.png"
+            path = resource_path(f"assets/Robots/{self.robot_type}.png")
             self.spritesheet = pygame.image.load(path).convert_alpha()
         except Exception as e:
             print(f"Error loading robot {self.robot_type}: {e}")

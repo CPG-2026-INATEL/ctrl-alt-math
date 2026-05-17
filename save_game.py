@@ -2,9 +2,10 @@ import json
 import os
 
 import settings
+from utils import app_path
 
 
-SAVE_PATH = os.path.join(os.path.dirname(__file__), "savegame.json")
+SAVE_PATH = os.path.join(app_path(), "savegame.json")
 
 
 def save_exists():
