@@ -5,6 +5,8 @@ import threading
 import settings
 from network import generate_room_code
 
+LAN_MAX_BUFFER_BYTES = 1024 * 1024  # 1 MB safety cap on receive buffer
+
 
 class MatchServer:
     def __init__(self, host=settings.MATCH_SERVER_BIND_HOST, port=settings.MATCH_SERVER_BIND_PORT):
@@ -81,6 +83,9 @@ class MatchServer:
                 if not data:
                     break
                 buffer += data.decode("utf-8")
+                if len(buffer) > LAN_MAX_BUFFER_BYTES:
+                    self._log(f"Client {client_id} buffer overflow, disconnecting")
+                    break
                 while "\n" in buffer:
                     line, buffer = buffer.split("\n", 1)
                     line = line.strip()

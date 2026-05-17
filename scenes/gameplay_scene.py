@@ -53,6 +53,10 @@ class GameplayScene(Scene):
         self.turn_log = []
         self.last_enemy_death_pos = None
         self.mp_sync_timer = 0
+        self.mp_last_state = None
+        self.mp_full_sync_counter = 0
+        self.mp_full_sync_interval = 30  # Full state every 30 ticks (~3s at 10Hz)
+        self.mp_cached_state = None  # Client-side cache of last full state for diff merging
 
         self.pending_player_col = None
         self.pending_player_row = None
@@ -238,6 +242,9 @@ class GameplayScene(Scene):
         self.selected_skill = None
         self.turn_log = []
         self.mp_sync_timer = 0
+        self.mp_last_state = None
+        self.mp_full_sync_counter = 0
+        self.mp_cached_state = None
         self.player_took_damage_this_room = False
         self.crits_this_room = 0
         self.tiles_moved_this_turn = 0
@@ -1365,20 +1372,8 @@ class GameplayScene(Scene):
 
     def update(self, dt):
         if self.game.mp_is_multiplayer and self.game.mp_client:
-            if self.game.mp_client:
-                for msg in self.game.mp_client.poll():
-                    if msg.get("type") == "gp_state":
-                        self._apply_mp_state(msg)
-                    elif msg.get("type") == "scene_switch":
-                        self.game.scene_manager.switch(msg.get("scene", "map"))
-                        return
             if not self._is_client_control_turn() and self.state not in ("WAVE_INTRO", "NO_COMBAT"):
                 return
-
-        if self.game.mp_is_multiplayer and self.game.mp_host:
-            for msg in self.game.mp_host.poll():
-                if msg.get("type") == "gp_cmd":
-                    self._apply_remote_gameplay_command(msg)
 
         self.cursor_timer += dt
 
@@ -1603,7 +1598,18 @@ class GameplayScene(Scene):
             self.mp_sync_timer += dt
             if self.mp_sync_timer >= 1.0 / settings.LAN_TICK_RATE:
                 self.mp_sync_timer = 0
-                self.game.mp_host.broadcast(self._serialize_mp_state())
+                self.mp_full_sync_counter += 1
+                current_state = self._serialize_mp_state()
+                if self.mp_full_sync_counter >= self.mp_full_sync_interval:
+                    self.mp_full_sync_counter = 0
+                    self.mp_last_state = current_state
+                    self.game.mp_host.broadcast(current_state)
+                else:
+                    diff, is_full = self._compute_state_diff(current_state, self.mp_last_state)
+                    if diff:
+                        diff["type"] = "gp_state_diff"
+                        self.game.mp_host.broadcast(diff)
+                    self.mp_last_state = current_state
 
             # Host: process commands from clients
             msgs = self.game.mp_host.poll()
@@ -1613,15 +1619,22 @@ class GameplayScene(Scene):
             self._process_pending_remote_turn()
 
         if self.game.mp_is_multiplayer and self.game.mp_client:
-            # Client: apply state updates from host
             msgs = self.game.mp_client.poll()
             for msg in msgs:
                 if msg.get("type") == "gp_state":
+                    self.mp_cached_state = dict(msg)
                     self._apply_mp_state(msg)
+                elif msg.get("type") == "gp_state_diff":
+                    if self.mp_cached_state is not None:
+                        merged = dict(self.mp_cached_state)
+                        merged.update(msg)
+                        merged["type"] = "gp_state"
+                        self.mp_cached_state = merged
+                        self._apply_mp_state(merged)
                 elif msg.get("type") == "scene_switch":
-                    target = msg.get("scene")
                     self._restore_primary_player()
-                    self.game.scene_manager.switch(target)
+                    self.game.scene_manager.switch(msg.get("scene", "map"))
+                    return
 
     def _resolve_enemy_turn(self, dt):
         if self.enemy_resolve_idx >= len(self.enemy_actions):
@@ -2051,6 +2064,18 @@ class GameplayScene(Scene):
             "camera": [self.camera_x, self.camera_y],
             "entropy": self.game.entropy,
         }
+
+    def _compute_state_diff(self, current, previous):
+        if previous is None:
+            return current, True
+        diff = {}
+        for key, value in current.items():
+            if key == "type":
+                continue
+            prev_value = previous.get(key)
+            if value != prev_value:
+                diff[key] = value
+        return diff, False
 
     def _apply_mp_state(self, msg):
         incoming_state = msg.get("state", self.state)

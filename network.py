@@ -1,3 +1,5 @@
+import base64
+import gzip
 import json
 import random
 import socket
@@ -12,6 +14,8 @@ LAN_PORT = settings.LAN_PORT
 LAN_DISCOVERY_PORT = getattr(settings, "LAN_DISCOVERY_PORT", LAN_PORT + 1)
 LAN_BUFFER_SIZE = settings.LAN_BUFFER_SIZE
 LAN_TIMEOUT = settings.LAN_TIMEOUT
+LAN_MAX_BUFFER_BYTES = 1024 * 1024  # 1 MB safety cap on receive buffer
+LAN_COMPRESS_THRESHOLD = 512  # Only compress payloads larger than this
 
 
 class NetworkHost:
@@ -60,6 +64,10 @@ class NetworkHost:
                 if not data:
                     break
                 buffer += data.decode("utf-8")
+                if len(buffer) > LAN_MAX_BUFFER_BYTES:
+                    self._log("Buffer overflow, resetting")
+                    buffer = ""
+                    continue
                 while "\n" in buffer:
                     line, buffer = buffer.split("\n", 1)
                     line = line.strip()
@@ -95,6 +103,12 @@ class NetworkHost:
             return
         if mtype == "relay":
             payload = msg.get("payload", {})
+            if msg.get("compressed"):
+                try:
+                    raw = base64.b64decode(payload)
+                    payload = json.loads(gzip.decompress(raw))
+                except Exception:
+                    return
             payload["_from"] = msg.get("from_player", 2)
             with self.lock:
                 self.inbox.append(payload)
@@ -112,7 +126,13 @@ class NetworkHost:
             pass
 
     def broadcast(self, msg):
-        self._send_raw({"type": "relay", "payload": msg})
+        raw = json.dumps(msg).encode("utf-8")
+        if len(raw) > LAN_COMPRESS_THRESHOLD:
+            compressed = gzip.compress(raw)
+            payload = base64.b64encode(compressed).decode("ascii")
+            self._send_raw({"type": "relay", "payload": payload, "compressed": True})
+        else:
+            self._send_raw({"type": "relay", "payload": msg})
 
     def send_to(self, cid, msg):
         if cid == 2:
@@ -184,6 +204,10 @@ class NetworkClient:
                 if not data:
                     break
                 buffer += data.decode("utf-8")
+                if len(buffer) > LAN_MAX_BUFFER_BYTES:
+                    self._log("Buffer overflow, resetting")
+                    buffer = ""
+                    continue
                 while "\n" in buffer:
                     line, buffer = buffer.split("\n", 1)
                     line = line.strip()
@@ -210,6 +234,12 @@ class NetworkClient:
             return
         if mtype == "relay":
             payload = msg.get("payload", {})
+            if msg.get("compressed"):
+                try:
+                    raw = base64.b64decode(payload)
+                    payload = json.loads(gzip.decompress(raw))
+                except Exception:
+                    return
             payload["_from"] = msg.get("from_player", 1)
             with self.lock:
                 self.inbox.append(payload)
