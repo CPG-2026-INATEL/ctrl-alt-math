@@ -104,9 +104,9 @@ SHOP_ITEMS = {
     "consumables": ["hp_potion_small", "hp_potion_large", "atk_tonic", "def_tonic", "speed_tonic", "vitality_elixir"],
 }
 
-GOLD_PER_STAR = {1: 20, 2: 35, 3: 55, 4: 80}
-GOLD_PER_ENEMY = {1: 5, 2: 8, 3: 12, 4: 18}
-GOLD_BOSS_REWARD = 200
+GOLD_PER_STAR = {1: 30, 2: 50, 3: 70, 4: 100}
+GOLD_PER_ENEMY = {1: 8, 2: 12, 3: 16, 4: 22}
+GOLD_BOSS_REWARD = 300
 
 ENEMY_EXP_ORTOGONAL = 25
 ENEMY_EXP_ATIRADOR = 20
@@ -398,11 +398,11 @@ SKILL_TO_KEY = {
 MAP_COLS = 5
 MAP_ROWS = 4
 MAP_START_ROOM = "hub"
-MAP_ROOM_WIDTH = 120
-MAP_ROOM_HEIGHT = 80
-MAP_ROOM_GAP = 30
-MAP_OFFSET_X = 80
-MAP_OFFSET_Y = 80
+MAP_ROOM_WIDTH = 160
+MAP_ROOM_HEIGHT = 110
+MAP_ROOM_GAP = 50
+MAP_OFFSET_X = 100
+MAP_OFFSET_Y = 100
 MAP_HEADER_H = 70
 
 MAP_GEN_DEPTH_EASY = 5
@@ -415,17 +415,35 @@ MAP_GEN_MAX_BRANCHES_HARD = 5
 DIFFICULTY = "medium"
 DIFFICULTY_SCALING = {
     "easy": {
-        "enemy_amount": 0.5,
+        "enemy_amount": 0.75,
+        "enemy_hp_mult": 1.0,
+        "enemy_dmg_mult": 1.0,
+        "boss_hp_mult": 1.0,
+        "enemy_crit_chance": 0.10,
+        "enemy_crit_multiplier": 1.8,
+        "entropy_per_turn": 3,
         "depth": MAP_GEN_DEPTH_EASY,
         "max_branches": MAP_GEN_MAX_BRANCHES_EASY,
     },
     "medium": {
-        "enemy_amount": 0.75,
+        "enemy_amount": 1.0,
+        "enemy_hp_mult": 1.2,
+        "enemy_dmg_mult": 1.15,
+        "boss_hp_mult": 1.3,
+        "enemy_crit_chance": 0.14,
+        "enemy_crit_multiplier": 2.0,
+        "entropy_per_turn": 4,
         "depth": MAP_GEN_DEPTH_MEDIUM,
         "max_branches": MAP_GEN_MAX_BRANCHES_MEDIUM,
     },
     "hard": {
-        "enemy_amount": 1.0,
+        "enemy_amount": 1.25,
+        "enemy_hp_mult": 1.5,
+        "enemy_dmg_mult": 1.35,
+        "boss_hp_mult": 1.7,
+        "enemy_crit_chance": 0.18,
+        "enemy_crit_multiplier": 2.2,
+        "entropy_per_turn": 5,
         "depth": MAP_GEN_DEPTH_HARD,
         "max_branches": MAP_GEN_MAX_BRANCHES_HARD,
     },

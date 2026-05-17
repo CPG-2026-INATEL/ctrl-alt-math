@@ -205,7 +205,7 @@ class GameplayScene(Scene):
             self.state = "WAIT_REMOTE_SYNC"
             return
         # If there are no enemies, immediately restart the player turn without phase shifts
-        alive_enemies = [e for e in self.game.enemies if not e.dead]
+        alive_enemies = [e for e in self.game.enemies if not e.dead and not getattr(e, 'is_decoy', False)]
         if len(alive_enemies) == 0:
             self.turn_manager.start_turn()
             self.state = "PLAYER_INPUT"
@@ -850,8 +850,10 @@ class GameplayScene(Scene):
                 if st.skills[sid]["level"] == 0:
                     st.skills[sid]["level"] = 1
             st.skill_points = 99
+            self.game.player.gold = 999
+            self.game.gold = 999
             self.game.floating_text.add_info(self.game.player.x, self.game.player.y - 40,
-                                            "DEBUG: All skills unlocked, 99 SP", settings.GOLD)
+                                            "DEBUG: All skills | 99 SP | 999 gold", settings.GOLD)
             self.game.sfx.play("skill_unlock")
             return
 
@@ -1309,7 +1311,7 @@ class GameplayScene(Scene):
         self._check_victory()
 
     def _check_victory(self):
-        alive = [e for e in self.game.enemies if not e.dead]
+        alive = [e for e in self.game.enemies if not e.dead and not getattr(e, 'is_decoy', False)]
         if len(alive) == 0 and self.state != "VICTORY_TRANSITION":
             self.state = "VICTORY_TRANSITION"
             self.victory_timer = 0
@@ -1582,8 +1584,9 @@ class GameplayScene(Scene):
                 self.game.scene_manager.switch("game_over")
 
         if self.state == "PLAYER_INPUT" or self.state == "PLAYER_ACTION_SELECT":
+            entropy_rate = settings.DIFFICULTY_SCALING[settings.DIFFICULTY]["entropy_per_turn"]
             self.game.entropy = min(settings.MAX_ENTROPY,
-                                    self.game.entropy + settings.ENTROPY_PER_TURN * dt * 0.1)
+                                    self.game.entropy + entropy_rate * dt * 0.1)
 
         if self.game.mp_is_multiplayer and self.game.mp_host:
             self.mp_sync_timer += dt
@@ -1887,7 +1890,7 @@ class GameplayScene(Scene):
         self._tick_decoy_clones()
 
         # Check for room completion or death before taking snapshot for next turn
-        alive = [e for e in self.game.enemies if not e.dead]
+        alive = [e for e in self.game.enemies if not e.dead and not getattr(e, 'is_decoy', False)]
         if len(alive) == 0:
             self.state = "VICTORY_TRANSITION"
             self.victory_timer = 0
