@@ -1,162 +1,120 @@
 import json
+import random
 import socket
+import string
 import threading
 import time
-import asyncio
-import websockets
-from py_localtunnel.tunnel import Tunnel
 
 import settings
 
-# Monkeypatch asyncio primitives to support older libraries (like aiohttp)
-# passing the deprecated 'loop' parameter in Python 3.10+ / 3.13+
-for _cls_name in ('Lock', 'Event', 'Condition', 'Semaphore', 'Queue'):
-    _cls = getattr(asyncio, _cls_name, None)
-    if _cls and hasattr(_cls, '__init__'):
-        _original_init = _cls.__init__
-        def _make_patched_init(orig):
-            def _patched_init(self, *args, **kwargs):
-                kwargs.pop('loop', None)
-                return orig(self, *args, **kwargs)
-            return _patched_init
-        _cls.__init__ = _make_patched_init(_original_init)
+
+LAN_PORT = settings.LAN_PORT
+LAN_DISCOVERY_PORT = getattr(settings, "LAN_DISCOVERY_PORT", LAN_PORT + 1)
+LAN_BUFFER_SIZE = settings.LAN_BUFFER_SIZE
+LAN_TIMEOUT = settings.LAN_TIMEOUT
 
 
 class NetworkHost:
-    def __init__(self, port=settings.LAN_PORT):
-        self.port = port
+    def __init__(self, host=settings.MATCH_SERVER_HOST, port=settings.MATCH_SERVER_PORT):
+        self.server_host = host
+        self.server_port = port
+        self.socket = None
         self.running = False
         self.lock = threading.Lock()
         self.inbox = []
-        self.clients = []        # list of active WebSocket connections
-        self.client_ids = {}     # client_id -> WebSocket
-        self._conn_to_id = {}    # WebSocket -> client_id
-        self._next_id = 1
-        self.public_url = None
-        self.tunnel = None
-        self.loop = None
-        self.server = None
+        self.connected_clients = []
+        self.my_id = None
+        self.room_code = ""
+        self.connection_error = None
 
     def _log(self, msg):
         if getattr(settings, "DEBUG_NETWORK", False):
             print(f"[Host] {msg}")
 
     def start(self):
-        self._log(f"Starting WebSocket host on port {self.port}")
+        self._log(f"Connecting to match server {self.server_host}:{self.server_port}")
+        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.socket.settimeout(LAN_TIMEOUT)
+        self.socket.connect((self.server_host, self.server_port))
+        self.socket.settimeout(LAN_TIMEOUT)
         self.running = True
-        self.server_ready = threading.Event()
+        threading.Thread(target=self._recv_loop, daemon=True).start()
+        self._send_raw({"type": "create_room"})
 
-        # Start the WebSocket server in a background thread
-        threading.Thread(target=self._run_server, daemon=True).start()
+        deadline = time.time() + LAN_TIMEOUT
+        while time.time() < deadline:
+            if self.connection_error:
+                self.stop()
+                raise ConnectionError(self.connection_error)
+            if self.room_code:
+                return
+            time.sleep(0.05)
+        self.stop()
+        raise ConnectionError("Could not create room on match server")
 
-        # Wait for the WebSocket server to be fully bound and listening (timeout 5s)
-        if not self.server_ready.wait(timeout=5.0):
-            self._log("Error: WebSocket server failed to start within timeout.")
+    def _recv_loop(self):
+        buffer = ""
+        while self.running:
+            try:
+                data = self.socket.recv(LAN_BUFFER_SIZE)
+                if not data:
+                    break
+                buffer += data.decode("utf-8")
+                while "\n" in buffer:
+                    line, buffer = buffer.split("\n", 1)
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        msg = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                    self._handle_server_msg(msg)
+            except (socket.timeout, ConnectionError, OSError):
+                if not self.running:
+                    break
+        self.running = False
+
+    def _handle_server_msg(self, msg):
+        mtype = msg.get("type")
+        if mtype == "room_created":
+            self.room_code = msg.get("room", "")
+            self.my_id = 1
+            self._log(f"Created room {self.room_code}")
             return
-
-        # Programmatically start the localtunnel
-        try:
-            self.tunnel = Tunnel()
-            # Monkeypatch check_local_port to be a no-op to avoid triggering raw TCP handshake EOFError warnings on websockets
-            self.tunnel.check_local_port = lambda: None
-            # Fetch the URL first (instantaneous)
-            raw_url = self.tunnel.get_url(None)
-            # Convert https:// to wss:// for public WebSocket connection
-            self.public_url = raw_url.replace("https://", "wss://").replace("http://", "ws://")
-            self._log(f"Localtunnel generated: {raw_url} -> {self.public_url}")
-
-            # Start the tunnel in a daemon thread, passing 127.0.0.1 as local_host
-            # to prevent Windows IPv6 localhost connection refusal (WinError 10061)
-            threading.Thread(
-                target=self.tunnel.create_tunnel,
-                args=(self.port, "127.0.0.1"),
-                daemon=True
-            ).start()
-        except Exception as e:
-            self._log(f"Failed to start localtunnel: {e}")
-            self.public_url = None
-
-        # Also start discovery loop for LAN discovery compatibility
-        threading.Thread(target=self._discovery_loop, daemon=True).start()
-
-    def _run_server(self):
-        self.loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(self.loop)
-
-        async def main():
-            self.server = await websockets.serve(self._handler, "0.0.0.0", self.port)
-            self._log(f"WebSocket server listening on port {self.port}")
-            self.server_ready.set()
-            while self.running:
-                await asyncio.sleep(0.1)
-            self.server.close()
-            await self.server.wait_closed()
-
-        try:
-            self.loop.run_until_complete(main())
-        except Exception as e:
-            self._log(f"Server thread error: {e}")
-            if not self.server_ready.is_set():
-                self.server_ready.set()
-        finally:
-            self.loop.close()
-
-    async def _handler(self, websocket):
-        with self.lock:
-            cid = self._next_id
-            self._next_id += 1
-            self.clients.append(websocket)
-            self.client_ids[cid] = websocket
-            self._conn_to_id[websocket] = cid
-
-        self._log(f"Client {cid} connected")
-
-        # Send initial assignments (ID assignment and player index)
-        try:
-            await websocket.send(json.dumps({"type": "assign_id", "id": cid}))
-            await websocket.send(json.dumps({"type": "player_index", "index": cid + 1}))
-        except Exception as e:
-            self._log(f"Failed to send initial messages to Client {cid}: {e}")
-
-        try:
-            async for message in websocket:
-                try:
-                    msg = json.loads(message)
-                except json.JSONDecodeError:
-                    continue
-                msg["_from"] = cid
-                with self.lock:
-                    self.inbox.append(msg)
-        except websockets.exceptions.ConnectionClosed:
-            pass
-        finally:
+        if mtype == "peer_joined":
+            peer_ip = msg.get("peer_ip", "unknown")
             with self.lock:
-                if websocket in self.clients:
-                    self.clients.remove(websocket)
-                self.client_ids.pop(cid, None)
-                self._conn_to_id.pop(websocket, None)
-            self._log(f"Client {cid} disconnected")
+                self.connected_clients = [(2, peer_ip)]
+            return
+        if mtype == "peer_left":
+            with self.lock:
+                self.connected_clients = []
+            return
+        if mtype == "relay":
+            payload = msg.get("payload", {})
+            payload["_from"] = msg.get("from_player", 2)
+            with self.lock:
+                self.inbox.append(payload)
+            return
+        if mtype == "error":
+            self.connection_error = msg.get("message", "Match server error")
 
-    def _send(self, websocket, msg):
-        if self.loop and self.loop.is_running():
-            async def send_coro():
-                try:
-                    await websocket.send(json.dumps(msg))
-                except Exception:
-                    pass
-            asyncio.run_coroutine_threadsafe(send_coro(), self.loop)
+    def _send_raw(self, msg):
+        if not self.socket:
+            return
+        raw = (json.dumps(msg) + "\n").encode("utf-8")
+        try:
+            self.socket.sendall(raw)
+        except (ConnectionError, OSError):
+            pass
 
     def broadcast(self, msg):
-        with self.lock:
-            targets = list(self.clients)
-        for ws in targets:
-            self._send(ws, msg)
+        self._send_raw({"type": "relay", "payload": msg})
 
     def send_to(self, cid, msg):
-        with self.lock:
-            ws = self.client_ids.get(cid)
-        if ws is not None:
-            self._send(ws, msg)
+        if cid == 2:
+            self.broadcast(msg)
 
     def poll(self):
         with self.lock:
@@ -166,189 +124,106 @@ class NetworkHost:
 
     def get_connected_clients_info(self):
         with self.lock:
-            info = []
-            for ws, cid in self._conn_to_id.items():
-                try:
-                    # Retrieve the client's peer IP address
-                    ip = ws.remote_address[0]
-                except Exception:
-                    ip = "unknown"
-                info.append((cid, ip))
-            return info
+            return list(self.connected_clients)
 
     def stop(self):
         self.running = False
-        if self.tunnel:
-            try:
-                self.tunnel.stop_tunnel()
-            except Exception:
-                pass
-
-        if self.loop and self.loop.is_running():
-            with self.lock:
-                clients = list(self.clients)
-            async def close_all():
-                for ws in clients:
-                    try:
-                        await ws.close()
-                    except Exception:
-                        pass
-            asyncio.run_coroutine_threadsafe(close_all(), self.loop)
-
-    def get_local_ip(self):
-        ips = self.get_all_local_ips()
-        return ips[0] if ips else "127.0.0.1"
-
-    def get_all_local_ips(self):
-        ips = set()
         try:
-            for info in socket.getaddrinfo(socket.gethostname(), None):
-                ip = info[4][0]
-                if ip.startswith("127.") or ":" in ip:
-                    continue
-                ips.add(ip)
+            if self.socket:
+                self.socket.close()
         except OSError:
             pass
-        try:
-            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            s.connect(("8.8.8.8", 80))
-            ips.add(s.getsockname()[0])
-            s.close()
-        except OSError:
-            pass
-
-        def rank(ip):
-            if ip.startswith("192.168."):
-                return 0
-            if ip.startswith("10."):
-                return 1
-            if ip.startswith("172."):
-                return 2
-            return 3
-
-        return sorted(ips, key=rank) or ["127.0.0.1"]
-
-    def _discovery_loop(self):
-        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        try:
-            sock.bind(("", settings.LAN_DISCOVERY_PORT))
-        except OSError:
-            return
-        sock.settimeout(1.0)
-        while self.running:
-            try:
-                data, addr = sock.recvfrom(256)
-                if data.decode("utf-8", errors="ignore").startswith("DISCOVER_REQUEST"):
-                    sock.sendto(b"DISCOVER_RESPONSE", (addr[0], settings.LAN_DISCOVERY_PORT + 1))
-            except socket.timeout:
-                continue
-            except OSError:
-                break
-        sock.close()
 
 
 class NetworkClient:
     def __init__(self):
+        self.socket = None
         self.running = False
         self.lock = threading.Lock()
         self.inbox = []
         self.my_id = None
-        self.websocket = None
-        self.loop = None
+        self.room_code = ""
+        self.player_index = None
+        self.connection_error = None
 
     def _log(self, msg):
         if getattr(settings, "DEBUG_NETWORK", False):
             print(f"[Client] {msg}")
 
-    def connect(self, host, port=settings.LAN_PORT):
-        self._log(f"Connecting to {host}:{port}")
+    def connect(self, host, port=LAN_PORT, room_code=None):
+        if not room_code:
+            raise ConnectionError("Room code is required")
+        self._log(f"Connecting to match server {host}:{port} room {room_code}")
+        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.socket.settimeout(LAN_TIMEOUT)
+        self.socket.connect((host, port))
+        self.socket.settimeout(LAN_TIMEOUT)
         self.running = True
+        self.room_code = room_code.upper()
+        threading.Thread(target=self._recv_loop, daemon=True).start()
+        self.send({"type": "join_room", "room": self.room_code}, raw=True)
 
-        # Resolve WebSocket URL
-        host_lower = host.lower()
-        if host_lower.startswith("wss://") or host_lower.startswith("ws://"):
-            url = host
-        elif host_lower.startswith("https://"):
-            url = host.replace("https://", "wss://")
-        elif host_lower.startswith("http://"):
-            url = host.replace("http://", "ws://")
-        elif "loca.lt" in host_lower:
-            url = f"wss://{host_lower}"
-        else:
-            if ":" in host:
-                url = f"ws://{host}"
-            else:
-                url = f"ws://{host}:{port}"
-
-        self._log(f"Resolved WebSocket URL: {url}")
-
-        connected_event = threading.Event()
-        error_container = []
-
-        threading.Thread(
-            target=self._run_client,
-            args=(url, connected_event, error_container),
-            daemon=True
-        ).start()
-
-        # Wait for ID assignment from host (longer timeout for localtunnel WAN)
-        timeout = 20.0 if "loca.lt" in url else 10.0
-        deadline = time.time() + timeout
+        deadline = time.time() + LAN_TIMEOUT
         while time.time() < deadline:
-            if error_container:
+            if self.connection_error:
                 self.disconnect()
-                raise ConnectionError(f"Failed to connect: {error_container[0]}")
+                raise ConnectionError(self.connection_error)
             if self.my_id is not None:
                 return
             time.sleep(0.05)
-
         self.disconnect()
-        raise ConnectionError(f"Connection to {url} timed out or no ID assigned after {timeout}s")
+        raise ConnectionError(f"Could not join room {self.room_code}")
 
-    def _run_client(self, url, connected_event, error_container):
-        self.loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(self.loop)
-
-        async def main():
+    def _recv_loop(self):
+        buffer = ""
+        while self.running:
             try:
-                async with websockets.connect(url) as ws:
-                    self.websocket = ws
-                    connected_event.set()
+                data = self.socket.recv(LAN_BUFFER_SIZE)
+                if not data:
+                    break
+                buffer += data.decode("utf-8")
+                while "\n" in buffer:
+                    line, buffer = buffer.split("\n", 1)
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        msg = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                    self._handle_server_msg(msg)
+            except (socket.timeout, ConnectionError, OSError):
+                if not self.running:
+                    break
+        self.running = False
 
-                    async for message in ws:
-                        try:
-                            msg = json.loads(message)
-                        except json.JSONDecodeError:
-                            continue
-                        if msg.get("type") == "assign_id":
-                            self.my_id = msg.get("id")
-                        else:
-                            with self.lock:
-                                self.inbox.append(msg)
-            except Exception as e:
-                if not connected_event.is_set():
-                    error_container.append(e)
-                    connected_event.set()
-                self._log(f"Connection error: {e}")
-
-        try:
-            self.loop.run_until_complete(main())
-        finally:
-            self.running = False
-            self.websocket = None
-            self.loop.close()
-
-    def send(self, msg):
-        if not self.websocket or not self.running:
+    def _handle_server_msg(self, msg):
+        mtype = msg.get("type")
+        if mtype == "room_joined":
+            self.my_id = 2
+            self.player_index = 2
+            self.room_code = msg.get("room", self.room_code)
             return
-        if self.loop and self.loop.is_running():
-            async def send_coro():
-                try:
-                    await self.websocket.send(json.dumps(msg))
-                except Exception:
-                    pass
-            asyncio.run_coroutine_threadsafe(send_coro(), self.loop)
+        if mtype == "relay":
+            payload = msg.get("payload", {})
+            payload["_from"] = msg.get("from_player", 1)
+            with self.lock:
+                self.inbox.append(payload)
+            return
+        if mtype == "error":
+            self.connection_error = msg.get("message", "Match server error")
+            with self.lock:
+                self.inbox.append(msg)
+
+    def send(self, msg, raw=False):
+        if not self.socket:
+            return
+        outgoing = msg if raw else {"type": "relay", "payload": msg}
+        raw_msg = (json.dumps(outgoing) + "\n").encode("utf-8")
+        try:
+            self.socket.sendall(raw_msg)
+        except (ConnectionError, OSError):
+            pass
 
     def poll(self):
         with self.lock:
@@ -358,60 +233,28 @@ class NetworkClient:
 
     def disconnect(self):
         self.running = False
-        if self.websocket:
-            if self.loop and self.loop.is_running():
-                async def close_coro():
-                    try:
-                        await self.websocket.close()
-                    except Exception:
-                        pass
-                asyncio.run_coroutine_threadsafe(close_coro(), self.loop)
+        try:
+            if self.socket:
+                self.socket.close()
+        except OSError:
+            pass
 
 
 class LANDiscovery:
-    def __init__(self, port=settings.LAN_PORT):
+    def __init__(self, port=LAN_PORT):
         self.port = port
         self.hosts = []
         self.running = False
         self.scan_thread = None
 
-    def _log(self, msg):
-        if getattr(settings, "DEBUG_NETWORK", False):
-            print(f"[Discovery] {msg}")
-
     def start_scan(self):
         self.running = True
         self.hosts = []
-        self.scan_thread = threading.Thread(target=self._scan, daemon=True)
-        self.scan_thread.start()
-
-    def _get_local_ip(self):
-        try:
-            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            s.connect(("8.8.8.8", 80))
-            ip = s.getsockname()[0]
-            s.close()
-            return ip
-        except OSError:
-            return "127.0.0.1"
-
-    def _scan(self):
-        local_ip = self._get_local_ip()
-        prefix = ".".join(local_ip.split(".")[:3])
-        targets = [f"{prefix}.{i}" for i in range(1, 255) if f"{prefix}.{i}" != local_ip]
-
-        for ip in targets:
-            if not self.running:
-                break
-            try:
-                s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                s.settimeout(0.08)
-                s.connect((ip, self.port))
-                s.close()
-                if ip not in self.hosts:
-                    self.hosts.append(ip)
-            except (socket.timeout, ConnectionError, OSError):
-                continue
 
     def stop_scan(self):
         self.running = False
+
+
+def generate_room_code(length=6):
+    alphabet = string.ascii_uppercase + string.digits
+    return "".join(random.choice(alphabet) for _ in range(length))
