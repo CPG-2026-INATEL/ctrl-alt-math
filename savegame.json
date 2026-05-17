@@ -1,0 +1,103 @@
+{
+  "language": "en",
+  "difficulty": "medium",
+  "entropy": 4.910800000000001,
+  "gold": 54,
+  "players": [
+    {
+      "hp": 65,
+      "max_hp": 100,
+      "base_damage": 15,
+      "rigor": 100,
+      "max_rigor": 100,
+      "level": 1,
+      "exp": 40,
+      "next_level_exp": 100,
+      "move_range": 3,
+      "upgrade_tickets": 0,
+      "defense": 0,
+      "upgrades": {
+        "atk": 0,
+        "def": 0,
+        "hp": 0,
+        "range": 0
+      },
+      "gold": 54,
+      "inventory": [
+        {
+          "id": "hp_potion_small",
+          "count": 2
+        },
+        {
+          "id": "atk_tonic",
+          "count": 1
+        }
+      ],
+      "equipment": {
+        "weapon": "basic_sword",
+        "shield": "wooden_shield"
+      },
+      "buffs": [],
+      "skin_index": 0,
+      "pitagoras_cooldown": 0,
+      "reflexao_cooldown": 0,
+      "integral_cooldown": 0,
+      "fractal_cooldown": 0
+    }
+  ],
+  "skill_tree": {
+    "skill_points": 3,
+    "levels": {
+      "axioma": 1,
+      "derivada": 0,
+      "pitagoras": 0,
+      "ctrlz": 0,
+      "bayes": 0,
+      "reflexao": 0,
+      "entropia": 0,
+      "teoria_jogos": 0,
+      "integral": 0,
+      "fractal": 0,
+      "gauss": 0,
+      "simetria": 0,
+      "matriz": 0
+    }
+  },
+  "world_map": {
+    "seed": 443869,
+    "player_room": "hub",
+    "rooms": {
+      "hub": "available",
+      "room_1_0": "completed",
+      "room_1_1": "available",
+      "room_1_2": "available",
+      "room_2_0": "locked",
+      "room_2_1": "available",
+      "room_2_2": "available",
+      "room_2_3": "locked",
+      "side_2_4": "locked",
+      "room_3_0": "locked",
+      "room_3_1": "locked",
+      "room_3_2": "locked",
+      "room_3_3": "locked",
+      "room_3_4": "locked",
+      "side_3_5": "locked",
+      "room_4_0": "locked",
+      "room_4_1": "locked",
+      "room_4_2": "locked",
+      "room_4_3": "locked",
+      "room_4_4": "locked",
+      "side_4_5": "locked",
+      "side_4_7": "locked",
+      "room_5_0": "locked",
+      "room_5_1": "locked",
+      "room_5_2": "locked",
+      "room_6_0": "locked",
+      "room_6_1": "locked",
+      "room_6_2": "locked",
+      "room_6_3": "locked",
+      "room_6_4": "locked",
+      "room_7_0": "locked"
+    }
+  }
+}
