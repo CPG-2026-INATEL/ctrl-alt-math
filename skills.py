@@ -244,50 +244,112 @@ class SkillTree:
             if level > 0:
                 pygame.draw.circle(screen, settings.GREEN, (rect.right - 6, rect.top + 6), 3)
 
-        # Detailed Info Panel inside the left side
+        # Detailed Theorem Card on the right side of the screen
         if self.hovered_id:
             skill = self.skills[self.hovered_id]
-            panel_w, panel_h = 360, 220
-            panel_rect = pygame.Rect(20, 
-                                     settings.WINDOW_HEIGHT - panel_h - 40, 
-                                     panel_w, panel_h)
             
-            pygame.draw.rect(screen, (15, 15, 30, 250), panel_rect, border_radius=12)
-            pygame.draw.rect(screen, settings.CYAN, panel_rect, 2, border_radius=12)
+            # Larger, highly readable card dimensions
+            panel_w, panel_h = 350, 360
             
-            title_y = panel_rect.top + 22
+            # Positioned on the right half of the screen
+            panel_x = settings.WINDOW_WIDTH - panel_w - 25
+            panel_y = (settings.WINDOW_HEIGHT - panel_h) // 2
+            
+            panel_rect = pygame.Rect(panel_x, panel_y, panel_w, panel_h)
+            
+            # Glassmorphic dark panel with high-contrast background
+            card_surface = pygame.Surface((panel_w, panel_h), pygame.SRCALPHA)
+            pygame.draw.rect(card_surface, (12, 14, 26, 245), (0, 0, panel_w, panel_h), border_radius=16)
+            
+            # Glow/Border using the skill's specific signature color!
+            sig_color = skill.get("color", settings.CYAN)
+            pygame.draw.rect(card_surface, sig_color, (0, 0, panel_w, panel_h), 2, border_radius=16)
+            
+            # Inner dark panel behind content
+            pygame.draw.rect(card_surface, (6, 8, 16, 120), (8, 8, panel_w - 16, panel_h - 16), border_radius=12)
+            screen.blit(card_surface, (panel_x, panel_y))
+            
+            # --- TITLE SECTION ---
+            title_y = panel_rect.top + 28
             title_text = t(skill["name"]).upper()
             if skill["level"] > 0:
                 title_text += f" - LV.{skill['level']}"
-            draw_text(screen, title_text, (panel_rect.centerx, title_y), settings.CYAN, 20)
+            draw_text(screen, title_text, (panel_rect.centerx, title_y), sig_color, 22)
             
-            desc_y = title_y + 35
-            draw_text(screen, t(skill["desc"]), (panel_rect.centerx, desc_y), settings.WHITE, 14)
+            # Divider line
+            div_y = title_y + 18
+            pygame.draw.line(screen, (sig_color[0]//2, sig_color[1]//2, sig_color[2]//2), 
+                             (panel_rect.left + 30, div_y), (panel_rect.right - 30, div_y), 1)
             
-            # Show Stat Summary
-            stats_y = desc_y + 40
+            # --- DESCRIPTION SECTION ---
+            desc_y = div_y + 15
+            desc_text = t(skill["desc"])
+            # Render description with comfortable line spacing and readable font size
+            draw_text(screen, desc_text, (panel_rect.centerx, desc_y), settings.WHITE, 15)
+            
+            # Calculate height used by description to position the stats box dynamically
+            desc_lines = len(desc_text.split('\n'))
+            desc_height = desc_lines * max(12, int(15 * settings.UI_SCALE)) * 1.45
+            
+            # --- FORMULA / STAT SUMMARY BOX ---
+            stats_y = desc_y + desc_height + 15
+            stats_box_h = 75
+            stats_rect = pygame.Rect(panel_rect.left + 20, stats_y, panel_w - 40, stats_box_h)
+            
+            # Draw highly styled inner stats card
+            s_box = pygame.Surface((stats_rect.width, stats_box_h), pygame.SRCALPHA)
+            pygame.draw.rect(s_box, (20, 25, 45, 180), (0, 0, stats_rect.width, stats_box_h), border_radius=8)
+            pygame.draw.rect(s_box, (80, 100, 140, 80), (0, 0, stats_rect.width, stats_box_h), 1, border_radius=8)
+            screen.blit(s_box, stats_rect.topleft)
+            
+            # Draw stats/formulas inside the box
             txt = ""
             if self.hovered_id == "axioma":
                 txt = f"Base Damage: {settings.PLAYER_ATTACK_DAMAGE + (max(0, skill['level']-1)*3)}"
             elif self.hovered_id == "pitagoras":
                 dmg = self.get_skill_value(self.hovered_id, 'damage', settings.PITAGORAS_DAMAGE)
                 rng = self.get_skill_value(self.hovered_id, 'range', settings.PITAGORAS_RANGE)
-                txt = f"Dmg: {dmg}, Range: {rng}"
+                txt = f"Dmg: {dmg}  |  Range: {rng} tiles"
+            elif self.hovered_id == "reflexao":
+                dmg = self.get_skill_value(self.hovered_id, 'damage', settings.REFLEXAO_DAMAGE)
+                rng = self.get_skill_value(self.hovered_id, 'range', settings.REFLEXAO_RANGE)
+                txt = f"Area Dmg: {dmg}  |  Radius: {rng} tiles"
+            elif self.hovered_id == "ctrlz":
+                undo = self.get_skill_value(self.hovered_id, 'undo_turns', settings.REWIND_UNDO_TURNS)
+                heal = self.get_skill_value(self.hovered_id, 'heal', settings.REWIND_HEAL_AMOUNT)
+                txt = f"Rewind: {undo} turns  |  Heal: +{heal} HP"
+            elif self.hovered_id == "entropia":
+                red = self.get_skill_value(self.hovered_id, 'reduction', 0.5)
+                txt = f"Entropy Gain: -{int(red * 100)}%"
             elif self.hovered_id == "derivada":
                 mult = self.get_skill_value(self.hovered_id, 'move_damage_mult', 1.0)
-                txt = f"Dmg Multiplier: x{mult:.2f} per tile"
+                txt = f"Damage Buff: +{int((mult - 1.0)*100)}% per tile"
+            elif self.hovered_id == "teoria_jogos":
+                crit = self.get_skill_value(self.hovered_id, 'crit_bonus', 0.05)
+                txt = f"Crit Chance Bonus: +{int(crit*100)}%"
             
-            if txt:
-                draw_text(screen, txt, (panel_rect.centerx, stats_y), settings.GREEN, 14)
-
-            # Show Next Level Buff
+            # If no custom text, show default status
+            if not txt:
+                txt = "State: Fully Operational"
+                
+            formula_label = "FORMULA STATS"
+            draw_text(screen, formula_label, (stats_rect.centerx, stats_rect.top + 16), settings.GOLD, 11)
+            draw_text(screen, txt, (stats_rect.centerx, stats_rect.top + 38), settings.GREEN, 14)
+            
+            # --- NEXT LEVEL & UPGRADE COST ---
+            cost_y = stats_rect.bottom + 12
             if skill["level"] < skill["max_level"]:
-                buff_text = f"Next Level: +Buff (Cost: {self.get_upgrade_cost(self.hovered_id)} SP)"
-                draw_text(screen, buff_text, (panel_rect.centerx, stats_y + 22), settings.GOLD, 14)
-
+                cost = self.get_upgrade_cost(self.hovered_id)
+                cost_color = settings.GOLD if self.skill_points >= cost else settings.RED
+                upgrade_text = f"Next Level cost: {cost} SP"
+                draw_text(screen, upgrade_text, (panel_rect.centerx, cost_y), cost_color, 13)
+            else:
+                draw_text(screen, "THEOREM MAXED OUT", (panel_rect.centerx, cost_y), settings.GREEN, 13)
+                
+            # --- FLAVOR TEXT SECTION ---
             flavor_key = f"skill_{self.hovered_id}_flavor"
-            draw_text(screen, f"\"{t(flavor_key)}\"", (panel_rect.centerx, panel_rect.bottom - 25), 
-                      (100, 200, 200), 12)
+            draw_text(screen, f"\"{t(flavor_key)}\"", (panel_rect.centerx, panel_rect.bottom - 28), 
+                      (120, 220, 220), 12)
 
         draw_text(screen, t("skill_tree_footer"),
                   (200, settings.WINDOW_HEIGHT - 20),

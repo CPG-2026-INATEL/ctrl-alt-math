@@ -2504,72 +2504,131 @@ class GameplayScene(Scene):
             img = font.render(entry, True, color)
             screen.blit(img, (log_x, log_y + i * 14))
 
+    def _draw_bar_sleek(self, screen, x, y, w, h, pct, fill_color, bg_color):
+        pygame.draw.rect(screen, bg_color, (x, y, w, h), border_radius=4)
+        if pct > 0:
+            filled_w = int(w * min(1.0, pct))
+            if filled_w > 0:
+                pygame.draw.rect(screen, fill_color, (x, y, filled_w, h), border_radius=4)
+                # Glossy shine on the upper half
+                shine_surf = pygame.Surface((filled_w, h // 2), pygame.SRCALPHA)
+                shine_surf.fill((255, 255, 255, 40))
+                screen.blit(shine_surf, (x, y))
+        pygame.draw.rect(screen, (80, 100, 130, 180), (x, y, w, h), 1, border_radius=4)
+
     def _draw_turn_hud(self, screen):
         bar_y = settings.WINDOW_HEIGHT - settings.UI_BAR_HEIGHT
-        pygame.draw.rect(screen, settings.DARK_GRAY,
-                         (0, bar_y, settings.WINDOW_WIDTH, settings.UI_BAR_HEIGHT))
-        pygame.draw.line(screen, settings.GRAY, (0, bar_y),
-                         (settings.WINDOW_WIDTH, bar_y), 1)
+        
+        # 1. Base bar panel: Futuristic dark-blue matte-glass style
+        pygame.draw.rect(screen, (10, 12, 22), (0, bar_y, settings.WINDOW_WIDTH, settings.UI_BAR_HEIGHT))
+        # Top neon border line
+        pygame.draw.line(screen, (30, 180, 220), (0, bar_y), (settings.WINDOW_WIDTH, bar_y), 2)
+        
+        panel_y = bar_y + 6
+        panel_h = 78
+
+        # --- DYNAMIC PANEL WIDTHS ---
+        total_w = settings.WINDOW_WIDTH
+        edge_padding = 10
+        gap = 10
+        available_w = total_w - 2 * edge_padding - 4 * gap
+
+        # Compute dynamic proportional widths
+        w1 = int(available_w * 0.25)
+        w2 = int(available_w * 0.18)
+        w3 = int(available_w * 0.16)
+        w4 = int(available_w * 0.18)
+        w5 = available_w - (w1 + w2 + w3 + w4)  # Take all remaining space on the right
+
+        # X coordinates
+        x1 = edge_padding
+        x2 = x1 + w1 + gap
+        x3 = x2 + w2 + gap
+        x4 = x3 + w3 + gap
+        x5 = x4 + w4 + gap
+
+        # Glassmorphic panels helper
+        def draw_hud_panel(x, w, title=None, title_color=settings.GOLD):
+            s = pygame.Surface((w, panel_h), pygame.SRCALPHA)
+            # Semi-transparent dark background
+            pygame.draw.rect(s, (18, 22, 38, 220), (0, 0, w, panel_h), border_radius=6)
+            # High-tech cyber border
+            pygame.draw.rect(s, (60, 85, 115, 120), (0, 0, w, panel_h), 1, border_radius=6)
+            screen.blit(s, (x, panel_y))
+            if title:
+                draw_text(screen, title.upper(), (x + 8, panel_y + 8), title_color, 11, center=False)
 
         current_player = self.game.player
         hp_pct = current_player.hp / current_player.get_max_hp()
         rigor_pct = current_player.rigor / current_player.max_rigor
         entropy_pct = self.game.entropy / settings.MAX_ENTROPY
+        exp_pct = current_player.exp / current_player.next_level_exp
 
+        # --- PANEL 1: STATUS (X = x1, W = w1) ---
+        draw_hud_panel(x1, w1)
+        
+        # Level & Identity Header
+        player_label = self._player_label(self.active_player_idx)
+        draw_text(screen, f"{player_label}  |  LVL {current_player.level}", (x1 + 8, panel_y + 8), settings.CYAN, 12, center=False)
+        
+        # HP Bar
         hp_color = settings.GREEN if hp_pct > 0.5 else settings.ORANGE if hp_pct > 0.25 else settings.RED
-        self._draw_bar(screen, settings.UI_PADDING, bar_y + 10, 160, 14,
-                       hp_pct, hp_color, (60, 20, 20))
-        draw_text(screen, f"{self._player_label(self.active_player_idx)} HP: {current_player.hp}/{current_player.get_max_hp()}",
-                  (settings.UI_PADDING + 80, bar_y + 17),
-                  settings.WHITE, 14)
+        self._draw_bar_sleek(screen, x1 + 8, panel_y + 22, w1 - 16, 11, hp_pct, hp_color, (45, 15, 15))
+        draw_text(screen, f"HP: {current_player.hp}/{current_player.get_max_hp()}", (x1 + w1 // 2, panel_y + 28), settings.WHITE, 11)
 
-        self._draw_bar(screen, settings.UI_PADDING, bar_y + 31, 160, 14,
-                       rigor_pct, settings.BLUE, (20, 20, 60))
-        draw_text(screen, f"{t('rigor')}: {current_player.rigor:.0f}/{current_player.max_rigor}",
-                  (settings.UI_PADDING + 80, bar_y + 38),
-                  settings.WHITE, 14)
+        # Rigor Bar
+        self._draw_bar_sleek(screen, x1 + 8, panel_y + 38, w1 - 16, 11, rigor_pct, settings.BLUE, (15, 15, 45))
+        draw_text(screen, f"{t('rigor')}: {current_player.rigor:.0f}/{current_player.max_rigor}", (x1 + w1 // 2, panel_y + 44), settings.WHITE, 11)
 
         # EXP Bar
-        exp_pct = current_player.exp / current_player.next_level_exp
-        self._draw_bar(screen, settings.UI_PADDING + 180, bar_y + 10, 120, 14,
-                       exp_pct, settings.GOLD, (40, 40, 10))
-        draw_text(screen, f"LVL {current_player.level} ({int(exp_pct*100)}%)",
-                  (settings.UI_PADDING + 240, bar_y + 17),
-                  settings.WHITE, 13)
+        self._draw_bar_sleek(screen, x1 + 8, panel_y + 54, w1 - 16, 11, exp_pct, settings.GOLD, (30, 25, 10))
+        draw_text(screen, f"EXP: {current_player.exp}/{current_player.next_level_exp} ({int(exp_pct*100)}%)", (x1 + w1 // 2, panel_y + 60), settings.WHITE, 10)
 
-        self._draw_bar(screen, settings.UI_PADDING + 180, bar_y + 31, 120, 14,
-                       entropy_pct, settings.COLOR_ENTROPY_BAR, (40, 10, 40))
-        draw_text(screen, f"Entropy: {self.game.entropy:.0f}",
-                  (settings.UI_PADDING + 240, bar_y + 38),
-                  settings.WHITE, 13)
 
-        # Crit display moved
-        draw_text(screen, f"Crit: {int(settings.PLAYER_CRIT_CHANCE * 100)}% x{settings.PLAYER_CRIT_MULTIPLIER:.0f}",
-                  (settings.UI_PADDING + 340, bar_y + 17),
-                  settings.GOLD, 12)
-        draw_text(screen, f"ATK:{current_player.get_attack_damage()} DEF:{current_player.get_defense()}",
-                  (settings.UI_PADDING + 340, bar_y + 38),
-                  settings.CYAN, 12)
-
+        # --- PANEL 2: COMBAT STATS (X = x2, W = w2) ---
+        draw_hud_panel(x2, w2, t("stats"), settings.GOLD)
+        
+        # Two-column dynamic alignment inside w2
+        col1_x = x2 + 8
+        col2_x = x2 + w2 // 2 + 4
+        
+        draw_text(screen, f"ATK: {current_player.get_attack_damage()}", (col1_x, panel_y + 22), settings.CYAN, 11, center=False)
+        draw_text(screen, f"DEF: {current_player.get_defense()}", (col2_x, panel_y + 22), settings.CYAN, 11, center=False)
+        
+        draw_text(screen, f"CRIT: {int(settings.PLAYER_CRIT_CHANCE * 100)}%", (col1_x, panel_y + 36), settings.GOLD, 11, center=False)
+        draw_text(screen, f"MULT: x{settings.PLAYER_CRIT_MULTIPLIER:.1f}", (col2_x, panel_y + 36), settings.GOLD, 11, center=False)
+        
+        draw_text(screen, f"GOLD: {current_player.gold}g", (col1_x, panel_y + 50), settings.GOLD, 11, center=False)
+        sp_points = self.game.skill_tree.skill_points if self.game.skill_tree else 0
+        draw_text(screen, f"SP: {sp_points}", (col2_x, panel_y + 50), settings.CYAN, 11, center=False)
+        
         if len(self.players) > 1:
             p1 = self.players[0]
             p2 = self.players[1]
-            draw_text(screen, f"P1 {p1.hp}/{p1.max_hp}",
-                      (settings.UI_PADDING + 430, bar_y + 17),
-                      settings.CYAN, 12)
-            draw_text(screen, f"P2 {p2.hp}/{p2.max_hp}",
-                      (settings.UI_PADDING + 430, bar_y + 38),
-                      settings.PURPLE, 12)
+            draw_text(screen, f"P1 HP: {p1.hp}/{p1.max_hp}", (col1_x, panel_y + 64), settings.CYAN, 10, center=False)
+            draw_text(screen, f"P2 HP: {p2.hp}/{p2.max_hp}", (col2_x, panel_y + 64), settings.PURPLE, 10, center=False)
+        else:
+            draw_text(screen, f"DIFFICULTY: {settings.DIFFICULTY.upper()}", (x2 + w2 // 2, panel_y + 64), settings.LIGHT_GRAY, 10)
 
+
+        # --- PANEL 3: GAME STATE & TURN (X = x3, W = w3) ---
+        draw_hud_panel(x3, w3)
+        
+        # Turn count
+        draw_text(screen, f"TURN {self.turn_manager.turn_number}", (x3 + w3 // 2, panel_y + 12), settings.WHITE, 14)
+        
+        # Phase info
         phase_text = "PLAYER MOVE"
-        phase_symbol = "dx"
+        phase_symbol = "\u0394x"
         phase_color = settings.CYAN
         if self.state in ("PLAYER_ACTION_SELECT", "RESOLVE_ACTION"):
             phase_text = "PLAYER ATTACK"
             phase_symbol = "f'(x)"
+            phase_color = settings.RED
         elif self.state == "RESOLVE_MOVE":
             phase_text = "PLAYER MOVE"
             phase_symbol = "\u0394x"
+            phase_color = settings.CYAN
         elif self.state == "LOCK_INDICATORS":
             phase_text = "LOCK AIM"
             phase_symbol = "!"
@@ -2595,33 +2654,132 @@ class GameplayScene(Scene):
             phase_symbol = "0/0"
             phase_color = settings.RED
 
-        center_x = settings.WINDOW_WIDTH // 2
-        draw_text(screen, f"Turn {self.turn_manager.turn_number} {phase_symbol}",
-                  (center_x, bar_y + 13),
-                  phase_color,
-                  12)
-        draw_text(screen, phase_text,
-                  (center_x, bar_y + 31),
-                  phase_color,
-                  16)
+        draw_text(screen, f"{phase_text} {phase_symbol}", (x3 + w3 // 2, panel_y + 34), phase_color, 12)
+        
+        # Move & Action Checklist dynamically centered in w3
+        mid_x = x3 + w3 // 2
+        move_x = mid_x - 38
+        act_x = mid_x + 18
+        
+        move_ready = self.turn_manager.player_moved
+        move_color = settings.GREEN if move_ready else (80, 80, 80)
+        pygame.draw.circle(screen, move_color, (move_x, panel_y + 58), 4)
+        draw_text(screen, "MOVE", (move_x + 8, panel_y + 59), settings.LIGHT_GRAY, 10, center=False)
 
-        move_status = "[x]" if self.turn_manager.player_moved else "[ ]"
-        act_status = "[x]" if self.turn_manager.player_acted else "[ ]"
-        draw_text(screen, f"Move {move_status}   Action {act_status}",
-                  (center_x, bar_y + 50),
-                  settings.LIGHT_GRAY, 14)
+        act_ready = self.turn_manager.player_acted
+        act_color = settings.GREEN if act_ready else (80, 80, 80)
+        pygame.draw.circle(screen, act_color, (act_x, panel_y + 58), 4)
+        draw_text(screen, "ACTION", (act_x + 8, panel_y + 59), settings.LIGHT_GRAY, 10, center=False)
 
-        log_x = settings.WINDOW_WIDTH - 190
-        log_title = pygame.font.Font(None, 12).render("Recent", True, settings.LIGHT_GRAY)
-        screen.blit(log_title, (log_x, bar_y + 10))
-        self._draw_combat_log(screen, log_x, bar_y + 22)
 
-        controls = "WASD/click move + confirm  1/2 skills  R rewind  Esc pause"
+        # --- PANEL 4: SKILLS & ACTIONS (X = x4, W = w4) ---
+        draw_hud_panel(x4, w4, t("actions"), settings.CYAN)
+        
+        def draw_skill_slot(slot_x, key_label, name_label, unlocked, active, cooldown, max_cooldown, cost, current_rigor, color):
+            slot_rect = pygame.Rect(slot_x, panel_y + 22, 26, 26)
+            if not unlocked:
+                pygame.draw.rect(screen, (22, 22, 34), slot_rect, border_radius=4)
+                pygame.draw.rect(screen, (40, 40, 60), slot_rect, 1, border_radius=4)
+                draw_text(screen, "🔒", slot_rect.center, (80, 80, 100), 10)
+                draw_text(screen, key_label, (slot_x + 13, panel_y + 57), (70, 70, 90), 9)
+                return
+
+            pygame.draw.rect(screen, (14, 18, 30), slot_rect, border_radius=4)
+            if active:
+                pygame.draw.rect(screen, settings.GOLD, slot_rect, 2, border_radius=4)
+                glow_rect = slot_rect.inflate(2, 2)
+                pygame.draw.rect(screen, settings.CYAN, glow_rect, 1, border_radius=4)
+            else:
+                pygame.draw.rect(screen, (60, 80, 110), slot_rect, 1, border_radius=4)
+
+            draw_text(screen, name_label, slot_rect.center, color, 10)
+
+            if cooldown > 0:
+                s_overlay = pygame.Surface((26, 26), pygame.SRCALPHA)
+                s_overlay.fill((0, 0, 0, 180))
+                screen.blit(s_overlay, slot_rect.topleft)
+                draw_text(screen, str(int(cooldown)), slot_rect.center, settings.WHITE, 12)
+            elif cost > current_rigor:
+                s_overlay = pygame.Surface((26, 26), pygame.SRCALPHA)
+                s_overlay.fill((100, 20, 20, 140))
+                screen.blit(s_overlay, slot_rect.topleft)
+                draw_text(screen, "⚡", slot_rect.center, settings.RED, 11)
+
+            key_color = settings.GOLD if active else settings.LIGHT_GRAY
+            draw_text(screen, key_label, (slot_x + 13, panel_y + 57), key_color, 9)
+
+        # Center the 4 skill slots inside w4
+        start_x = x4 + (w4 - 122) // 2
+        
+        # Slot 1: Attack
+        atk_active = (self.selected_skill is None) and (self.state in ("PLAYER_ACTION_SELECT", "RESOLVE_ACTION"))
+        draw_skill_slot(start_x, "LMB", "ATK", True, atk_active, 0, 0, 0, current_player.rigor, settings.RED)
+
+        # Slot 2: Pythagoras
+        has_pitagoras = self.game.skill_tree.is_unlocked("pitagoras") if self.game.skill_tree else False
+        pit_active = self.selected_skill == "pitagoras"
+        draw_skill_slot(start_x + 32, "1", "PIT", has_pitagoras, pit_active, current_player.pitagoras_cooldown, 1, settings.PITAGORAS_RIGOR_COST, current_player.rigor, settings.YELLOW)
+
+        # Slot 3: Reflection
+        has_reflexao = self.game.skill_tree.is_unlocked("reflexao") if self.game.skill_tree else False
+        ref_active = self.selected_skill == "reflexao"
+        draw_skill_slot(start_x + 64, "2", "REF", has_reflexao, ref_active, current_player.reflexao_cooldown, 3, settings.REFLEXAO_RIGOR_COST, current_player.rigor, settings.CYAN)
+
+        # Slot 4: Rewind
+        has_ctrlz = self.game.skill_tree.is_unlocked("ctrlz") if self.game.skill_tree else False
+        ctrlz_cooldown = self.turn_manager.rewind_cooldown_turns
+        draw_skill_slot(start_x + 96, "R", "Z", has_ctrlz, False, ctrlz_cooldown, settings.REWIND_COOLDOWN_TURNS, 0, current_player.rigor, settings.PURPLE)
+
+        draw_text(screen, "SKILLS & REWIND", (x4 + w4 // 2, panel_y + 68), settings.LIGHT_GRAY, 9)
+
+
+        # --- PANEL 5: RECENT FEED LOGS (X = x5, W = w5) ---
+        draw_hud_panel(x5, w5)
+        draw_text(screen, t("feed"), (x5 + w5 // 2, panel_y + 8), settings.GREEN, 9)
+        
+        log_y = panel_y + 18
+        if self.turn_log:
+            font = pygame.font.Font(None, 12)
+            max_lines = 4
+            start_idx = max(0, len(self.turn_log) - max_lines)
+            for i, entry in enumerate(self.turn_log[start_idx:start_idx + max_lines]):
+                display_entry = entry
+                
+                # Dynamic truncation based on w5 panel size!
+                max_chars = max(15, int((w5 - 16) / 5))  # Simple estimation of safe char count based on panel width
+                if len(display_entry) > max_chars:
+                    display_entry = display_entry[:max_chars-3] + "..."
+                
+                if "CRIT" in entry or "CRITICAL" in entry:
+                    color = settings.GOLD
+                elif "hit" in entry.lower() or "attack" in entry.lower():
+                    color = settings.RED
+                elif "Miss" in entry or "missed" in entry:
+                    color = settings.GRAY
+                elif "moved" in entry:
+                    color = settings.LIGHT_GRAY
+                elif "QED" in entry.upper() or "eliminated" in entry:
+                    color = settings.GREEN
+                else:
+                    color = (180, 180, 220)
+
+                img = font.render(display_entry, True, color)
+                screen.blit(img, (x5 + 8, log_y + i * 13))
+        else:
+            font = pygame.font.Font(None, 12)
+            img1 = font.render("SYSTEM: ACTIVE", True, settings.GREEN)
+            screen.blit(img1, (x5 + 8, log_y + 10))
+            img2 = font.render("AWAITING FORMULA", True, settings.GRAY)
+            screen.blit(img2, (x5 + 8, log_y + 24))
+
+
+        # --- BOTTOM LEGEND: CONTROLS & STATUS ---
+        controls = "WASD/click move + confirm  |  1/2 skills  |  R rewind  |  Esc pause"
         if self._is_true_coop():
             turn_owner = "HOST" if self._current_player_owner() == "host" else "CLIENT"
-            controls = f"{controls}  Turn: {turn_owner} {self._player_label(self.active_player_idx)}"
+            controls = f"{controls}   [ Turn: {turn_owner} {player_label} ]"
         controls_img = pygame.font.Font(None, 11).render(controls, True, settings.GRAY)
-        screen.blit(controls_img, (settings.UI_PADDING, settings.WINDOW_HEIGHT - 14))
+        screen.blit(controls_img, (12, bar_y + 91))
 
     def _draw_bar(self, screen, x, y, w, h, pct, fill_color, bg_color):
         pygame.draw.rect(screen, bg_color, (x, y, w, h))

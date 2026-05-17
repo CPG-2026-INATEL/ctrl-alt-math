@@ -102,7 +102,7 @@ class Game:
             settings.WINDOW_WIDTH / settings.BASE_WIDTH,
             settings.WINDOW_HEIGHT / settings.BASE_HEIGHT,
         )
-        settings.UI_BAR_HEIGHT = int(72 * settings.UI_SCALE)
+        settings.UI_BAR_HEIGHT = int(105 * settings.UI_SCALE)
 
         available_w = settings.WINDOW_WIDTH - 40
         available_h = settings.WINDOW_HEIGHT - settings.UI_BAR_HEIGHT - 30
