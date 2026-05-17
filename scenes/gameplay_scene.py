@@ -1417,12 +1417,15 @@ class GameplayScene(Scene):
         self.camera_x = max(0, min(max_cam_x, target_cam_x))
         self.camera_y = max(0, min(max_cam_y, target_cam_y))
 
-        self.game.player.update_animation(dt, self.grid)
+        anim_grid = None if (self.game.mp_is_multiplayer and self.game.mp_client) else self.grid
+        for p in self.players:
+            p.update_animation(dt, anim_grid)
         self.game.player.update(dt, {})
 
         for enemy in self.game.enemies:
-            enemy.update_animation(dt, self.grid)
-            enemy.snap_to_grid(self.grid)
+            enemy.update_animation(dt, anim_grid)
+            if anim_grid is not None: enemy.snap_to_grid(anim_grid)
+            pass
             enemy.bob_phase += dt * 3
             enemy.spawn_timer = max(0, enemy.spawn_timer - dt)
             enemy.flash_timer = max(0, enemy.flash_timer - dt)
@@ -2041,7 +2044,7 @@ class GameplayScene(Scene):
                     "hp": player.hp,
                     "max_hp": player.max_hp,
                     "rigor": player.rigor,
-                    "player_id": getattr(player, "player_id", idx + 1),
+                    "anim": player.current_anim, "dir_x": player.dir_x, "dir_y": player.dir_y, "player_id": getattr(player, "player_id", idx + 1),
                 }
                 for idx, player in enumerate(self.players)
             ],
@@ -2055,7 +2058,7 @@ class GameplayScene(Scene):
                     "hp": enemy.hp,
                     "max_hp": enemy.max_hp,
                     "alive": enemy.alive,
-                    "dead": enemy.dead,
+                    "dead": enemy.dead, "anim": getattr(enemy, "current_anim", "idle"),
                 }
                 for enemy in self.game.enemies
             ],
@@ -2150,6 +2153,9 @@ class GameplayScene(Scene):
                 player.hp = data.get("hp", player.hp)
                 player.max_hp = data.get("max_hp", player.max_hp)
                 player.rigor = data.get("rigor", player.rigor)
+                if "anim" in data: player.current_anim = data["anim"]
+                if "dir_x" in data: player.dir_x = data["dir_x"]
+                if "dir_y" in data: player.dir_y = data["dir_y"]
         else:
             pdata = msg.get("player", {})
             self.players[0].col = pdata.get("col", self.players[0].col)
@@ -2176,6 +2182,7 @@ class GameplayScene(Scene):
             enemy.max_hp = data.get("max_hp", enemy.max_hp)
             enemy.alive = data.get("alive", enemy.alive)
             enemy.dead = data.get("dead", enemy.dead)
+            if "anim" in data: enemy.current_anim = data["anim"]
 
         self.enemy_intents = []
         for data in msg.get("enemy_intents", []):
