@@ -94,14 +94,28 @@ class MapScene(Scene):
             elif mtype == "map_vote_cancel":
                 self._remote_voted_room = None
                 self._vote_status = ""
+            elif mtype == "map_enter_room":
+                room_data = msg.get("room")
+                if room_data and len(room_data) == 2:
+                    room = self.game.world_map.rooms.get((room_data[0], room_data[1]))
+                    if room and self.game.scene_manager.current is self:
+                        self.room = room
+                        self.game.sfx.play("menu_confirm")
+                        self.game.scene_manager.switch("gameplay")
 
     def _check_votes(self):
         if self._local_voted_room and self._remote_voted_room and self._local_voted_room == self._remote_voted_room:
             room = self.game.world_map.rooms.get(self._local_voted_room)
             if room and room.state in ("available", "completed"):
-                self.room = room
-                self.game.sfx.play("menu_confirm")
-                self.game.scene_manager.switch("gameplay")
+                if self.game.mp_host:
+                    self._net_send({"type": "map_enter_room", "room": [room.col, room.row]})
+                    self.room = room
+                    self.game.sfx.play("menu_confirm")
+                    self.game.scene_manager.switch("gameplay")
+                elif not self.game.mp_is_multiplayer:
+                    self.room = room
+                    self.game.sfx.play("menu_confirm")
+                    self.game.scene_manager.switch("gameplay")
 
     def _cast_vote(self, room_id):
         if not self.game.mp_is_multiplayer:

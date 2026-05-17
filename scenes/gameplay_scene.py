@@ -2123,10 +2123,10 @@ class GameplayScene(Scene):
             self.game.mp_client.send(msg)
 
     def _apply_remote_gameplay_command(self, msg):
-        if not self._is_remote_turn():
+        cmd = msg.get("cmd")
+        if cmd not in ("begin_room", "leave_no_combat") and not self._is_remote_turn():
             return
 
-        cmd = msg.get("cmd")
         if cmd == "begin_room" and self.state == "WAVE_INTRO":
             self._begin_room()
         elif cmd == "leave_no_combat" and self.state == "NO_COMBAT":

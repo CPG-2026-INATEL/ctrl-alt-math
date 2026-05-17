@@ -1,0 +1,6 @@
+[Client] Connecting to wss://sweet-guests-jam.loca.lt:5555
+[Client] Resolved WebSocket URL: wss://sweet-guests-jam.loca.lt
+[Client] Connection error: As of 3.10, the *loop* parameter was removed from Lock() since it is no longer necessary
+[Client] Connecting to wss://sweet-guests-jam.loca.lt:5555
+[Client] Resolved WebSocket URL: wss://sweet-guests-jam.loca.lt
+[Client] Connection error: As of 3.10, the *loop* parameter was removed from Lock() since it is no longer necessary

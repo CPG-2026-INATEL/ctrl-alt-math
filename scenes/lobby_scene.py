@@ -1,6 +1,4 @@
 import pygame
-import socket
-import threading
 
 import settings
 from i18n import t
@@ -80,14 +78,13 @@ class LobbyScene(Scene):
         self.host = NetworkHost()
         try:
             self.host.start()
-            all_ips = self.host.get_all_local_ips()
-            self.host_ip = all_ips[0] if all_ips else "?.?.?.?"
-            self.host_all_ips = all_ips
-            self.status = t("lobby_waiting", ip=self.host_ip)
+            self.host_ip = self.host.server_host
+            self.host_all_ips = [f"{self.host.server_host}:{self.host.server_port}"]
+            self.status = t("lobby_room_code", code=self.host.room_code)
             self.status_color = settings.GREEN
             self.mode = "hosting"
             self.player_index = 1
-        except OSError as e:
+        except (ConnectionError, OSError, RuntimeError) as e:
             self.status = f"Error: {e}"
             self.status_color = settings.RED
             self.host = None
@@ -96,7 +93,7 @@ class LobbyScene(Scene):
         self.mode = "join"
         self.ip_editing = True
         self.ip_input = ""
-        self.status = t("lobby_enter_ip")
+        self.status = t("lobby_default_server", server=f"{settings.MATCH_SERVER_HOST}:{settings.MATCH_SERVER_PORT}")
         self.status_color = settings.CYAN
         self.scan_hosts = []
         self.selected_host = 0
@@ -108,16 +105,35 @@ class LobbyScene(Scene):
         self.status_color = settings.YELLOW
         self.discovery.start_scan()
 
+    def _parse_endpoint(self, text):
+        raw = text.strip()
+        endpoint = f"{settings.MATCH_SERVER_HOST}:{settings.MATCH_SERVER_PORT}"
+        room_code = raw
+        if "@" in raw:
+            room_code, endpoint = raw.split("@", 1)
+        elif "/" in raw:
+            endpoint, room_code = raw.rsplit("/", 1)
+
+        host = endpoint.strip()
+        port = settings.MATCH_SERVER_PORT
+        if ":" in endpoint:
+            host, port_str = endpoint.rsplit(":", 1)
+            if port_str.isdigit():
+                port = int(port_str)
+
+        return host.strip(), port, room_code.strip().upper()
+
     def _connect_to(self, ip):
         self.client = NetworkClient()
         try:
-            self.client.connect(ip)
+            host, port, room_code = self._parse_endpoint(ip)
+            self.client.connect(host, port, room_code=room_code)
             self.connected = True
-            self.status = t("lobby_connected")
+            self.status = t("lobby_room_code", code=self.client.room_code)
             self.status_color = settings.GREEN
             self.mode = "connected"
             self.player_index = 2
-        except (ConnectionError, OSError) as e:
+        except (ConnectionError, OSError, RuntimeError) as e:
             self.status = f"Error: {e}"
             self.status_color = settings.RED
             self.client = None
@@ -218,7 +234,8 @@ class LobbyScene(Scene):
                 if self._start_rect().collidepoint(event.pos):
                     if self.client:
                         self.client.send({"type": "client_ready"})
-                    self._start_game()
+                        self.status = t("lobby_waiting_host")
+                        self.status_color = settings.YELLOW
                     return
                 if self._cancel_rect().collidepoint(event.pos):
                     if self.client:
@@ -278,7 +295,7 @@ class LobbyScene(Scene):
                     self._scan_lan()
                 else:
                     ch = event.unicode
-                    if ch and (ch.isdigit() or ch == "."):
+                    if ch and (ch.isalnum() or ch in ".:-/@"):
                         self.ip_input += ch
             else:
                 if event.key == pygame.K_UP:
@@ -317,6 +334,20 @@ class LobbyScene(Scene):
                     self.connected = True
                     self.status = t("lobby_player_joined")
                     self.status_color = settings.GREEN
+                elif msg.get("type") == "error":
+                    self.status = msg.get("message", "Server error")
+                    self.status_color = settings.RED
+
+            # Update client list for display
+            self.connected_clients = self.host.get_connected_clients_info()
+            if self.connected_clients and not self.connected:
+                self.connected = True
+                self.status = t("lobby_player_joined")
+                self.status_color = settings.GREEN
+            elif not self.connected_clients:
+                self.connected = False
+                self.status = t("lobby_room_code", code=self.host.room_code)
+                self.status_color = settings.GREEN
 
         if self.client:
             msgs = self.client.poll()
@@ -325,6 +356,9 @@ class LobbyScene(Scene):
                     difficulty = msg.get("difficulty")
                     seed = msg.get("seed")
                     self._do_enter_game(difficulty=difficulty, seed=seed)
+                elif msg.get("type") == "error":
+                    self.status = msg.get("message", "Server error")
+                    self.status_color = settings.RED
 
         if self.discovery:
             self.scan_hosts = list(set(self.discovery.hosts))
@@ -356,20 +390,34 @@ class LobbyScene(Scene):
         elif self.mode == "hosting":
             draw_text(screen, t("lobby_hosting"),
                       (settings.WINDOW_WIDTH // 2, 160), settings.GREEN, 28)
-            # Show all local IPs so the user can pick the right one
             ips = getattr(self, "host_all_ips", [self.host_ip] if self.host_ip else [])
-            draw_text(screen, t("lobby_share_ip"),
+            draw_text(screen, t("lobby_match_server"),
                       (settings.WINDOW_WIDTH // 2, 195), settings.LIGHT_GRAY, 14)
             for idx, ip in enumerate(ips):
                 color = settings.WHITE if idx > 0 else settings.CYAN
                 draw_text(screen, ip,
                           (settings.WINDOW_WIDTH // 2, 215 + idx * 24), color, 20)
             status_y = 215 + len(ips) * 24 + 10
+
+            draw_text(screen, t("lobby_room_code", code=getattr(self.host, "room_code", "")),
+                      (settings.WINDOW_WIDTH // 2, status_y), settings.GOLD, 20)
+            status_y += 30
+
             draw_text(screen, self.status,
                       (settings.WINDOW_WIDTH // 2, status_y), self.status_color, 18)
+
+            # Show connected clients
+            clients = getattr(self, "connected_clients", [])
+            if clients:
+                draw_text(screen, f"Connected: {len(clients)}",
+                          (settings.WINDOW_WIDTH // 2, status_y + 25), settings.LIGHT_GRAY, 16)
+                for i, (cid, ip) in enumerate(clients):
+                    draw_text(screen, f"Player {cid} ({ip})",
+                              (settings.WINDOW_WIDTH // 2, status_y + 45 + i * 20), settings.WHITE, 14)
+
             if self.connected:
                 draw_text(screen, t("lobby_start_prompt"),
-                          (settings.WINDOW_WIDTH // 2, status_y + 40), settings.GOLD, 24)
+                          (settings.WINDOW_WIDTH // 2, settings.WINDOW_HEIGHT - 100), settings.GOLD, 24)
             draw_text(screen, t("lobby_esc_cancel"),
                       (settings.WINDOW_WIDTH // 2, settings.WINDOW_HEIGHT - 40), settings.GRAY, 14)
 
@@ -381,7 +429,7 @@ class LobbyScene(Scene):
                           (settings.WINDOW_WIDTH // 2, 240), settings.CYAN, 18)
                 draw_text(screen, self.ip_input + "_",
                           (settings.WINDOW_WIDTH // 2, 280), settings.WHITE, 24)
-                draw_text(screen, t("lobby_scan_hint"),
+                draw_text(screen, t("lobby_default_server", server=f"{settings.MATCH_SERVER_HOST}:{settings.MATCH_SERVER_PORT}"),
                           (settings.WINDOW_WIDTH // 2, 330), settings.GRAY, 14)
                 draw_text(screen, t("lobby_join_help"),
                           (settings.WINDOW_WIDTH // 2, 365), settings.LIGHT_GRAY, 15)
