@@ -247,6 +247,11 @@ class GameplayScene(Scene):
         if prev_scene and hasattr(prev_scene, "room"):
             room = prev_scene.room
             self.game.current_room = room
+
+            if room.type == "boss":
+                self.game.music.play("boss")
+            else:
+                self.game.music.play("gameplay")
             
             # Deterministic random for room generation
             room_seed = getattr(self.game, "seed", 0) ^ hash((room.col, room.row))
