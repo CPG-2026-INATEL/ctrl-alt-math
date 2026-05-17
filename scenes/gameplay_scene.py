@@ -204,15 +204,10 @@ class GameplayScene(Scene):
         if self._is_client_control_turn():
             self.state = "WAIT_REMOTE_SYNC"
             return
-        # If there are no enemies, immediately restart the player turn without phase shifts
+        # If there are no enemies, trigger victory
         alive_enemies = [e for e in self.game.enemies if not e.dead and not getattr(e, 'is_decoy', False)]
         if len(alive_enemies) == 0:
-            self.turn_manager.start_turn()
-            self.state = "PLAYER_INPUT"
-            self._set_active_player(0)
-            self.show_move_range = True
-            self.show_action_range = False
-            self.selected_skill = None
+            self._check_victory()
             return
         next_idx = self._next_living_player_idx(self.active_player_idx)
         if next_idx is not None:
