@@ -1,7 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
 from PyInstaller.utils.hooks import collect_all
 
-datas = [('assets', 'assets'), ('achievements.json', '.'), ('items.json', '.'), ('savegame.json', '.'), ('*.ttf', '.')]
+datas = [('assets', 'assets'), ('achievements.json', '.'), ('items.json', '.'), ('savegame.json', '.')]
 binaries = []
 hiddenimports = ['pygame', 'requests']
 tmp_ret = collect_all('pygame')
