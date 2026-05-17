@@ -123,8 +123,8 @@ class MapGenerator:
             "jitter_x": 0,
             "jitter_y": 0,
             "objective": "kill_all",
-            "arena_cols": 0,
-            "arena_rows": 0,
+            "arena_cols": 12,
+            "arena_rows": 9,
         }
         connections[hub_id] = []
 
