@@ -487,6 +487,8 @@ class GameplayScene(Scene):
             self.game.world_map.complete_room(
                 self.game.current_room.id
             )
+            if hasattr(self.game, "save_progress"):
+                self.game.save_progress()
             if self.game.current_room.type == "victory" and self.game.world_map.all_required_rooms_completed():
                 self._broadcast_scene_switch("victory")
                 self._restore_primary_player()
@@ -1033,6 +1035,10 @@ class GameplayScene(Scene):
         self.turn_manager.player_acted = True
         self.show_action_range = False
         self.selected_skill = None
+        if not self.game.mp_client or self.game.mp_host:
+            self._check_victory()
+            if self.state == "VICTORY_TRANSITION":
+                return
         self._advance_after_player_turn()
 
     def _execute_skill(self):
@@ -1190,6 +1196,10 @@ class GameplayScene(Scene):
         self.turn_manager.player_acted = True
         self.show_action_range = False
         self.selected_skill = None
+        if not self.game.mp_client or self.game.mp_host:
+            self._check_victory()
+            if self.state == "VICTORY_TRANSITION":
+                return True
         self._advance_after_player_turn()
         return True
 
@@ -1326,6 +1336,9 @@ class GameplayScene(Scene):
                 self.game.floating_text.add_info(
                     self.game.player.x, self.game.player.y - 60,
                     f"+{gold_reward} gold", settings.GOLD)
+
+                if hasattr(self.game, "save_progress"):
+                    self.game.save_progress()
 
             from achievement_manager import AchievementManager
             mgr = AchievementManager()
@@ -1555,6 +1568,8 @@ class GameplayScene(Scene):
                     self.game.world_map.complete_room(
                         self.game.current_room.id
                     )
+                    if hasattr(self.game, "save_progress"):
+                        self.game.save_progress()
                     if (self.game.current_room.type == "victory" or
                         self.game.current_room.is_final or
                         getattr(self.game.current_room, 'is_final_gate', False)):
@@ -2410,6 +2425,7 @@ class GameplayScene(Scene):
                     if scale_x != 1.0 or scale_y != 1.0:
                         tile_surf = pygame.transform.scale(tile_surf, (scaled_w, scaled_h))
                     temp.blit(tile_surf, rect)
+            self._draw_high_tile_shadows(temp, world_offset)
         else:
             pygame.draw.rect(temp, self.game.math_bg.get_arena_color(), arena_rect)
 
@@ -2680,6 +2696,7 @@ class GameplayScene(Scene):
         self.game.particles.draw(temp, offset=world_offset)
         self.game.floating_text.draw(temp, offset=world_offset)
 
+        self.game.ui.draw_entropy_effects(temp, self.game.entropy)
         self._draw_cursor_info(temp)
         self._draw_turn_hud(temp)
 
@@ -2746,6 +2763,32 @@ class GameplayScene(Scene):
             fade.set_alpha(int(200 * progress))
             fade.fill(settings.BLACK)
             screen.blit(fade, (0, 0))
+
+    def _draw_high_tile_shadows(self, screen, world_offset):
+        high_tiles = {TILE_HIGH, TILE_HIGH_EDGE}
+        low_tiles = {TILE_LOW, TILE_STAIRS_DOWN, TILE_STAIRS_LEFT, TILE_STAIRS_RIGHT}
+
+        for (col, row), tile in self.grid.tile_types.items():
+            if tile not in high_tiles:
+                continue
+
+            for dc, dr, alpha, height_frac in ((0, 1, 70, 0.42), (1, 0, 40, 1.0), (-1, 0, 40, 1.0)):
+                neighbor = (col + dc, row + dr)
+                if self.grid.tile_types.get(neighbor) not in low_tiles:
+                    continue
+                rect = self.grid.cell_rect(neighbor[0], neighbor[1])
+                rect.x += world_offset[0]
+                rect.y += world_offset[1]
+                shadow_h = max(4, int(rect.height * height_frac))
+                if dr == 1:
+                    shadow_rect = pygame.Rect(rect.x, rect.y, rect.width, shadow_h)
+                elif dc == 1:
+                    shadow_rect = pygame.Rect(rect.x, rect.y, max(4, rect.width // 6), rect.height)
+                else:
+                    shadow_rect = pygame.Rect(rect.right - max(4, rect.width // 6), rect.y, max(4, rect.width // 6), rect.height)
+                shadow = pygame.Surface((shadow_rect.width, shadow_rect.height), pygame.SRCALPHA)
+                shadow.fill((0, 0, 0, alpha))
+                screen.blit(shadow, shadow_rect)
 
     def _draw_cursor_info(self, screen):
         if self.state not in ("PLAYER_INPUT", "PLAYER_ACTION_SELECT"):
@@ -2996,25 +3039,26 @@ class GameplayScene(Scene):
         
         # Level & Identity Header
         player_label = self._player_label(self.active_player_idx)
-        draw_text(screen, f"{player_label}  |  LVL {current_player.level}", (x1 + 8, panel_y + 6), settings.CYAN, 15, center=False)
+        draw_text(screen, f"{player_label}  |  LVL {current_player.level}", (x1 + 8, panel_y + 7), settings.CYAN, 15, center=False)
         
         # HP Bar
+        bar_w = w1 - 16
         hp_color = settings.GREEN if hp_pct > 0.5 else settings.ORANGE if hp_pct > 0.25 else settings.RED
-        self._draw_bar_sleek(screen, x1 + 8, panel_y + 22, w1 - 16, 11, hp_pct, hp_color, (45, 15, 15))
-        draw_text(screen, f"HP: {current_player.hp}/{current_player.get_max_hp()}", (x1 + w1 // 2, panel_y + 28), settings.WHITE, 14)
+        self._draw_bar_sleek(screen, x1 + 8, panel_y + 22, bar_w, 10, hp_pct, hp_color, (45, 15, 15))
+        draw_text(screen, f"HP: {current_player.hp}/{current_player.get_max_hp()}", (x1 + w1 // 2, panel_y + 27), settings.WHITE, 13)
 
         # Rigor Bar
-        self._draw_bar_sleek(screen, x1 + 8, panel_y + 41, w1 - 16, 11, rigor_pct, settings.BLUE, (15, 15, 45))
-        draw_text(screen, f"{t('rigor')}: {current_player.rigor:.0f}/{current_player.max_rigor}", (x1 + w1 // 2, panel_y + 47), settings.WHITE, 14)
-
-        # EXP Bar
-        self._draw_bar_sleek(screen, x1 + 8, panel_y + 60, w1 - 16, 11, exp_pct, settings.GOLD, (30, 25, 10))
-        draw_text(screen, f"EXP: {current_player.exp}/{current_player.next_level_exp} ({int(exp_pct*100)}%)", (x1 + w1 // 2, panel_y + 66), settings.WHITE, 13)
+        self._draw_bar_sleek(screen, x1 + 8, panel_y + 40, bar_w, 10, rigor_pct, settings.BLUE, (15, 15, 45))
+        draw_text(screen, f"{t('rigor')}: {current_player.rigor:.0f}/{current_player.max_rigor}", (x1 + w1 // 2, panel_y + 45), settings.WHITE, 13)
 
         # Entropy Bar
         entropy_color = settings.COLOR_ENTROPY_BAR if entropy_pct < 0.75 else settings.RED
-        self._draw_bar_sleek(screen, x1 + 8, panel_y + 79, w1 - 16, 11, entropy_pct, entropy_color, (40, 10, 40))
-        draw_text(screen, f"{t('entropy')}: {self.game.entropy:.0f}/{settings.MAX_ENTROPY}", (x1 + w1 // 2, panel_y + 85), settings.WHITE, 13)
+        self._draw_bar_sleek(screen, x1 + 8, panel_y + 58, bar_w, 10, entropy_pct, entropy_color, (35, 10, 40))
+        draw_text(screen, f"{t('entropy')}: {self.game.entropy:.0f}/{settings.MAX_ENTROPY}", (x1 + w1 // 2, panel_y + 63), settings.WHITE, 13)
+
+        # EXP Bar
+        self._draw_bar_sleek(screen, x1 + 8, panel_y + 76, bar_w, 10, exp_pct, settings.GOLD, (30, 25, 10))
+        draw_text(screen, f"EXP: {current_player.exp}/{current_player.next_level_exp} ({int(exp_pct*100)}%)", (x1 + w1 // 2, panel_y + 81), settings.WHITE, 12)
 
 
         # --- PANEL 2: COMBAT STATS (X = x2, W = w2) ---

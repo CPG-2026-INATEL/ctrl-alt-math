@@ -68,6 +68,7 @@ class Room:
 
 class WorldMap:
     def __init__(self, seed=None):
+        self.seed = seed
         self.rooms = {}
         self.connections_map = {}
         self.layers = []
@@ -91,6 +92,7 @@ class WorldMap:
 
     def _generate_map(self, seed=None):
         gen = MapGenerator(seed)
+        self.seed = gen.seed
         rooms, connections, layers = gen.generate(settings.DIFFICULTY)
 
         for room_id, room_data in rooms.items():
@@ -261,7 +263,9 @@ class WorldMap:
         adjusted_x = pos[0] + self.scroll_x
         adjusted_y = pos[1] - settings.MAP_HEADER_H + self.scroll_y
         adjusted_pos = (adjusted_x, adjusted_y)
-        for room in self.rooms.values():
+        # Match hit testing to visual stacking so overlapping mid-row rooms are selectable.
+        rooms = sorted(self.rooms.values(), key=lambda room: (room.screen_y, room.screen_x), reverse=True)
+        for room in rooms:
             if room.rect.collidepoint(adjusted_pos):
                 return room
         return None
@@ -289,6 +293,31 @@ class WorldMap:
                 if conn_room and conn_room.state == "locked":
                     conn_room.state = "available"
 
+    def all_required_rooms_completed(self):
+        required_types = {"normal", "challenge", "boss", "victory"}
+        required_rooms = [room for room in self.rooms.values() if room.type in required_types]
+        return bool(required_rooms) and all(room.state == "completed" for room in required_rooms)
+
+    def get_state_data(self):
+        return {
+            "seed": self.seed,
+            "player_room": self.player_room,
+            "rooms": {room_id: room.state for room_id, room in self.rooms.items()},
+        }
+
+    def apply_state_data(self, data):
+        if not data:
+            return
+        seed = data.get("seed")
+        if seed is not None and seed != self.seed:
+            self._generate_map(seed)
+        self.player_room = data.get("player_room", self.player_room)
+        for room_id, state in data.get("rooms", {}).items():
+            room = self.rooms.get(room_id)
+            if room and state in ("locked", "available", "completed"):
+                room.state = state
+        self._update_scroll_to_player()
+
     def draw(self, screen, player=None, mp_info=None):
         screen.fill(settings.DARK_BLUE)
 
@@ -302,7 +331,8 @@ class WorldMap:
         sx = int(self.scroll_x)
         sy = int(self.scroll_y)
 
-        for room in self.rooms.values():
+        rooms_in_draw_order = sorted(self.rooms.values(), key=lambda room: (room.screen_y, room.screen_x))
+        for room in rooms_in_draw_order:
             for conn_id in room.connections:
                 conn_room = self.rooms.get(conn_id)
                 if conn_room and conn_room.col >= room.col:
@@ -320,7 +350,7 @@ class WorldMap:
 
                     pygame.draw.line(screen, color, (start_x, start_y), (end_x, end_y), 2)
 
-        for room in self.rooms.values():
+        for room in rooms_in_draw_order:
             self._draw_room(screen, room, sx, sy)
 
         player_room = self.rooms[self.player_room]

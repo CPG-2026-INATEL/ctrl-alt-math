@@ -12,3 +12,4 @@ env/
 *.swp
 *.swo
 save.json
+savegame.json

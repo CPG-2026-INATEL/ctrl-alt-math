@@ -12,6 +12,7 @@ from math_bg import MathBackground
 from map import WorldMap
 from rewind_fx import RewindEffects
 from tts_manager import TTSManager
+from save_game import save_game, load_game, save_exists
 
 from scenes.scene_manager import SceneManager
 from scenes.menu_scene import MenuScene
@@ -39,6 +40,7 @@ class Game:
         pygame.display.set_caption("Ctrl + Alt + Math")
         self.clock = pygame.time.Clock()
         self.running = True
+        self._autosave_timer = 0.0
 
         self.ui = UI()
         self.sfx = SFX()
@@ -237,6 +239,17 @@ class Game:
         from grid import Grid
         self.obstacles = Grid().obstacle_rects(settings.ARENA_OBSTACLES)
 
+    def save_progress(self):
+        if self.mp_is_multiplayer:
+            return
+        save_game(self)
+
+    def load_progress(self):
+        return load_game(self)
+
+    def can_continue(self):
+        return save_exists()
+
     def run(self):
         while self.running:
             dt = self.clock.tick(settings.FPS) / 1000.0
@@ -255,6 +268,15 @@ class Game:
 
             if self.scene_manager.current:
                 self.scene_manager.current.update(dt)
+
+            scene_name = self.scene_manager.current.__class__.__name__ if self.scene_manager.current else ""
+            if not self.mp_is_multiplayer and scene_name not in {"MenuScene", "LobbyScene"}:
+                self._autosave_timer += dt
+                if self._autosave_timer >= 2.0:
+                    self._autosave_timer = 0.0
+                    self.save_progress()
+            else:
+                self._autosave_timer = 0.0
 
             self.tts.update()
             
