@@ -206,11 +206,12 @@ class GameplayScene(Scene):
         if self._is_client_control_turn():
             self.state = "WAIT_REMOTE_SYNC"
             return
-        # If there are no enemies, trigger victory
+        # If there are no enemies, check victory but don't block movement in CTF
         alive_enemies = [e for e in self.game.enemies if not e.dead and not getattr(e, 'is_decoy', False)]
         if len(alive_enemies) == 0:
             self._check_victory()
-            return
+            if self.state == "VICTORY_TRANSITION":
+                return
         next_idx = self._next_living_player_idx(self.active_player_idx)
         if next_idx is not None:
             self.turn_manager.start_turn()
