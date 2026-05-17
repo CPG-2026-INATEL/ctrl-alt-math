@@ -47,7 +47,7 @@ PLAYER_ATTACK_COOLDOWN = 0.3
 PLAYER_ATTACK_DAMAGE = 15
 PLAYER_CRIT_CHANCE = 0.15
 PLAYER_CRIT_MULTIPLIER = 2.0
-PLAYER_START_SKILL_POINTS = 2
+PLAYER_START_SKILL_POINTS = 0
 RIGOR_REGEN_RATE = 15
 RIGOR_REGEN_DELAY = 0
 
@@ -117,6 +117,13 @@ REFLEXAO_RIGOR_COST = 30
 REFLEXAO_DAMAGE = 22
 REFLEXAO_RANGE = 3
 REFLEXAO_DURATION = 2
+INTEGRAL_RIGOR_COST = 25
+INTEGRAL_DAMAGE = 20
+INTEGRAL_RANGE = 2
+INTEGRAL_LIFESTEAL = 0.3
+FRACTAL_RIGOR_COST = 35
+FRACTAL_HP_PER_LEVEL = 20
+FRACTAL_RANGE = 1
 
 ENEMY_SIZE = 14
 BOSS_SIZE = 36
@@ -328,6 +335,51 @@ SKILL_TREE_DATA = [
         "prereqs": ["bayes"],
         "x": 200, "y": 480,
         "color": (255, 215, 0)
+    },
+    {
+        "id": "integral",
+        "name": "skill_integral_name",
+        "desc": "skill_integral_desc",
+        "cost": 3,
+        "prereqs": ["reflexao"],
+        "x": 400, "y": 480,
+        "color": (100, 255, 180)
+    },
+    {
+        "id": "fractal",
+        "name": "skill_fractal_name",
+        "desc": "skill_fractal_desc",
+        "cost": 3,
+        "prereqs": ["entropia"],
+        "x": 600, "y": 480,
+        "color": (255, 180, 100)
+    },
+    {
+        "id": "gauss",
+        "name": "skill_gauss_name",
+        "desc": "skill_gauss_desc",
+        "cost": 4,
+        "prereqs": ["integral"],
+        "x": 400, "y": 580,
+        "color": (200, 150, 255)
+    },
+    {
+        "id": "simetria",
+        "name": "skill_simetria_name",
+        "desc": "skill_simetria_desc",
+        "cost": 4,
+        "prereqs": ["fractal"],
+        "x": 600, "y": 580,
+        "color": (150, 255, 220)
+    },
+    {
+        "id": "matriz",
+        "name": "skill_matriz_name",
+        "desc": "skill_matriz_desc",
+        "cost": 5,
+        "prereqs": ["gauss", "simetria"],
+        "x": 400, "y": 680,
+        "color": (255, 255, 100)
     },
 ]
 

@@ -116,6 +116,21 @@ class SkillTree:
         if skill_id == "teoria_jogos":
             # Tactical bonuses
             if key == "crit_bonus": return (level) * 0.05 # +5% crit per level
+
+        if skill_id == "integral":
+            if key == "damage": return settings.INTEGRAL_DAMAGE + (level - 1) * 6
+            if key == "range": return settings.INTEGRAL_RANGE + (level - 1) // 3
+            if key == "lifesteal": return settings.INTEGRAL_LIFESTEAL + (level - 1) * 0.05
+
+        if skill_id == "fractal":
+            if key == "hp": return settings.FRACTAL_HP_PER_LEVEL * level
+            if key == "range": return settings.FRACTAL_RANGE
+
+        if skill_id == "gauss":
+            if key == "chain_pct": return 0.15 * level
+
+        if skill_id == "simetria":
+            if key == "reflect_pct": return 0.05 * level
             
         return base_val
 
