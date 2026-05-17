@@ -1282,13 +1282,16 @@ class GameplayScene(Scene):
             pos = self.last_enemy_death_pos or (self.game.player.x, self.game.player.y)
             self.game.particles.emit_burst(pos[0], pos[1], settings.GOLD, 30, 100, 0.8)
             
+            if self.game.skill_tree:
+                self.game.skill_tree.add_points(1)
             self.game.floating_text.add_info(pos[0], pos[1] - 40, 
                                             t("earned_skill_point"), settings.GOLD)
             self.game.tts.speak(t("earned_skill_point"), lang=settings.LANGUAGE)
 
             if self.game.current_room:
                 gold_reward = getattr(self.game.current_room, 'gold_reward', 20)
-                self.game.gold += gold_reward
+                self.game.player.gold += gold_reward
+                self.game.gold = self.game.player.gold
                 self.game.floating_text.add_info(
                     self.game.player.x, self.game.player.y - 60,
                     f"+{gold_reward} gold", settings.GOLD)

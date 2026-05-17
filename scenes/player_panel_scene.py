@@ -358,14 +358,13 @@ class PlayerPanelScene(Scene):
             bonus_map = {"atk": 3 * level, "def": 2 * level, "hp": 15 * level, "range": level}
             draw_text(screen, f"+{bonus_map[utype]}", (content_x + 15, row_y + 48), settings.GOLD, 13, center=False)
 
-            tickets = getattr(player, "upgrade_tickets", 0)
             if tickets > 0:
-                buy_color = settings.GOLD
+                buy_color = settings.GREEN
                 buy_text_color = settings.BLACK
                 button_label = "FREE"
             else:
                 buy_color = settings.GREEN if can_afford else settings.DARK_GRAY
-                buy_text_color = settings.WHITE if can_afford else settings.GRAY
+                buy_text_color = settings.BLACK if can_afford else settings.GRAY
                 button_label = f"{cost}g"
 
             buy_rect = pygame.Rect(content_x + content_w - 80, row_y + 30, 70, 28)

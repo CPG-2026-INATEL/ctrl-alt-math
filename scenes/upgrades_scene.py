@@ -150,12 +150,12 @@ class UpgradesScene(Scene):
             buy_rect = pygame.Rect(px + panel_w - 85, row_y + 17, 70, 26)
             
             if tickets > 0:
-                buy_color = settings.GOLD
+                buy_color = settings.GREEN
                 buy_text_color = settings.BLACK
                 button_label = "FREE"
             else:
                 buy_color = settings.GREEN if can_afford else settings.DARK_GRAY
-                buy_text_color = settings.WHITE if can_afford else settings.GRAY
+                buy_text_color = settings.BLACK if can_afford else settings.GRAY
                 button_label = f"{cost}g"
 
             bg_btn = buy_color
