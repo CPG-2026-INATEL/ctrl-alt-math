@@ -264,7 +264,7 @@ class GameplayScene(Scene):
             self.game.current_room = room
             
             # Deterministic random for room generation
-            room_seed = getattr(self.game, "seed", 0) ^ hash((room.col, room.row))
+            room_seed = getattr(self.game, "seed", 0) ^ ((room.col * 73856093) ^ (room.row * 19349663))
             random.seed(room_seed)
             
             # Randomize map size based on difficulty
@@ -399,7 +399,9 @@ class GameplayScene(Scene):
     def _generate_tilemap(self):
         seed = 42
         if self.game.current_room:
-            seed = hash((self.game.current_room.col, self.game.current_room.row)) & 0xFFFFFFFF
+            col = self.game.current_room.col
+            row = self.game.current_room.row
+            seed = ((col * 73856093) ^ (row * 19349663)) & 0xFFFFFFFF
         gen = MapGenerator(
             width=self.grid.cols,
             height=self.grid.rows,
@@ -527,7 +529,11 @@ class GameplayScene(Scene):
         world_x = pos[0] + self.camera_x
         world_y = pos[1] + self.camera_y
         
-        self.cursor_col, self.cursor_row = self.grid.to_grid(world_x, world_y)
+        new_col, new_row = self.grid.to_grid(world_x, world_y)
+        if self.cursor_col != new_col or self.cursor_row != new_row:
+            self.cursor_col, self.cursor_row = new_col, new_row
+            if self.game.mp_is_multiplayer:
+                self._send_mp_command("cursor_abs", col=self.cursor_col, row=self.cursor_row)
         return True
 
     def _toggle_skill(self, skill_id):
