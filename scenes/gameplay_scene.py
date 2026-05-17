@@ -2089,7 +2089,11 @@ class GameplayScene(Scene):
     def _apply_mp_state(self, msg):
         incoming_state = msg.get("state", self.state)
         incoming_active_idx = msg.get("active_player_idx", self.active_player_idx)
-        preserve_local_turn = self._is_client_control_turn() and self.state != "WAIT_REMOTE_SYNC"
+        preserve_local_turn = (
+            self._is_client_control_turn()
+            and self.state == incoming_state
+            and self.state != "WAIT_REMOTE_SYNC"
+        )
         if self.state == "WAIT_REMOTE_SYNC" and incoming_active_idx == self.active_player_idx and incoming_state in (
             "PLAYER_INPUT",
             "PLAYER_ACTION_SELECT",
@@ -2136,7 +2140,7 @@ class GameplayScene(Scene):
             for idx, data in enumerate(players_data):
                 if idx >= len(self.players):
                     break
-                if preserve_local_turn and idx == local_player_idx:
+                if False: # Always apply physical position and stat updates for client
                     continue
                 player = self.players[idx]
                 player.col = data.get("col", player.col)
