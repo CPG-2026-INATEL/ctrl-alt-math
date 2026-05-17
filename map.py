@@ -610,7 +610,8 @@ class WorldMap:
             trail_x = x - sx
             trail_y = y - sy + settings.MAP_HEADER_H + bob_y
             trail_surf = pygame.Surface((avatar_size, avatar_size), pygame.SRCALPHA)
-            trail_color = (50, 255, 255, int(a * 60))
+            trail_alpha = max(0, min(255, int(a * 60)))
+            trail_color = (50, 255, 255, trail_alpha)
             pygame.draw.circle(trail_surf, trail_color, (avatar_size // 2, avatar_size // 2), avatar_size // 2)
             screen.blit(trail_surf, (int(trail_x) - avatar_size // 2, int(trail_y) - avatar_size // 2))
 
