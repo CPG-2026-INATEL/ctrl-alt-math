@@ -203,7 +203,7 @@ class Player:
                 px, py = grid.to_pixel(self.col, self.row)
                 self.x, self.y = int(px), int(py)
 
-    def update(self, dt, keys):
+    def update(self, dt, keys=None):
         self.invulnerable = max(0, self.invulnerable - dt)
         self.flash_timer = max(0, self.flash_timer - dt)
         self.glow_phase += dt * 4
