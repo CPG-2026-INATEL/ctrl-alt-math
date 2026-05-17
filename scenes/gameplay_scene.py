@@ -982,7 +982,7 @@ class GameplayScene(Scene):
                     hit_enemies.append(enemy)
         else:
             for enemy in self.game.enemies:
-                if enemy.dead:
+                if enemy.dead or getattr(enemy, 'is_decoy', False):
                     continue
                 d = self.grid.grid_distance(pc, pr, enemy.col, enemy.row)
                 if d <= settings.BASIC_ATTACK_RANGE and not self.grid.is_level_change(pc, pr, enemy.col, enemy.row):
@@ -1184,6 +1184,7 @@ class GameplayScene(Scene):
             clone.max_hp = clone_hp
             clone.color = (100, 255, 180)
             clone.is_decoy = True
+            clone.is_ally = True
             clone.decoy_lifetime = level * 2 + 2
             clone.robot_type = "Clone"
             clone.size = settings.ENEMY_SIZE * 0.8
@@ -1305,6 +1306,7 @@ class GameplayScene(Scene):
                 self._on_enemy_death(enemy)
 
     def _tick_decoy_clones(self):
+        self._perform_decoy_actions()
         for i in range(len(self.game.enemies) - 1, -1, -1):
             enemy = self.game.enemies[i]
             if getattr(enemy, 'is_decoy', False) and not enemy.dead:
@@ -1314,6 +1316,45 @@ class GameplayScene(Scene):
                     self.game.enemies.pop(i)
 
         self._check_victory()
+
+    def _perform_decoy_actions(self):
+        real_enemies = [e for e in self.game.enemies if not e.dead and not getattr(e, 'is_decoy', False)]
+        if not real_enemies:
+            return
+        clones = [e for e in self.game.enemies if getattr(e, 'is_decoy', False) and not e.dead]
+        occupied = {(e.col, e.row) for e in self.game.enemies if not e.dead}
+        for p in self.players:
+            if p.hp > 0:
+                occupied.add((p.col, p.row))
+
+        for clone in clones:
+            if not real_enemies:
+                break
+            nearest = min(real_enemies, key=lambda e: self.grid.grid_distance(clone.col, clone.row, e.col, e.row))
+            dist = self.grid.grid_distance(clone.col, clone.row, nearest.col, nearest.row)
+            if dist <= 1:
+                dmg = max(1, int(self.game.player.get_attack_damage() * 0.4))
+                nearest.take_damage(dmg)
+                self.game.floating_text.add_enemy_damage(nearest.x, nearest.y, dmg, False)
+                self.game.particles.emit_burst(nearest.x, nearest.y, (100, 255, 180), 4, 30, 0.2)
+                self.game.sfx.play("hit")
+                self.turn_log.append(f"Clone attacks {nearest.type} for {dmg}")
+                if nearest.dead:
+                    self._on_enemy_death(nearest)
+                    real_enemies = [e for e in real_enemies if not e.dead]
+            else:
+                dc = 1 if nearest.col > clone.col else (-1 if nearest.col < clone.col else 0)
+                dr = 1 if nearest.row > clone.row else (-1 if nearest.row < clone.row else 0)
+                new_col = clone.col + dc
+                new_row = clone.row + dr
+                if self.grid.is_valid(new_col, new_row) and not self.grid.is_blocked(new_col, new_row):
+                    if (new_col, new_row) not in occupied:
+                        occupied.discard((clone.col, clone.row))
+                        clone.col = new_col
+                        clone.row = new_row
+                        clone.x, clone.y = self.grid.to_pixel(new_col, new_row)
+                        occupied.add((new_col, new_row))
+                        self.turn_log.append("Clone moved")
 
     def _check_victory(self):
         alive = [e for e in self.game.enemies if not e.dead and not getattr(e, 'is_decoy', False)]
@@ -2365,7 +2406,7 @@ class GameplayScene(Scene):
         pr = self.game.player.row
 
         for enemy in self.game.enemies:
-            if enemy.dead:
+            if enemy.dead or getattr(enemy, 'is_decoy', False):
                 continue
 
             if enemy.type == "boss":
@@ -2577,7 +2618,7 @@ class GameplayScene(Scene):
             pr = self.game.player.row
             font = pygame.font.Font(None, 11)
             for enemy in self.game.enemies:
-                if enemy.dead:
+                if enemy.dead or getattr(enemy, 'is_decoy', False):
                     continue
                 dist = self.grid.grid_distance(enemy.col, enemy.row, pc, pr)
                 max_dist = enemy.attack_range
@@ -2614,7 +2655,7 @@ class GameplayScene(Scene):
             
             # Red threat vectors pointing to player
             for enemy in self.game.enemies:
-                if enemy.dead:
+                if enemy.dead or getattr(enemy, 'is_decoy', False):
                     continue
                 if self.grid.grid_distance(enemy.col, enemy.row, pc, pr) <= enemy.attack_range:
                     self.grid.draw_vector_arrow(temp, enemy.col, enemy.row,
@@ -2632,7 +2673,7 @@ class GameplayScene(Scene):
             for cc, cr in candidates:
                 threat_score = 0
                 for enemy in self.game.enemies:
-                    if enemy.dead:
+                    if enemy.dead or getattr(enemy, 'is_decoy', False):
                         continue
                     # Count threats that can hit this candidate cell
                     if self.grid.grid_distance(enemy.col, enemy.row, cc, cr) <= enemy.attack_range:
