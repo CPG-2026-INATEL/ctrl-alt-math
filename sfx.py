@@ -54,6 +54,8 @@ class SFX:
             "skill_unlock": lambda: self._tone(523, 0.15, 0.2, "sine"),
             "wave_start": lambda: self._tone(440, 0.2, 0.2, "sine"),
             "wave_complete": lambda: self._tone(660, 0.3, 0.25, "sine"),
+            "your_turn": lambda: self._tone(587.33, 0.1, 0.15, "sine"),
+            "enemy_turn": lambda: self._tone(293.66, 0.12, 0.15, "sine"),
             "boss_phase": lambda: self._tone(150, 0.4, 0.3, "saw", decay=1),
             "projectile": lambda: self._tone(800, 0.05, 0.1, "sine"),
             "reflect": lambda: self._tone(1000, 0.1, 0.2, "sine"),
