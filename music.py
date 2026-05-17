@@ -162,25 +162,25 @@ def generate_room_track(seed):
     scale_name = _choice(seed + 3, scale_names)
     scale = _SCALES[scale_name]
 
-    arp_wave = _choice(seed + 4, _WAVES)
+    arp_wave = _choice(seed + 4, ["sine", "triangle"])
     arp_oct = _rand_int(seed + 5, 3, 5)
-    arp_vol = 0.20 + _rand(seed + 6) * 0.20
+    arp_vol = 0.08 + _rand(seed + 6) * 0.10
     arp_pan = -0.4 + _rand(seed + 7) * 0.8
     arp_offset = int(_rand(seed + 8) * len(scale) * 2)
 
-    pad_wave = _choice(seed + 9, ["sine", "triangle"])
+    pad_wave = "sine"
     pad_oct = _rand_int(seed + 10, 3, 4)
     pad_vol = 0.10 + _rand(seed + 11) * 0.12
     pad_pan = -0.3 + _rand(seed + 12) * 0.6
 
-    pad2_wave = _choice(seed + 13, ["sine", "triangle"])
+    pad2_wave = "sine"
     pad2_oct = _rand_int(seed + 14, 4, 5)
-    pad2_vol = 0.08 + _rand(seed + 15) * 0.10
+    pad2_vol = 0.04 + _rand(seed + 15) * 0.06
     pad2_pan = -0.4 + _rand(seed + 16) * 0.8
 
-    bass_wave = _choice(seed + 17, ["square", "saw"])
+    bass_wave = _choice(seed + 17, ["sine", "triangle"])
     bass_oct = _rand_int(seed + 18, 1, 2)
-    bass_vol = 0.18 + _rand(seed + 19) * 0.20
+    bass_vol = 0.08 + _rand(seed + 19) * 0.10
 
     bass_patterns = [
         [(0, 2), (7, 1), (0, 1), (3, 2), (0, 1), (7, 1)],
@@ -193,9 +193,9 @@ def generate_room_track(seed):
     bass_pat = _choice(seed + 20, bass_patterns)
     bass_note_len = 0.75 + _rand(seed + 21) * 0.20
 
-    arp = _arpeggio(scale, root, arp_oct, int(duration_beats / (60.0 / bpm)), bpm, 0.4, arp_wave, arp_vol, offset=arp_offset)
+    arp = _arpeggio(scale, root, arp_oct, int(duration_beats / (60.0 / bpm)), bpm, 0.75, arp_wave, arp_vol, offset=arp_offset)
     pad = _bass_line(root, pad_oct, bpm, [(0, duration_beats)], 0.97, pad_wave, pad_vol)
-    pad2_int = _choice(seed + 22, [4, 5, 7, 8, 10, 11])
+    pad2_int = _choice(seed + 22, [3, 4, 5, 7])
     pad2 = _bass_line(root + pad2_int, pad2_oct, bpm, [(0, duration_beats)], 0.97, pad2_wave, pad2_vol)
     bass = _bass_line(root, bass_oct, bpm, bass_pat, bass_note_len, bass_wave, bass_vol)
 

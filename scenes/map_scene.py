@@ -368,12 +368,12 @@ class MapScene(Scene):
 
     def _draw_hover_popup(self, screen):
         room = self._hovered_room
-        if room is None or room.state == "locked":
+        if room is None:
             return
 
         mx, my = self._mouse_pos
         popup_w = 220
-        popup_h = 100
+        popup_h = 120
         popup_x = mx + 18
         popup_y = my - 15
 
@@ -414,6 +414,14 @@ class MapScene(Scene):
         badge_txt = badge_font.render(type_label, True, type_color)
         screen.blit(badge_txt, (popup_x + 10, popup_y + 28))
 
+        obj_labels = {"capture_flag": "FLAG", "kill_all": "KILL"}
+        obj_colors = {"capture_flag": (0, 220, 80), "kill_all": (200, 60, 60)}
+        obj_label = obj_labels.get(room.objective, "")
+        obj_color = obj_colors.get(room.objective, settings.GRAY)
+        if obj_label:
+            obj_badge = badge_font.render(obj_label, True, obj_color)
+            screen.blit(obj_badge, (popup_x + 10 + badge_txt.get_width() + 10, popup_y + 28))
+
         pygame.draw.line(screen, (40, 40, 60),
                          (popup_x + 8, popup_y + 42),
                          (popup_x + popup_w - 8, popup_y + 42), 1)
@@ -453,6 +461,16 @@ class MapScene(Scene):
         narr_text = t(room.narrative)[:40] + "…" if len(t(room.narrative)) > 40 else t(room.narrative)
         narr_surf = narr_font.render(narr_text, True, (130, 130, 150))
         screen.blit(narr_surf, (popup_x + 10, popup_y + 84))
+
+        obj_descriptions = {
+            "capture_flag": "Capture the flag — pick it up and return to base",
+            "kill_all": "Defeat all enemies to clear the room",
+        }
+        obj_desc = obj_descriptions.get(room.objective, "")
+        if obj_desc:
+            desc_font = pygame.font.Font(None, 11)
+            desc_surf = desc_font.render(obj_desc, True, obj_color)
+            screen.blit(desc_surf, (popup_x + 10, popup_y + 104))
 
     def _draw_detail_panel(self, screen):
         room = self._detail_panel_room
@@ -500,6 +518,15 @@ class MapScene(Scene):
         type_badge = badge_font.render(type_label, True, type_color)
         type_badge.set_alpha(alpha)
         screen.blit(type_badge, (panel_x + 10, y))
+
+        obj_labels = {"capture_flag": "FLAG", "kill_all": "KILL"}
+        obj_colors = {"capture_flag": (0, 220, 80), "kill_all": (200, 60, 60)}
+        obj_label = obj_labels.get(room.objective, "")
+        obj_color = obj_colors.get(room.objective, settings.GRAY)
+        if obj_label:
+            obj_badge = badge_font.render(obj_label, True, obj_color)
+            obj_badge.set_alpha(alpha)
+            screen.blit(obj_badge, (panel_x + 10 + type_badge.get_width() + 10, y))
         y += 20
 
         pygame.draw.line(screen, (40, 40, 60, alpha // 2),

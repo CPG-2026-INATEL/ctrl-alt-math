@@ -158,6 +158,12 @@ class MapGenerator:
 
                 num_rooms = rng.randint(min_rooms, min(max_rooms, max_branches + 2))
 
+            if is_boss_layer:
+                _layer_max_ctf = 0
+            else:
+                _layer_max_ctf = max(1, int(math.ceil(num_rooms * 0.5)))
+            _layer_ctf_count = 0
+
             layer_room_ids = []
             for i in range(num_rooms):
                 room_id = f"room_{layer_idx}_{i}"
@@ -204,10 +210,11 @@ class MapGenerator:
                 else:
                     boss_hp = settings.BOSS_HP
                     enemy_mult = settings.DIFFICULTY_SCALING[settings.DIFFICULTY]["enemy_amount"]
-                    if rtype != "hub" and rng.random() < 0.35:
+                    if _layer_ctf_count < _layer_max_ctf and rng.random() < 0.35:
                         objective = "capture_flag"
                         enemies = self._generate_ctf_enemies(diff, rng)
                         arena_size = CTF_ARENA_SIZES.get(diff, CTF_ARENA_SIZES[1])
+                        _layer_ctf_count += 1
                     else:
                         objective = "kill_all"
                         enemies = self._generate_enemies(diff, rng)

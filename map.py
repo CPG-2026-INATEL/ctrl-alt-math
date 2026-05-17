@@ -728,8 +728,13 @@ class WorldMap:
                  (draw_rect.centerx, draw_rect.bottom - int(10 * settings.UI_SCALE)),
                  name_color, 8)
 
-        if room.objective == "capture_flag" and room.state != "locked":
-            obj_color = (255, 220, 40) if room.state == "available" else settings.GREEN
+        if room.objective == "capture_flag":
+            if room.state == "locked":
+                obj_color = (50, 50, 50)
+            elif room.state == "available":
+                obj_color = (255, 220, 40)
+            else:
+                obj_color = settings.GREEN
             draw_text(screen, "[FLAG]",
                      (draw_rect.centerx, draw_rect.bottom - 2),
                      obj_color, 7)
