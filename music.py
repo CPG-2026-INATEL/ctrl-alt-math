@@ -58,25 +58,26 @@ def _generate_track(patterns, duration=4.0):
                 continue
             start_i = max(0, int(start_t * SAMPLE_RATE))
             end_i = min(n_samples, int(end_t * SAMPLE_RATE))
+            length = end_t - start_t
             for i in range(start_i, end_i):
                 t = i / SAMPLE_RATE
-                env = 1.0
-                fade_in = 0.02
-                fade_out = 0.03
                 local_t = t - start_t
-                length = end_t - start_t
-                if local_t < fade_in:
-                    env = local_t / fade_in
-                elif length - local_t < fade_out:
-                    env = (length - local_t) / fade_out
-                val = _osc(freq * t, wave) * env
+                env = 1.0
+                fade_dur = 0.008
+                if local_t < fade_dur:
+                    env = local_t / fade_dur
+                elif length - local_t < fade_dur:
+                    env = (length - local_t) / fade_dur
+                val = _osc(freq * local_t, wave) * env
                 lpan = min(1.0, 1.0 - pan) if pan >= 0 else 1.0
                 rpan = min(1.0, 1.0 + pan) if pan <= 0 else 1.0
                 left[i] += val * lpan
                 right[i] += val * rpan
 
     max_val = max(max(abs(v) for v in left), max(abs(v) for v in right))
-    scale = AMPLITUDE / max_val * 0.7 if max_val > 0 else 1.0
+    scale = AMPLITUDE / max_val if max_val > 0 else 1.0
+    headroom = 0.75
+    scale *= headroom
 
     buf = bytearray()
     for i in range(n_samples):
