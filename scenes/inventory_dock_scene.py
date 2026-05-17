@@ -110,7 +110,7 @@ class InventoryDockScene(Scene):
                 row_y = py + 80 + i * 70
                 item_data = settings.CONSUMABLE_DATA.get(item.get("id"), {})
                 color = item_data.get("color", settings.GRAY)
-                name = item_data.get("name", item.get("id", "?"))
+                name = t(item_data.get("name", item.get("id", "?")))
                 count = item.get("count", 0)
 
                 card_rect = pygame.Rect(px + 15, row_y, panel_w - 30, 60)

@@ -564,7 +564,7 @@ class PlayerPanelScene(Scene):
             pygame.draw.rect(screen, (25, 25, 45), item_rect, border_radius=6)
             pygame.draw.rect(screen, color, item_rect, 1, border_radius=6)
 
-            name = item_data.get("name", item["id"])
+            name = t(item_data.get("name", item["id"]))
             count = item.get("count", 0)
             draw_text(screen, name, (ix + 10, iy + 8), color, 14, center=False)
             draw_text(screen, f"x{count}", (ix + item_w - 30, iy + 8), settings.WHITE, 13, center=False)
@@ -606,7 +606,7 @@ class PlayerPanelScene(Scene):
             slot_label = "WEAPON" if is_weapon else "SHIELD"
             draw_text(screen, slot_label, (content_x + 20, slot_y + 5), border_color, 13, center=False)
 
-            name = item_data.get("name", "Empty")
+            name = t(item_data.get("name", "Empty"))
             draw_text(screen, name, (content_x + 20, slot_y + 22), settings.WHITE, 17, center=False)
 
             if is_weapon:

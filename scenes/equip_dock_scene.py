@@ -112,7 +112,7 @@ class EquipDockScene(Scene):
             equipped_id = player.equipment.get(slot_name)
             item_data = data_source.get(equipped_id, {})
 
-            name = item_data.get("name", t("eq_empty_slot"))
+            name = t(item_data.get("name", "eq_empty_slot"))
             draw_text(screen, name, (px + 30, slot_y + 26), settings.WHITE, 16, center=False)
 
             # Stats line
@@ -138,7 +138,7 @@ class EquipDockScene(Scene):
             equipped_id = player.equipment.get(slot_name)
             item_data = data_source.get(equipped_id, {})
 
-            desc = item_data.get("desc", "No description available.")
+            desc = t(item_data.get("desc", "eq_empty_slot"))
             effect = item_data.get("effect", "Standard gear.")
             
             # Draw Description and formula

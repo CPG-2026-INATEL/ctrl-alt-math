@@ -142,6 +142,21 @@ STRINGS = {
         LANG_EN: "The ultimate authority of the regime. It reduces the infinite complexity of the universe into a single, suffocating truth.",
         LANG_PT: "A autoridade máxima do regime. Reduz a complexidade infinita do universo em uma verdade única e sufocante."
     },
+    "enemy_ortogonal": {LANG_EN: "Orthogonal Enforcer", LANG_PT: "Executor Ortogonal"},
+    "enemy_atirador": {LANG_EN: "Ranged Assassin", LANG_PT: "Atirador de Elite"},
+    "enemy_granadeiro": {LANG_EN: "Area Denier", LANG_PT: "Granadeiro Tático"},
+    "lore_ortogonal": {
+        LANG_EN: "Attacks in four directions simultaneously. Its cross-shaped pattern leaves no escape.",
+        LANG_PT: "Ataca em quatro direções simultaneamente. Seu padrão em cruz não deixa escapatória."
+    },
+    "lore_atirador": {
+        LANG_EN: "Fires piercing shots in a straight line. Distance is no protection.",
+        LANG_PT: "Dispara tiros perfurantes em linha reta. Distância não é proteção."
+    },
+    "lore_granadeiro": {
+        LANG_EN: "Saturates an area with explosions. Staying close together is fatal.",
+        LANG_PT: "Satura uma área com explosões. Ficar muito próximo é fatal."
+    },
 
     # Skills
     "skill_axioma_name": {LANG_EN: "Axioma Básico", LANG_PT: "Axioma Básico"},
@@ -235,6 +250,8 @@ STRINGS = {
     "wave_4_narr": {LANG_EN: "An Inquisidor Bayesiano joins.\nIt calculates your every move.", LANG_PT: "Um Inquisidor Bayesiano se junta.\nEle calcula cada movimento seu."},
     "wave_4_post": {LANG_EN: "Probability bends to your will.\nThe end approaches.", LANG_PT: "A probabilidade se curva à sua vontade.\nO fim se aproxima."},
     "wave_5_narr": {LANG_EN: "O Grande Simplificador approaches.\nIt wants to reduce all thought\nto one dimension.", LANG_PT: "O Grande Simplificador se aproxima.\nEle quer reduzir todo o pensamento\na uma dimensão."},
+    "wave_6_narr": {LANG_EN: "Elite enforcers surround you.\nOnly proof withstands their assault.", LANG_PT: "Executores de elite te cercam.\nSó a prova resiste ao ataque deles."},
+    "wave_7_narr": {LANG_EN: "The final confrontation.\nAll of mathematics hangs in the balance.", LANG_PT: "O confronto final.\nToda a matemática está em jogo."},
 
     # Map Rooms
     "room_archive_name": {LANG_EN: "The Archive", LANG_PT: "O Arquivo"},
@@ -267,6 +284,26 @@ STRINGS = {
     "room_vault_narr": {LANG_EN: "Linear transformations guard this room.", LANG_PT: "Transformações lineares guardam esta sala."},
     "room_lab_name": {LANG_EN: "Chaos Lab", LANG_PT: "Laboratório do Caos"},
     "room_lab_narr": {LANG_EN: "Small changes have massive consequences.", LANG_PT: "Pequenas mudanças têm consequências massivas."},
+    "room_study_name": {LANG_EN: "The Study", LANG_PT: "O Estúdio"},
+    "room_study_narr": {LANG_EN: "Desks covered in forgotten formulas.", LANG_PT: "Mesas cobertas de fórmulas esquecidas."},
+    "room_cloister_name": {LANG_EN: "The Cloister", LANG_PT: "O Claustro"},
+    "room_cloister_narr": {LANG_EN: "Silence amplifies the whispers of logic.", LANG_PT: "O silêncio amplifica os sussurros da lógica."},
+    "room_atrium_name": {LANG_EN: "The Atrium", LANG_PT: "O Átrio"},
+    "room_atrium_narr": {LANG_EN: "Numbers spiral up the pillars like ivy.", LANG_PT: "Números espiralizam pelos pilares como hera."},
+    "room_vestibule_name": {LANG_EN: "The Vestibule", LANG_PT: "O Vestíbulo"},
+    "room_vestibule_narr": {LANG_EN: "A threshold between reason and chaos.", LANG_PT: "Um limiar entre a razão e o caos."},
+    "room_observatory_name": {LANG_EN: "The Observatory", LANG_PT: "O Observatório"},
+    "room_observatory_narr": {LANG_EN: "Stars align in prime-numbered constellations.", LANG_PT: "Estrelas se alinham em constelações de números primos."},
+    "room_scriptorium_name": {LANG_EN: "The Scriptorium", LANG_PT: "O Scriptório"},
+    "room_scriptorium_narr": {LANG_EN: "Monks transcribe forbidden equations by candlelight.", LANG_PT: "Monges transcrevem equações proibidas à luz de velas."},
+    "room_catacomb_name": {LANG_EN: "The Catacombs", LANG_PT: "As Catacumbas"},
+    "room_catacomb_narr": {LANG_EN: "Forgotten theorems are buried in these tunnels.", LANG_PT: "Teoremas esquecidos estão enterrados nestes túneis."},
+    "room_citadel_name": {LANG_EN: "The Citadel", LANG_PT: "A Cidadela"},
+    "room_citadel_narr": {LANG_EN: "A fortress built atop a mountain of discarded proofs.", LANG_PT: "Uma fortaleza construída sobre uma montanha de provas descartadas."},
+    "room_fortress_name": {LANG_EN: "The Fortress", LANG_PT: "A Fortaleza"},
+    "room_fortress_narr": {LANG_EN: "Iron walls inscribed with paradoxes that weaken the regime.", LANG_PT: "Paredes de ferro inscritas com paradoxos que enfraquecem o regime."},
+    "room_stronghold_name": {LANG_EN: "The Stronghold", LANG_PT: "O Bastião"},
+    "room_stronghold_narr": {LANG_EN: "The last bastion of free thought. Defend it at all cost.", LANG_PT: "O último bastião do pensamento livre. Defenda-o a todo custo."},
     
     # Intent Tooltips
     "tip_attack_area": {LANG_EN: "ATTACK AREA", LANG_PT: "ÁREA DE ATAQUE"},
@@ -433,6 +470,42 @@ STRINGS = {
     "eq_close_hint": {LANG_EN: "Press E or ESC to close", LANG_PT: "Pressione E ou ESC para fechar"},
     "eq_weapon_label": {LANG_EN: "WEAPON", LANG_PT: "ARMA"},
     "eq_shield_label": {LANG_EN: "SHIELD", LANG_PT: "ESCUDO"},
+
+    # Equipment / Consumable Names and Descriptions
+    "eq_basic_sword_name": {LANG_EN: "Basic Sword", LANG_PT: "Espada Básica"},
+    "eq_basic_sword_desc": {LANG_EN: "A simple sword. Gets the job done.", LANG_PT: "Uma espada simples. Dá conta do recado."},
+    "eq_fire_blade_name": {LANG_EN: "Flame Blade", LANG_PT: "Lâmina de Fogo"},
+    "eq_fire_blade_desc": {LANG_EN: "Causes burn (3 dmg / 2 turns).", LANG_PT: "Causa queimadura (3 dano / 2 turnos)."},
+    "eq_ice_rapier_name": {LANG_EN: "Ice Rapier", LANG_PT: "Florete de Gelo"},
+    "eq_ice_rapier_desc": {LANG_EN: "Slows enemy movement by 1 turn.", LANG_PT: "Reduz movimento do inimigo por 1 turno."},
+    "eq_thunder_axe_name": {LANG_EN: "Thunder Axe", LANG_PT: "Machado do Trovão"},
+    "eq_thunder_axe_desc": {LANG_EN: "Chance to stun the enemy.", LANG_PT: "Chance de atordoar o inimigo."},
+    "eq_arcane_staff_name": {LANG_EN: "Arcane Staff", LANG_PT: "Cajado Arcano"},
+    "eq_arcane_staff_desc": {LANG_EN: "Attacks enemies adjacent to the target.", LANG_PT: "Ataca inimigos adjacentes ao alvo."},
+    "eq_shadow_dagger_name": {LANG_EN: "Shadow Dagger", LANG_PT: "Adaga das Sombras"},
+    "eq_shadow_dagger_desc": {LANG_EN: "Poisons for 2 dmg over 3 turns.", LANG_PT: "Envenena causando 2 de dano por 3 turnos."},
+    "eq_heavy_axe_name": {LANG_EN: "Heavy Axe", LANG_PT: "Machado Pesado"},
+    "eq_heavy_axe_desc": {LANG_EN: "High damage, no special effect.", LANG_PT: "Dano alto, sem efeito especial."},
+    "eq_wooden_shield_name": {LANG_EN: "Wooden Shield", LANG_PT: "Escudo de Madeira"},
+    "eq_wooden_shield_desc": {LANG_EN: "Basic protection.", LANG_PT: "Proteção básica."},
+    "eq_iron_shield_name": {LANG_EN: "Iron Shield", LANG_PT: "Escudo de Ferro"},
+    "eq_iron_shield_desc": {LANG_EN: "Solid, reliable defense.", LANG_PT: "Defesa sólida e confiável."},
+    "eq_mirror_shield_name": {LANG_EN: "Mirror Shield", LANG_PT: "Escudo Espelhado"},
+    "eq_mirror_shield_desc": {LANG_EN: "Reflects 25% of damage received.", LANG_PT: "Reflete 25% do dano recebido."},
+    "eq_steel_shield_name": {LANG_EN: "Steel Shield", LANG_PT: "Escudo de Aço"},
+    "eq_steel_shield_desc": {LANG_EN: "Maximum protection.", LANG_PT: "Proteção máxima."},
+    "item_hp_small_name": {LANG_EN: "Health Potion", LANG_PT: "Poção de Vida"},
+    "item_hp_small_desc": {LANG_EN: "Restores 30 HP.", LANG_PT: "Restaura 30 PV."},
+    "item_hp_large_name": {LANG_EN: "Large Health Potion", LANG_PT: "Poção de Vida Grande"},
+    "item_hp_large_desc": {LANG_EN: "Restores 60 HP.", LANG_PT: "Restaura 60 PV."},
+    "item_atk_tonic_name": {LANG_EN: "Strength Tonic", LANG_PT: "Tônico de Força"},
+    "item_atk_tonic_desc": {LANG_EN: "+10 ATK for 1 room.", LANG_PT: "+10 ATQ por 1 sala."},
+    "item_def_tonic_name": {LANG_EN: "Shield Tonic", LANG_PT: "Tônico de Escudo"},
+    "item_def_tonic_desc": {LANG_EN: "+5 DEF for 3 turns.", LANG_PT: "+5 DEF por 3 turnos."},
+    "item_speed_tonic_name": {LANG_EN: "Speed Tonic", LANG_PT: "Tônico de Velocidade"},
+    "item_speed_tonic_desc": {LANG_EN: "+2 move range for 1 room.", LANG_PT: "+2 alcance de movimento por 1 sala."},
+    "item_vitality_name": {LANG_EN: "Vitality Elixir", LANG_PT: "Elixir de Vitalidade"},
+    "item_vitality_desc": {LANG_EN: "+15 max HP for the room.", LANG_PT: "+15 PV máximo pela sala."},
 }
 
 # Merge Lore Strings

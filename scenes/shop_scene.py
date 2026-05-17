@@ -260,7 +260,7 @@ class ShopScene(Scene):
                 pygame.draw.rect(screen, tab_color, row_rect, 2, border_radius=6)
 
             name_color = settings.WHITE if not is_equipped else (100, 100, 100)
-            draw_text(screen, item_data.get("name", item_data["id"]), (list_x + 15, row_y + 8), name_color, 16, center=False)
+            draw_text(screen, t(item_data.get("name", item_data["id"])), (list_x + 15, row_y + 8), name_color, 16, center=False)
 
             cost = item_data.get("cost", 0)
             sp_cost = item_data.get("sp_cost", 0)
@@ -296,11 +296,11 @@ class ShopScene(Scene):
             return
 
         y = 55
-        draw_text(screen, item_data.get("name", self.selected_item), (detail_x + 10, y), settings.WHITE, 22, center=False)
+        draw_text(screen, t(item_data.get("name", self.selected_item)), (detail_x + 10, y), settings.WHITE, 22, center=False)
         y += 35
 
         desc = item_data.get("desc", "")
-        draw_text(screen, desc, (detail_x + 10, y), settings.LIGHT_GRAY, 14, center=False)
+        draw_text(screen, t(desc), (detail_x + 10, y), settings.LIGHT_GRAY, 14, center=False)
         y += 30
 
         pygame.draw.line(screen, (60, 60, 80), (detail_x + 10, y), (detail_x + detail_w - 10, y), 1)
