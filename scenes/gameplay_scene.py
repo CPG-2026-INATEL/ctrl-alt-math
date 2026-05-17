@@ -3039,8 +3039,6 @@ class GameplayScene(Scene):
             p2 = self.players[1]
             draw_text(screen, f"P1 HP: {p1.hp}/{p1.max_hp}", (col1_x, panel_y + 94), settings.CYAN, 14, center=False)
             draw_text(screen, f"P2 HP: {p2.hp}/{p2.max_hp}", (col2_x, panel_y + 94), settings.PURPLE, 14, center=False)
-        else:
-            draw_text(screen, f"DIFFICULTY: {settings.DIFFICULTY.upper()}", (x2 + w2 // 2, panel_y + 94), settings.LIGHT_GRAY, 14)
 
 
         # --- PANEL 3: GAME STATE & TURN (X = x3, W = w3) ---
