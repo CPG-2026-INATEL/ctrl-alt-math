@@ -1,50 +1,50 @@
 {
     "inventory_items": [
         {
-            "id": "pocao_pequena_vida",
-            "nome": "Poção Pequena de Vida",
+            "id": "linear_hp_formula",
+            "nome": "Fórmula Linear de HP",
             "tipo": "consumivel",
-            "descricao": "Recupera uma pequena quantidade de vida.",
+            "descricao": "Soma uma constante positiva de 20 HP à sua vida.",
             "ouro": 15,
             "efeito": {
                 "hp": 20
             }
         },
         {
-            "id": "pocao_media_vida",
-            "nome": "Poção Média de Vida",
+            "id": "quadratic_hp_formula",
+            "nome": "Fórmula Quadrática de HP",
             "tipo": "consumivel",
-            "descricao": "Recupera uma quantidade moderada de vida.",
+            "descricao": "Integra fatias moderadas de vitalidade, restaurando 40 HP.",
             "ouro": 30,
             "efeito": {
                 "hp": 40
             }
         },
         {
-            "id": "pocao_grande_vida",
-            "nome": "Poção Grande de Vida",
+            "id": "riemann_hp_sum",
+            "nome": "Soma de Riemann de HP",
             "tipo": "consumivel",
-            "descricao": "Recupera uma grande quantidade de vida.",
+            "descricao": "Soma fatias infinitesimais de vitalidade, restaurando 75 HP.",
             "ouro": 55,
             "efeito": {
                 "hp": 75
             }
         },
         {
-            "id": "elixir_vitalidade",
-            "nome": "Elixir de Vitalidade",
+            "id": "vitality_integral",
+            "nome": "Integral de Vitalidade",
             "tipo": "consumivel",
-            "descricao": "Aumenta a vida maxima durante a partida.",
+            "descricao": "Expande o limite superior da integridade celular em +15 HP.",
             "ouro": 45,
             "efeito": {
                 "max_hp": 15
             }
         },
         {
-            "id": "tonico_defensivo",
-            "nome": "Tônico Defensivo",
+            "id": "defense_constant",
+            "nome": "Constante de Defesa",
             "tipo": "consumivel",
-            "descricao": "Concede defesa temporaria.",
+            "descricao": "Concede barreira numérica invariante de 5 DEF temporariamente.",
             "ouro": 35,
             "efeito": {
                 "defesa": 5,
@@ -54,50 +54,50 @@
     ],
     "equipments": [
         {
-            "id": "espada_curta",
-            "nome": "Espada Curta",
+            "id": "linear_blade",
+            "nome": "Lâmina Linear",
             "tipo": "weapon",
-            "descricao": "Arma basica que aumenta o ataque.",
+            "descricao": "Um segmento de reta afiado que causa +5 de ataque básico.",
             "ouro": 40,
             "bonus": {
                 "ataque": 5
             }
         },
         {
-            "id": "machado_pesado",
-            "nome": "Machado Pesado",
+            "id": "max_modulus_axe",
+            "nome": "Machado de Módulo Máximo",
             "tipo": "weapon",
-            "descricao": "Arma forte com grande bonus de ataque.",
+            "descricao": "Dano bruto devastador de +9 calculado pela norma euclidiana.",
             "ouro": 75,
             "bonus": {
                 "ataque": 9
             }
         },
         {
-            "id": "cajado_arcano",
-            "nome": "Cajado Arcano",
+            "id": "singularity_staff",
+            "nome": "Cajado da Singularidade",
             "tipo": "weapon",
-            "descricao": "Canaliza energia e melhora o dano magico.",
+            "descricao": "Canaliza energia de um buraco negro, melhorando o dano básico em +7.",
             "ouro": 60,
             "bonus": {
                 "ataque": 7
             }
         },
         {
-            "id": "escudo_madeira",
-            "nome": "Escudo de Madeira",
+            "id": "cartesian_plane_shield",
+            "nome": "Escudo do Plano Cartesiano",
             "tipo": "shield",
-            "descricao": "Escudo simples que aumenta a defesa.",
+            "descricao": "Escudo simples em grade bidimensional que adiciona +4 de defesa.",
             "ouro": 35,
             "bonus": {
                 "defesa": 4
             }
         },
         {
-            "id": "escudo_aco",
-            "nome": "Escudo de Aço",
+            "id": "steel_axiom_shield",
+            "nome": "Escudo do Axioma de Aço",
             "tipo": "shield",
-            "descricao": "Escudo resistente com bonus maior de defesa.",
+            "descricao": "Uma verdade impenetrável de proteção que adiciona +8 de defesa.",
             "ouro": 65,
             "bonus": {
                 "defesa": 8

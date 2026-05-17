@@ -12,12 +12,23 @@ def draw_text(surf, text, pos, color, size=24, center=True):
         else:
             rect = img.get_rect(topleft=(pos[0], pos[1] + i * scaled_size * 1.3))
         surf.blit(img, rect)
+        if hasattr(settings, 'DRAWN_TEXTS') and settings.DRAWN_TEXTS is not None:
+            settings.DRAWN_TEXTS.append({
+                "text": line.strip(),
+                "rect": rect.copy()
+            })
 
 def draw_text_simple(surf, text, pos, color, size=24):
     scaled_size = max(12, int(size * settings.UI_SCALE))
     font = pygame.font.Font(None, scaled_size)
     img = font.render(text, True, color)
+    rect = img.get_rect(topleft=pos)
     surf.blit(img, pos)
+    if hasattr(settings, 'DRAWN_TEXTS') and settings.DRAWN_TEXTS is not None:
+        settings.DRAWN_TEXTS.append({
+            "text": text.strip(),
+            "rect": rect
+        })
 
 def clamp(value, min_val, max_val):
     return max(min_val, min(value, max_val))

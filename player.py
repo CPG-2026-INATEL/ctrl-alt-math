@@ -29,7 +29,7 @@ class Player:
         self.upgrades = {"atk": 0, "def": 0, "hp": 0, "range": 0}
         self.gold = 0
         self.inventory = []
-        self.equipment = {"weapon": "basic_sword", "shield": "wooden_shield"}
+        self.equipment = {"weapon": "linear_blade", "shield": "cartesian_plane_shield"}
         self.buffs = []
         self.has_flag = False
 

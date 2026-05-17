@@ -18,6 +18,7 @@ MATCH_SERVER_BIND_PORT = int(os.getenv("CTRL_ALT_MATH_SERVER_BIND_PORT", "5555")
 BASE_WIDTH = 800
 BASE_HEIGHT = 600
 UI_SCALE = 1.0
+DRAWN_TEXTS = []
 
 DIFFICULTY_EASY = "easy"
 DIFFICULTY_MEDIUM = "medium"
@@ -73,35 +74,35 @@ UPGRADE_PER_LEVEL = {"atk": 3, "def": 2, "hp": 15, "range": 1}
 
 EQUIPMENT_DATA = {
     "weapons": {
-        "basic_sword":   {"name": "Espada Basica",      "multiplier": 1.0,  "effect": None,      "desc": "Uma espada simples",       "cost": 0,   "sp_cost": 0},
-        "fire_blade":    {"name": "Lamina de Fogo",      "multiplier": 1.12, "effect": "burn",   "desc": "Causa queimadura (3 dmg/2 turnos)",  "cost": 80,  "sp_cost": 0},
-        "ice_rapier":    {"name": "Florete de Gelo",     "multiplier": 1.08, "effect": "slow",   "desc": "Reduz movimento do inimigo por 1 turno", "cost": 70,  "sp_cost": 0},
-        "thunder_axe":   {"name": "Machado do Trovao",   "multiplier": 1.18, "effect": "stun",   "desc": "Chance de atordoar inimigo",  "cost": 100, "sp_cost": 0},
-        "arcane_staff":  {"name": "Cajado Arcano",       "multiplier": 1.05, "effect": "aoe",    "desc": "Ataca inimigos adjacentes ao alvo", "cost": 60,  "sp_cost": 0},
-        "shadow_dagger": {"name": "Adaga das Sombras",   "multiplier": 1.10, "effect": "poison", "desc": "2 dmg por 3 turnos (veneno)",  "cost": 85,  "sp_cost": 0},
-        "heavy_axe":     {"name": "Machado Pesado",      "multiplier": 1.15, "effect": None,     "desc": "Dano alto sem efeito especial", "cost": 75,  "sp_cost": 0},
+        "linear_blade":          {"name": "item_linear_blade_name",             "multiplier": 1.0,  "effect": None,      "desc": "item_linear_blade_desc", "cost": 0,   "sp_cost": 0},
+        "fiery_tangent":         {"name": "item_fiery_tangent_name",            "multiplier": 1.12, "effect": "burn",   "desc": "item_fiery_tangent_desc", "cost": 80,  "sp_cost": 0},
+        "cryo_bisector":         {"name": "item_cryo_bisector_name",            "multiplier": 1.08, "effect": "slow",   "desc": "item_cryo_bisector_desc", "cost": 70,  "sp_cost": 0},
+        "fractal_thunder_axe":   {"name": "item_fractal_thunder_axe_name",      "multiplier": 1.18, "effect": "stun",   "desc": "item_fractal_thunder_axe_desc", "cost": 100, "sp_cost": 0},
+        "singularity_staff":     {"name": "item_singularity_staff_name",        "multiplier": 1.05, "effect": "aoe",    "desc": "item_singularity_staff_desc", "cost": 60,  "sp_cost": 0},
+        "null_matrix_dagger":    {"name": "item_null_matrix_dagger_name",       "multiplier": 1.10, "effect": "poison", "desc": "item_null_matrix_dagger_desc", "cost": 85,  "sp_cost": 0},
+        "max_modulus_axe":       {"name": "item_max_modulus_axe_name",          "multiplier": 1.15, "effect": None,     "desc": "item_max_modulus_axe_desc", "cost": 75,  "sp_cost": 0},
     },
     "shields": {
-        "wooden_shield":  {"name": "Escudo de Madeira",   "defense": 3,  "effect": None,      "desc": "Protecao basica",           "cost": 0,   "sp_cost": 0},
-        "iron_shield":    {"name": "Escudo de Ferro",     "defense": 6,  "effect": None,      "desc": "Protecao resistente",       "cost": 50,  "sp_cost": 0},
-        "mirror_shield":  {"name": "Escudo Espelhado",    "defense": 4,  "effect": "reflect", "desc": "Reflete 25% do dano recebido", "cost": 65,  "sp_cost": 0},
-        "steel_shield":   {"name": "Escudo de Aco",      "defense": 8,  "effect": None,      "desc": "Protecao maxima",           "cost": 90,  "sp_cost": 0},
+        "cartesian_plane_shield": {"name": "item_cartesian_plane_shield_name",  "defense": 3,  "effect": None,      "desc": "item_cartesian_plane_shield_desc", "cost": 0,   "sp_cost": 0},
+        "orthogonal_barrier":     {"name": "item_orthogonal_barrier_name",      "defense": 6,  "effect": None,      "desc": "item_orthogonal_barrier_desc", "cost": 50,  "sp_cost": 0},
+        "reflection_matrix":      {"name": "item_reflection_matrix_name",       "defense": 4,  "effect": "reflect", "desc": "item_reflection_matrix_desc", "cost": 65,  "sp_cost": 0},
+        "steel_axiom_shield":     {"name": "item_steel_axiom_shield_name",      "defense": 8,  "effect": None,      "desc": "item_steel_axiom_shield_desc", "cost": 90,  "sp_cost": 0},
     },
 }
 
 CONSUMABLE_DATA = {
-    "hp_potion_small":  {"name": "Pocao de Vida",        "desc": "Restaura 30 HP",                     "effect": "heal",       "value": 30, "cost": 15, "sp_cost": 0, "scope": "instant",  "duration": 0, "color": (200, 50, 50)},
-    "hp_potion_large":  {"name": "Pocao de Vida Grande",  "desc": "Restaura 60 HP",                     "effect": "heal",       "value": 60, "cost": 35, "sp_cost": 0, "scope": "instant",  "duration": 0, "color": (220, 30, 30)},
-    "atk_tonic":        {"name": "Tonico de Forca",       "desc": "+10 ATK por 1 sala",                 "effect": "atk_buff",  "value": 10, "cost": 20, "sp_cost": 0, "scope": "room",    "duration": 0, "color": (255, 150, 50)},
-    "def_tonic":        {"name": "Tonico de Escudo",      "desc": "+5 DEF por 3 turnos",                "effect": "def_buff",  "value": 5,  "cost": 18, "sp_cost": 0, "scope": "turns",   "duration": 3, "color": (50, 150, 255)},
-    "speed_tonic":      {"name": "Tonico de Velocidade",  "desc": "+2 alcance de movimento por 1 sala", "effect": "range_buff","value": 2,  "cost": 25, "sp_cost": 0, "scope": "room",    "duration": 0, "color": (50, 255, 150)},
-    "vitality_elixir":   {"name": "Elixir de Vitalidade", "desc": "+15 vida maxima pela sala",          "effect": "max_hp_buff","value": 15, "cost": 50, "sp_cost": 1, "scope": "room",    "duration": 0, "color": (255, 215, 0)},
+    "linear_hp_formula":   {"name": "item_linear_hp_formula_name",  "desc": "item_linear_hp_formula_desc", "effect": "heal",       "value": 30, "cost": 15, "sp_cost": 0, "scope": "instant",  "duration": 0, "color": (200, 50, 50)},
+    "riemann_hp_sum":      {"name": "item_riemann_hp_sum_name",     "desc": "item_riemann_hp_sum_desc",    "effect": "heal",       "value": 60, "cost": 35, "sp_cost": 0, "scope": "instant",  "duration": 0, "color": (220, 30, 30)},
+    "force_derivative":    {"name": "item_force_derivative_name",   "desc": "item_force_derivative_desc",  "effect": "atk_buff",  "value": 10, "cost": 20, "sp_cost": 0, "scope": "room",    "duration": 0, "color": (255, 150, 50)},
+    "defense_constant":    {"name": "item_defense_constant_name",   "desc": "item_defense_constant_desc",  "effect": "def_buff",  "value": 5,  "cost": 18, "sp_cost": 0, "scope": "turns",   "duration": 3, "color": (50, 150, 255)},
+    "translation_vector":  {"name": "item_translation_vector_name", "desc": "item_translation_vector_desc", "effect": "range_buff","value": 2,  "cost": 25, "sp_cost": 0, "scope": "room",    "duration": 0, "color": (50, 255, 150)},
+    "vitality_integral":   {"name": "item_vitality_integral_name",  "desc": "item_vitality_integral_desc",  "effect": "max_hp_buff","value": 15, "cost": 50, "sp_cost": 1, "scope": "room",    "duration": 0, "color": (255, 215, 0)},
 }
 
 SHOP_ITEMS = {
-    "weapons": ["fire_blade", "ice_rapier", "thunder_axe", "arcane_staff", "shadow_dagger", "heavy_axe"],
-    "shields": ["iron_shield", "mirror_shield", "steel_shield"],
-    "consumables": ["hp_potion_small", "hp_potion_large", "atk_tonic", "def_tonic", "speed_tonic", "vitality_elixir"],
+    "weapons": ["fiery_tangent", "cryo_bisector", "fractal_thunder_axe", "singularity_staff", "null_matrix_dagger", "max_modulus_axe"],
+    "shields": ["orthogonal_barrier", "reflection_matrix", "steel_axiom_shield"],
+    "consumables": ["linear_hp_formula", "riemann_hp_sum", "force_derivative", "defense_constant", "translation_vector", "vitality_integral"],
 }
 
 GOLD_PER_STAR = {1: 30, 2: 50, 3: 70, 4: 100}

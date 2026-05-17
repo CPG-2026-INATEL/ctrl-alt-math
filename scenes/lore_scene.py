@@ -28,10 +28,30 @@ class LoreScene(Scene):
         self._speak_category()
 
     def _speak_category(self):
-        cat_key, _ = LORE_CATEGORIES[self.category_index]
-        self.game.tts.speak(t(cat_key), lang=settings.LANGUAGE)
+        cat_key, content_key = LORE_CATEGORIES[self.category_index]
+        full_text = f"{t(cat_key)}. {t(content_key)}"
+        self.game.tts.speak(full_text, lang=settings.LANGUAGE)
 
     def handle_event(self, event):
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 3:  # Right click
+            mx, my = event.pos
+            content_rect = self._content_rect()
+            if content_rect.collidepoint(mx, my):
+                cat_key, content_key = LORE_CATEGORIES[self.category_index]
+                font = pygame.font.Font(None, 22)
+                wrapped_lines = self.game.ui._wrap_text(t(content_key), font, content_rect.width)
+                
+                line_height = 24
+                relative_y = my - content_rect.y + self.scroll_y
+                line_idx = int(relative_y // line_height)
+                
+                if 0 <= line_idx < len(wrapped_lines):
+                    clicked_line = wrapped_lines[line_idx].strip()
+                    if clicked_line:
+                        self.game.tts.speak(clicked_line, lang=settings.LANGUAGE)
+                        self.game.sfx.play("menu_select")
+            return
+
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             if self._left_rect().collidepoint(event.pos):
                 self.category_index = (self.category_index - 1) % len(LORE_CATEGORIES)
@@ -74,8 +94,7 @@ class LoreScene(Scene):
             self.scroll_y = min(self.max_scroll, self.scroll_y + 40)
         elif event.key == pygame.K_SPACE:
             # Read full content
-            _, content_key = LORE_CATEGORIES[self.category_index]
-            self.game.tts.speak(t(content_key), lang=settings.LANGUAGE)
+            self._speak_category()
 
     def update(self, dt):
         pass

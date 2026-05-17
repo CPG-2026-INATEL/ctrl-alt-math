@@ -564,17 +564,17 @@ class PlayerPanelScene(Scene):
             pygame.draw.rect(screen, (25, 25, 45), item_rect, border_radius=6)
             pygame.draw.rect(screen, color, item_rect, 1, border_radius=6)
 
-            name = item_data.get("name", item["id"])
+            name = t(item_data.get("name", item["id"]))
             count = item.get("count", 0)
             draw_text(screen, name, (ix + 10, iy + 8), color, 14, center=False)
             draw_text(screen, f"x{count}", (ix + item_w - 30, iy + 8), settings.WHITE, 13, center=False)
 
             use_rect = pygame.Rect(ix + item_w - 50, iy + 30, 45, 20)
             pygame.draw.rect(screen, (40, 100, 40), use_rect, border_radius=3)
-            draw_text(screen, "Usar", (use_rect.centerx, use_rect.centery), settings.WHITE, 11)
+            draw_text(screen, t("inv_use_button"), (use_rect.centerx, use_rect.centery), settings.WHITE, 11)
 
             if self.hovered_item == item["id"]:
-                desc = item_data.get("desc", "")
+                desc = t(item_data.get("desc", ""))
                 draw_text(screen, desc, (ix + 10, iy + 48), settings.GRAY, 11, center=False)
 
     def _draw_equipment(self, screen):
@@ -606,7 +606,7 @@ class PlayerPanelScene(Scene):
             slot_label = "WEAPON" if is_weapon else "SHIELD"
             draw_text(screen, slot_label, (content_x + 20, slot_y + 5), border_color, 13, center=False)
 
-            name = item_data.get("name", "Empty")
+            name = t(item_data.get("name", "eq_empty_slot"))
             draw_text(screen, name, (content_x + 20, slot_y + 22), settings.WHITE, 17, center=False)
 
             if is_weapon:
