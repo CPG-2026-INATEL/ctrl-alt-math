@@ -61,7 +61,7 @@ class SkillTreeScene(Scene):
 
     def handle_event(self, event):
         if event.type == pygame.KEYDOWN:
-            if event.key in (pygame.K_TAB, pygame.K_ESCAPE):
+            if event.key in (pygame.K_s, pygame.K_ESCAPE, pygame.K_TAB):
                 self.game.scene_manager.pop()
             elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
                 self._unlock_hovered()
@@ -71,7 +71,7 @@ class SkillTreeScene(Scene):
                 self._move_selection(1, 0)
             elif event.key in (pygame.K_UP, pygame.K_w):
                 self._move_selection(0, -1)
-            elif event.key in (pygame.K_DOWN, pygame.K_s):
+            elif event.key == pygame.K_DOWN:
                 self._move_selection(0, 1)
             return
 
