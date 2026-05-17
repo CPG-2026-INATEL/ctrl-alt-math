@@ -4,6 +4,7 @@ import settings
 from i18n import t, LANG_EN, LANG_PT
 from save_game import save_exists
 from scenes.scene import Scene
+from utils import draw_text
 
 
 class MenuScene(Scene):
