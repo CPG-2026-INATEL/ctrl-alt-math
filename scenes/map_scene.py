@@ -95,9 +95,9 @@ class MapScene(Scene):
                 self._remote_voted_room = None
                 self._vote_status = ""
             elif mtype == "map_enter_room":
-                room_data = msg.get("room")
-                if room_data and len(room_data) == 2:
-                    room = self.game.world_map.rooms.get((room_data[0], room_data[1]))
+                room_id = msg.get("room")
+                if room_id:
+                    room = self.game.world_map.rooms.get(room_id)
                     if room and self.game.scene_manager.current is self:
                         self.room = room
                         self.game.sfx.play("menu_confirm")
@@ -110,7 +110,7 @@ class MapScene(Scene):
                 self.room = room
                 self.game.sfx.play("menu_confirm")
                 if self.game.mp_host:
-                    self._net_send({"type": "map_enter_room", "room": [room.col, room.row]})
+                    self._net_send({"type": "map_enter_room", "room": room.id})
                 self.game.scene_manager.switch("gameplay")
 
     def _cast_vote(self, room_id):
