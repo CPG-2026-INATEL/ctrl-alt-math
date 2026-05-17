@@ -56,8 +56,8 @@ class TurnManager:
         action = self.current_action
         self.current_action = None
         if action["type"] == "move":
-            action["actor"].col = action["target_col"]
-            action["actor"].row = action["target_row"]
+            action["actor"].col = int(action["target_col"])
+            action["actor"].row = int(action["target_row"])
         return action
 
     def next_phase(self):

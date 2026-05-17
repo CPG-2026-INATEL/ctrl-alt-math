@@ -137,7 +137,8 @@ class Player:
     def set_grid_position(self, col, row, grid):
         self.col = int(col)
         self.row = int(row)
-        self.x, self.y = grid.to_pixel(self.col, self.row)
+        px, py = grid.to_pixel(self.col, self.row)
+        self.x, self.y = int(px), int(py)
 
     def _begin_anim_step(self, grid):
         from_col, from_row = self.anim_cells[self.anim_step_idx]
@@ -146,8 +147,10 @@ class Player:
         self.anim_from_row = from_row
         self.anim_to_col = to_col
         self.anim_to_row = to_row
-        self.anim_from_px, self.anim_from_py = grid.to_pixel(from_col, from_row)
-        self.anim_to_px, self.anim_to_py = grid.to_pixel(to_col, to_row)
+        px_from, py_from = grid.to_pixel(from_col, from_row)
+        px_to, py_to = grid.to_pixel(to_col, to_row)
+        self.anim_from_px, self.anim_from_py = int(px_from), int(py_from)
+        self.anim_to_px, self.anim_to_py = int(px_to), int(py_to)
         self.anim_progress = 0.0
         self.current_anim = "walk"
         self.dir_x = to_col - from_col
@@ -178,8 +181,8 @@ class Player:
             self.anim_progress = min(1.0, self.anim_progress + dt * 10)
             frac = self.anim_progress
             frac = frac * frac * (3 - 2 * frac)
-            self.x = self.anim_from_px + (self.anim_to_px - self.anim_from_px) * frac
-            self.y = self.anim_from_py + (self.anim_to_py - self.anim_from_py) * frac
+            self.x = int(self.anim_from_px + (self.anim_to_px - self.anim_from_px) * frac)
+            self.y = int(self.anim_from_py + (self.anim_to_py - self.anim_from_py) * frac)
             if self.anim_progress >= 1.0:
                 self.anim_step_idx += 1
                 self.col = int(self.anim_to_col)
@@ -190,13 +193,15 @@ class Player:
                     self.anim_progress = 1.0
                     self.current_anim = "idle"
                 if grid is not None:
-                    self.x, self.y = grid.to_pixel(self.col, self.row)
+                    px, py = grid.to_pixel(self.col, self.row)
+                    self.x, self.y = int(px), int(py)
                     if self.anim_step_idx < len(self.anim_cells):
                         self._begin_anim_step(grid)
         else:
-            self.current_anim = "idle"
             if grid is not None:
-                self.x, self.y = grid.to_pixel(self.col, self.row)
+                self.current_anim = "idle"
+                px, py = grid.to_pixel(self.col, self.row)
+                self.x, self.y = int(px), int(py)
 
     def update(self, dt, keys):
         self.invulnerable = max(0, self.invulnerable - dt)

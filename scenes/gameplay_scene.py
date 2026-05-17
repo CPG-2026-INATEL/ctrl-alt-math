@@ -195,6 +195,17 @@ class GameplayScene(Scene):
         return False
 
     def _advance_after_player_turn(self):
+        # If there are no enemies, immediately restart the player turn without phase shifts
+        alive_enemies = [e for e in self.game.enemies if not e.dead]
+        if len(alive_enemies) == 0:
+            self.turn_manager.start_turn()
+            self.state = "PLAYER_INPUT"
+            self._set_active_player(0)
+            self.show_move_range = True
+            self.show_action_range = False
+            self.selected_skill = None
+            return
+
         next_idx = self._next_living_player_idx(self.active_player_idx)
         if next_idx is not None:
             self.turn_manager.start_turn()
@@ -258,13 +269,13 @@ class GameplayScene(Scene):
                     ex, ey = self._get_spawn_position()
                     enemy = Enemy(ex, ey, enemy_type)
                     if enemy_type == "boss":
+                        size_factor = enemy_multiplier
                         enemy.max_hp = int(room.boss_hp * (1.0 + (size_factor - 1.0) * 0.5))
                         enemy.hp = enemy.max_hp
                     self.game.enemies.append(enemy)
 
             if len(self.game.enemies) == 0:
                 self.state = "NO_COMBAT"
-                self._check_victory()
             
             # Speak room narrative
             text = f"{t(room.name)}. {t(room.narrative)}"
@@ -1895,6 +1906,10 @@ class GameplayScene(Scene):
                     "hp": player.hp,
                     "max_hp": player.max_hp,
                     "rigor": player.rigor,
+                    "pitagoras_cooldown": getattr(player, 'pitagoras_cooldown', 0),
+                    "reflexao_cooldown": getattr(player, 'reflexao_cooldown', 0),
+                    "integral_cooldown": getattr(player, 'integral_cooldown', 0),
+                    "fractal_cooldown": getattr(player, 'fractal_cooldown', 0),
                 }
                 for player in self.players
             ],
@@ -2169,8 +2184,8 @@ class GameplayScene(Scene):
             if idx >= len(self.players):
                 break
             player = self.players[idx]
-            player.col = player_snap["col"]
-            player.row = player_snap["row"]
+            player.col = int(player_snap["col"])
+            player.row = int(player_snap["row"])
             player.hp = player_snap["hp"]
             player.max_hp = player_snap["max_hp"]
             old_hp = player.hp
@@ -2178,18 +2193,40 @@ class GameplayScene(Scene):
             if idx == self.active_player_idx:
                 actual_heal = player.hp - old_hp
             player.rigor = player_snap["rigor"]
-            player.x, player.y = self.grid.to_pixel(player.col, player.row)
+            
+            # Restore skill cooldowns
+            player.pitagoras_cooldown = player_snap.get("pitagoras_cooldown", 0)
+            player.reflexao_cooldown = player_snap.get("reflexao_cooldown", 0)
+            player.integral_cooldown = player_snap.get("integral_cooldown", 0)
+            player.fractal_cooldown = player_snap.get("fractal_cooldown", 0)
+            
+            px, py = self.grid.to_pixel(player.col, player.row)
+            player.x, player.y = int(px), int(py)
 
+        # Restore enemies list exactly from snapshot to eliminate clones/decoys
+        restored_enemies = []
         for i, e_snap in enumerate(snapshot["enemies"]):
             if i < len(self.game.enemies):
                 enemy = self.game.enemies[i]
-                enemy.col = e_snap["col"]
-                enemy.row = e_snap["row"]
-                enemy.hp = e_snap["hp"]
-                enemy.max_hp = e_snap["max_hp"]
-                enemy.alive = e_snap["alive"]
-                enemy.dead = e_snap["dead"]
-                enemy.x, enemy.y = self.grid.to_pixel(enemy.col, enemy.row)
+            else:
+                enemy = Enemy(0, 0, e_snap["type"])
+            
+            enemy.col = int(e_snap["col"])
+            enemy.row = int(e_snap["row"])
+            enemy.hp = e_snap["hp"]
+            enemy.max_hp = e_snap["max_hp"]
+            enemy.alive = e_snap["alive"]
+            enemy.dead = e_snap["dead"]
+            
+            if "size" in e_snap:
+                enemy.size = e_snap["size"]
+            if "color" in e_snap:
+                enemy.color = e_snap["color"]
+                
+            px, py = self.grid.to_pixel(enemy.col, enemy.row)
+            enemy.x, enemy.y = int(px), int(py)
+            restored_enemies.append(enemy)
+        self.game.enemies = restored_enemies
 
         self.game.entropy = snapshot["entropy"]
 
