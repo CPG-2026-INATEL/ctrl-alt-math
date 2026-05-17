@@ -4,6 +4,7 @@ import settings
 from i18n import t, LANG_EN, LANG_PT
 from save_game import save_exists
 from scenes.scene import Scene
+from utils import draw_text
 
 
 class MenuScene(Scene):
@@ -12,6 +13,7 @@ class MenuScene(Scene):
         self._update_menu_items()
         self.selected = 0
         self.showing_how_to_play = False
+        self.confirm_overwrite = False
 
     def _menu_item_rect(self, index):
         h = settings.WINDOW_HEIGHT
@@ -75,9 +77,12 @@ class MenuScene(Scene):
         self.game.sfx.play("menu_confirm")
         _, action = self.menu_items[self.selected]
         if action == "start":
-            self.game.reset_game_state()
-            self.game.save_progress()
-            self.game.scene_manager.switch("map")
+            if save_exists():
+                self.confirm_overwrite = True
+            else:
+                self.game.reset_game_state()
+                self.game.save_progress()
+                self.game.scene_manager.switch("map")
         elif action == "continue":
             if self.game.load_progress():
                 self._update_menu_items()
@@ -127,6 +132,22 @@ class MenuScene(Scene):
                 self._speak_selection()
             return
 
+        if self.confirm_overwrite:
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_RETURN:
+                    self.confirm_overwrite = False
+                    self.game.reset_game_state()
+                    self.game.save_progress()
+                    self.game.scene_manager.switch("map")
+                elif event.key == pygame.K_ESCAPE:
+                    self.confirm_overwrite = False
+                    self.game.sfx.play("menu_select")
+            elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                if event.pos[1] > settings.WINDOW_HEIGHT // 2:
+                    self.confirm_overwrite = False
+                    self.game.sfx.play("menu_select")
+            return
+
         if event.type == pygame.MOUSEMOTION:
             for i in range(len(self.menu_items)):
                 if self._menu_item_rect(i).collidepoint(event.pos):
@@ -163,7 +184,25 @@ class MenuScene(Scene):
         pass
 
     def draw(self, screen):
-        if self.showing_how_to_play:
+        if self.confirm_overwrite:
+            self.game.ui.draw_main_menu(screen, self.menu_items, self.selected)
+            overlay = pygame.Surface((settings.WINDOW_WIDTH, settings.WINDOW_HEIGHT))
+            overlay.set_alpha(200)
+            overlay.fill(settings.BLACK)
+            screen.blit(overlay, (0, 0))
+            draw_text(screen, "Existing Save Found",
+                     (settings.WINDOW_WIDTH // 2, settings.WINDOW_HEIGHT // 2 - 50),
+                     settings.GOLD, 24)
+            draw_text(screen, "A save game already exists.",
+                     (settings.WINDOW_WIDTH // 2, settings.WINDOW_HEIGHT // 2 - 10),
+                     settings.WHITE, 18)
+            draw_text(screen, "Starting a new game will overwrite it.",
+                     (settings.WINDOW_WIDTH // 2, settings.WINDOW_HEIGHT // 2 + 15),
+                     settings.LIGHT_GRAY, 16)
+            draw_text(screen, "ENTER = Confirm     ESC = Cancel",
+                     (settings.WINDOW_WIDTH // 2, settings.WINDOW_HEIGHT // 2 + 60),
+                     settings.GREEN, 16)
+        elif self.showing_how_to_play:
             self.game.ui.draw_how_to_play(screen)
         else:
             self.game.ui.draw_main_menu(screen, self.menu_items, self.selected)

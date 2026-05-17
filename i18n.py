@@ -113,6 +113,7 @@ STRINGS = {
     "no_hit": {LANG_EN: "NO HIT", LANG_PT: "NÃO ACERTOU"},
     "out_of_reach": {LANG_EN: "OUT OF REACH", LANG_PT: "FORA DE ALCANCE"},
     "out_of_range": {LANG_EN: "OUT OF RANGE", LANG_PT: "FORA DE ALCANCE"},
+    "skill_locked": {LANG_EN: "SKILL LOCKED", LANG_PT: "HABILIDADE BLOQUEADA"},
     "not_enough_rigor": {LANG_EN: "NOT ENOUGH RIGOR", LANG_PT: "RIGOR INSUFICIENTE"},
     "rewind_locked": {LANG_EN: "REWIND LOCKED", LANG_PT: "REBOBINAR BLOQUEADO"},
     "no_rewind_available": {LANG_EN: "NO REWIND AVAILABLE", LANG_PT: "SEM REBOBINAR DISPONIVEL"},

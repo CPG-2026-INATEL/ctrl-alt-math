@@ -10,22 +10,39 @@ ENEMY_POOL_BY_DIFFICULTY = {
     4: [("censor", 3, 4), ("ortogonal", 2, 3), ("atirador", 1, 2), ("strawman", 1, 2), ("granadeiro", 1, 2), ("bayesian", 1, 1)],
 }
 
+CTF_ENEMY_POOL = {
+    1: [("censor", 3, 4)],
+    2: [("censor", 2, 3), ("ortogonal", 2, 3)],
+    3: [("censor", 2, 4), ("ortogonal", 2, 3), ("atirador", 1, 2), ("strawman", 1, 2)],
+    4: [("censor", 3, 5), ("ortogonal", 2, 4), ("atirador", 2, 3), ("strawman", 1, 2), ("granadeiro", 1, 2), ("bayesian", 1, 1)],
+}
+
 OBSTACLE_TEMPLATES = {
     1: [
         [{"col": 4, "row": 3, "w": 2, "h": 1}],
         [{"col": 10, "row": 5, "w": 2, "h": 2}],
+        [{"col": 6, "row": 3, "w": 1, "h": 3}],
     ],
     2: [
         [{"col": 3, "row": 2, "w": 2, "h": 2}, {"col": 11, "row": 7, "w": 2, "h": 2}],
         [{"col": 5, "row": 4, "w": 2, "h": 3}, {"col": 9, "row": 3, "w": 1, "h": 1}],
+        [{"col": 2, "row": 2, "w": 3, "h": 1}, {"col": 12, "row": 6, "w": 1, "h": 3}],
+        [{"col": 7, "row": 3, "w": 1, "h": 2}, {"col": 7, "row": 7, "w": 1, "h": 2}],
+        [{"col": 4, "row": 2, "w": 1, "h": 5}, {"col": 11, "row": 4, "w": 1, "h": 4}],
     ],
     3: [
         [{"col": 3, "row": 2, "w": 2, "h": 2}, {"col": 11, "row": 2, "w": 2, "h": 2}, {"col": 7, "row": 6, "w": 2, "h": 2}],
         [{"col": 5, "row": 3, "w": 3, "h": 1}, {"col": 2, "row": 7, "w": 2, "h": 2}, {"col": 12, "row": 7, "w": 2, "h": 2}],
+        [{"col": 3, "row": 2, "w": 1, "h": 4}, {"col": 8, "row": 2, "w": 1, "h": 3}, {"col": 12, "row": 4, "w": 1, "h": 4}],
+        [{"col": 4, "row": 2, "w": 3, "h": 1}, {"col": 4, "row": 6, "w": 3, "h": 1}, {"col": 10, "row": 3, "w": 1, "h": 3}],
+        [{"col": 2, "row": 3, "w": 2, "h": 2}, {"col": 6, "row": 2, "w": 2, "h": 1}, {"col": 10, "row": 5, "w": 2, "h": 2}],
     ],
     4: [
         [{"col": 3, "row": 1, "w": 2, "h": 2}, {"col": 11, "row": 1, "w": 2, "h": 2}, {"col": 7, "row": 4, "w": 2, "h": 3}, {"col": 3, "row": 8, "w": 2, "h": 2}],
         [{"col": 5, "row": 2, "w": 2, "h": 2}, {"col": 9, "row": 5, "w": 2, "h": 3}, {"col": 2, "row": 7, "w": 2, "h": 2}, {"col": 12, "row": 7, "w": 2, "h": 2}],
+        [{"col": 2, "row": 2, "w": 1, "h": 5}, {"col": 7, "row": 1, "w": 1, "h": 3}, {"col": 12, "row": 2, "w": 1, "h": 5}, {"col": 5, "row": 7, "w": 3, "h": 1}],
+        [{"col": 3, "row": 2, "w": 3, "h": 1}, {"col": 3, "row": 7, "w": 3, "h": 1}, {"col": 10, "row": 2, "w": 1, "h": 5}, {"col": 14, "row": 4, "w": 1, "h": 4}],
+        [{"col": 4, "row": 1, "w": 2, "h": 2}, {"col": 8, "row": 3, "w": 1, "h": 3}, {"col": 12, "row": 1, "w": 2, "h": 2}, {"col": 6, "row": 7, "w": 2, "h": 2}],
     ],
 }
 
@@ -54,6 +71,13 @@ ARENA_SIZES = {
     2: (14, 10),
     3: (14, 10),
     4: (16, 12),
+}
+
+CTF_ARENA_SIZES = {
+    1: (16, 13),
+    2: (18, 14),
+    3: (18, 14),
+    4: (20, 16),
 }
 
 SIDE_ROOM_NAMES = ["room_cloister_name", "room_atrium_name", "room_vestibule_name",
@@ -98,6 +122,9 @@ class MapGenerator:
             "boss_hp": settings.BOSS_HP,
             "jitter_x": 0,
             "jitter_y": 0,
+            "objective": "kill_all",
+            "arena_cols": 0,
+            "arena_rows": 0,
         }
         connections[hub_id] = []
 
@@ -173,9 +200,18 @@ class MapGenerator:
                     enemies = [("boss", 1)]
                     arena_size = ARENA_SIZES[4]
                     gold_reward = settings.GOLD_BOSS_REWARD
+                    objective = "kill_all"
                 else:
                     boss_hp = settings.BOSS_HP
-                    arena_size = ARENA_SIZES.get(diff, ARENA_SIZES[1])
+                    enemy_mult = settings.DIFFICULTY_SCALING[settings.DIFFICULTY]["enemy_amount"]
+                    if rtype != "hub" and rng.random() < 0.35:
+                        objective = "capture_flag"
+                        enemies = self._generate_ctf_enemies(diff, rng)
+                        arena_size = CTF_ARENA_SIZES.get(diff, CTF_ARENA_SIZES[1])
+                    else:
+                        objective = "kill_all"
+                        enemies = self._generate_enemies(diff, rng)
+                        arena_size = ARENA_SIZES.get(diff, ARENA_SIZES[1])
                     gold_reward = self._calculate_gold(diff, enemies)
 
                 rooms[room_id] = {
@@ -196,6 +232,7 @@ class MapGenerator:
                     "arena_rows": arena_size[1],
                     "jitter_x": jitter_x,
                     "jitter_y": jitter_y,
+                    "objective": objective,
                 }
                 connections[room_id] = []
                 layer_room_ids.append(room_id)
@@ -277,6 +314,7 @@ class MapGenerator:
                             "arena_rows": ARENA_SIZES[side_diff][1],
                             "jitter_x": jitter_x,
                             "jitter_y": jitter_y,
+                            "objective": "kill_all",
                         }
                         connections[side_id] = []
 
@@ -364,6 +402,15 @@ class MapGenerator:
 
     def _generate_enemies(self, difficulty, rng):
         pool = ENEMY_POOL_BY_DIFFICULTY.get(difficulty, ENEMY_POOL_BY_DIFFICULTY[1])
+        enemies = []
+        for enemy_type, min_count, max_count in pool:
+            count = rng.randint(min_count, max_count)
+            if count > 0:
+                enemies.append((enemy_type, count))
+        return enemies
+
+    def _generate_ctf_enemies(self, difficulty, rng):
+        pool = CTF_ENEMY_POOL.get(difficulty, CTF_ENEMY_POOL[1])
         enemies = []
         for enemy_type, min_count, max_count in pool:
             count = rng.randint(min_count, max_count)

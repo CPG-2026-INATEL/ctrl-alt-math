@@ -722,27 +722,31 @@ class UI:
             screen.blit(s, (x, y))
 
     def draw_enemy_tooltip(self, screen, enemy, pos):
-        # Premium tooltip design
         padding = 10
-        max_width = 200
+        max_width = 220
         title_font = pygame.font.Font(None, 20)
         lore_font = pygame.font.Font(None, 16)
         hp_font = pygame.font.Font(None, 14)
+        pattern_font = pygame.font.Font(None, 12)
 
-        # Render elements to calculate size
         title_surf = title_font.render(t(enemy.info_title), True, settings.GOLD)
         hp_text = f"{t('hp')}: {enemy.hp}/{enemy.max_hp}"
         hp_surf = hp_font.render(hp_text, True, settings.WHITE)
 
-        # Wrap lore text
         lines = self._wrap_text(t(enemy.lore), lore_font, max_width - padding * 2)
         lore_surfs = [lore_font.render(line, True, settings.LIGHT_GRAY) for line in lines]
 
-        # Calculate box size
-        width = max(title_surf.get_width(), hp_surf.get_width(), max([s.get_width() for s in lore_surfs])) + padding * 2
-        height = title_surf.get_height() + hp_surf.get_height() + sum([s.get_height() for s in lore_surfs]) + padding * 2 + 10
+        pattern_size = 63
+        pattern_label = self._get_attack_pattern_label(enemy)
+        label_surf = pattern_font.render(pattern_label, True, enemy.color) if pattern_label else None
 
-        # Adjust position to stay within screen
+        width = max(title_surf.get_width(), hp_surf.get_width(),
+                    max([s.get_width() for s in lore_surfs]), pattern_size + 10) + padding * 2
+        height = (title_surf.get_height() + 10
+                  + pattern_size + (label_surf.get_height() + 4 if label_surf else 0) + 10
+                  + sum([s.get_height() for s in lore_surfs]) + 10
+                  + hp_surf.get_height() + padding * 2)
+
         x, y = pos
         x += 15
         y += 15
@@ -751,35 +755,100 @@ class UI:
         if y + height > settings.WINDOW_HEIGHT:
             y -= height + 30
 
-        # Draw box background (glassmorphism effect)
         bg_rect = pygame.Rect(x, y, width, height)
         s = pygame.Surface((width, height), pygame.SRCALPHA)
         pygame.draw.rect(s, (15, 15, 25, 230), (0, 0, width, height), border_radius=8)
         screen.blit(s, (x, y))
-
-        # Draw borders
         pygame.draw.rect(screen, settings.GRAY, bg_rect, 1, border_radius=8)
         pygame.draw.rect(screen, settings.GOLD, bg_rect, 2, border_radius=8)
 
-        # Draw content
         curr_y = y + padding
         screen.blit(title_surf, (x + padding, curr_y))
-        curr_y += title_surf.get_height() + 2
+        curr_y += title_surf.get_height() + 10
 
-        # HP bar in tooltip
-        hp_bar_w = width - padding * 2
-        hp_bar_h = 4
-        hp_ratio = enemy.hp / enemy.max_hp
-        pygame.draw.rect(screen, (60, 20, 20), (x + padding, curr_y, hp_bar_w, hp_bar_h))
-        pygame.draw.rect(screen, settings.RED, (x + padding, curr_y, int(hp_bar_w * hp_ratio), hp_bar_h))
-        curr_y += hp_bar_h + 8
+        pattern_x = x + (width - pattern_size) // 2
+        self._draw_attack_pattern(screen, pattern_x, curr_y, pattern_size, enemy)
+        curr_y += pattern_size + 2
+
+        if label_surf:
+            screen.blit(label_surf, (x + (width - label_surf.get_width()) // 2, curr_y))
+            curr_y += label_surf.get_height() + 6
 
         for surf in lore_surfs:
             screen.blit(surf, (x + padding, curr_y))
             curr_y += surf.get_height()
 
-        curr_y += 5
+        curr_y += 8
+        hp_bar_w = width - padding * 2
+        hp_bar_h = 4
+        hp_ratio = enemy.hp / enemy.max_hp
+        pygame.draw.rect(screen, (60, 20, 20), (x + padding, curr_y, hp_bar_w, hp_bar_h))
+        pygame.draw.rect(screen, settings.RED, (x + padding, curr_y, int(hp_bar_w * hp_ratio), hp_bar_h))
+        curr_y += hp_bar_h + 6
         screen.blit(hp_surf, (x + padding, curr_y))
+
+    def _get_attack_pattern_label(self, enemy):
+        if enemy.type == "boss":
+            return "LINE + AREA"
+        elif enemy.type in ("censor", "bayesian", "atirador"):
+            return "LINE"
+        elif enemy.type in ("strawman", "ortogonal"):
+            return "CROSS"
+        elif enemy.type == "granadeiro":
+            return "AREA"
+        return ""
+
+    def _draw_attack_pattern(self, screen, x, y, size, enemy):
+        grid_n = 7
+        cell = size // grid_n
+
+        bg_color = (8, 8, 18)
+        grid_color = (35, 35, 55)
+        glow_color = tuple(min(255, c + 100) for c in enemy.color)
+        dim_color = tuple(max(0, c // 3) for c in enemy.color)
+
+        pygame.draw.rect(screen, bg_color, (x, y, size, size), border_radius=4)
+        pygame.draw.rect(screen, grid_color, (x, y, size, size), 1, border_radius=4)
+
+        for i in range(1, grid_n):
+            gx = x + i * cell
+            gy = y + i * cell
+            pygame.draw.line(screen, grid_color, (gx, y), (gx, y + size), 1)
+            pygame.draw.line(screen, grid_color, (x, gy), (x + size, gy), 1)
+
+        cx, cy = grid_n // 2, grid_n // 2
+
+        def draw_cell(gx, gy, fill, border):
+            r = pygame.Rect(x + gx * cell + 1, y + gy * cell + 1, cell - 2, cell - 2)
+            pygame.draw.rect(screen, fill, r, border_radius=2)
+            if border:
+                pygame.draw.rect(screen, border, r, 1, border_radius=2)
+
+        draw_cell(cx, cy, enemy.color, None)
+
+        if enemy.type in ("censor", "bayesian", "atirador"):
+            for col in range(cx + 1, grid_n):
+                draw_cell(col, cy, dim_color, glow_color)
+
+        elif enemy.type in ("strawman", "ortogonal"):
+            for dc, dr in [(0, -1), (0, 1), (-1, 0), (1, 0)]:
+                draw_cell(cx + dc, cy + dr, dim_color, glow_color)
+
+        elif enemy.type == "granadeiro":
+            for dc in [-1, 0, 1]:
+                for dr in [-1, 0, 1]:
+                    if dc == 0 and dr == 0:
+                        continue
+                    draw_cell(cx + dc, cy + dr, dim_color, glow_color)
+
+        elif enemy.type == "boss":
+            for col in range(cx + 1, grid_n):
+                draw_cell(col, cy, dim_color, glow_color)
+            for dc in [-1, 0, 1]:
+                for dr in [-1, 0, 1]:
+                    if dc == 0 and dr == 0:
+                        continue
+                    draw_cell(cx + dc, cy + dr, dim_color, glow_color)
 
     def draw_intent_tooltip(self, screen, intent_type, is_fake, pos):
         padding = 10

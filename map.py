@@ -193,6 +193,7 @@ class Room:
         self.gold_reward = data.get("gold_reward", 20)
         self.is_start = data.get("is_start", False)
         self.is_final = data.get("is_final", False)
+        self.objective = data.get("objective", "kill_all")
         self.arena_cols = data.get("arena_cols", settings.GRID_COLS)
         self.arena_rows = data.get("arena_rows", settings.GRID_ROWS)
         self.jitter_x = data.get("jitter_x", 0)
@@ -559,11 +560,179 @@ class WorldMap:
                 room.state = state
         self._update_scroll_to_player()
 
+    def draw(self, screen, player=None, mp_info=None):
+        screen.fill(settings.DARK_BLUE)
+
+        title_y = int(30 * settings.UI_SCALE)
+        map_height = settings.WINDOW_HEIGHT - settings.MAP_HEADER_H
+
+        map_clip = pygame.Rect(0, settings.MAP_HEADER_H,
+                                settings.WINDOW_WIDTH, map_height)
+        screen.set_clip(map_clip)
+
+        sx = int(self.scroll_x)
+        sy = int(self.scroll_y)
+
+        rooms_in_draw_order = sorted(self.rooms.values(), key=lambda room: (room.screen_y, room.screen_x))
+        for room in rooms_in_draw_order:
+            for conn_id in room.directional_connections.values():
+                if conn_id is None:
+                    continue
+                conn_room = self.rooms.get(conn_id)
+                if conn_room and conn_room.col >= room.col:
+                    start_x = room.rect.centerx - sx
+                    start_y = room.rect.centery - sy + settings.MAP_HEADER_H
+                    end_x = conn_room.rect.centerx - sx
+                    end_y = conn_room.rect.centery - sy + settings.MAP_HEADER_H
+
+                    if room.state == "completed" and conn_room.state == "completed":
+                        color = settings.GREEN
+                    elif room.state != "locked" and conn_room.state != "locked":
+                        color = settings.GRAY
+                    else:
+                        color = (40, 40, 40)
+
+                    pygame.draw.line(screen, color, (start_x, start_y), (end_x, end_y), 2)
+
+        for room in rooms_in_draw_order:
+            self._draw_room(screen, room, sx, sy)
+
+        player_room = self.rooms[self.player_room]
+        bob_y = int(math.sin(self.anim_timer * 4) * 4)
+        avatar_draw_y = self.avatar_y - sy + settings.MAP_HEADER_H + bob_y
+        avatar_draw_x = self.avatar_x - sx
+        avatar_size = max(36, int(48 * settings.UI_SCALE))
+
+        if player:
+            sprite = player.get_current_sprite()
+            if sprite:
+                if player.dir_x < 0:
+                    sprite = pygame.transform.flip(sprite, True, False)
+                sprite = pygame.transform.scale(sprite, (avatar_size, avatar_size))
+                screen.blit(sprite, (int(avatar_draw_x) - avatar_size // 2, int(avatar_draw_y) - avatar_size // 2))
+            else:
+                pygame.draw.rect(screen, settings.CYAN,
+                                (int(avatar_draw_x) - avatar_size // 2, int(avatar_draw_y) - avatar_size // 2, avatar_size, avatar_size))
+                pygame.draw.rect(screen, settings.WHITE,
+                                (int(avatar_draw_x) - avatar_size // 2, int(avatar_draw_y) - avatar_size // 2, avatar_size, avatar_size), 1)
+        else:
+            pygame.draw.rect(screen, settings.CYAN,
+                            (int(avatar_draw_x) - avatar_size // 2, int(avatar_draw_y) - avatar_size // 2, avatar_size, avatar_size))
+            pygame.draw.rect(screen, settings.WHITE,
+                            (int(avatar_draw_x) - avatar_size // 2, int(avatar_draw_y) - avatar_size // 2, avatar_size, avatar_size), 1)
+
+        if mp_info:
+            for info in mp_info:
+                self._draw_mp_avatar(screen, info, avatar_size, bob_y, sx, sy)
+
+        screen.set_clip(None)
+
+        header_surf = pygame.Surface((settings.WINDOW_WIDTH, settings.MAP_HEADER_H), pygame.SRCALPHA)
+        header_surf.fill((10, 10, 40, 245))
+        screen.blit(header_surf, (0, 0))
+
+        draw_text(screen, t("map_title"),
+                 (settings.WINDOW_WIDTH // 2, title_y),
+                 settings.CYAN, 32)
+
+        draw_text(screen, "[TAB] Player", (15, 12), settings.GRAY, 13, center=False)
+        draw_text(screen, "[S] Shop",    (15, 33), settings.GRAY, 13, center=False)
+
     def _get_gold(self):
         try:
             return self._game.gold
         except:
             return 0
+
+    def _draw_room(self, screen, room, sx, sy):
+        draw_x = room.rect.x - sx
+        draw_y = room.rect.y - sy + settings.MAP_HEADER_H
+        draw_rect = pygame.Rect(draw_x, draw_y, room.rect.width, room.rect.height)
+
+        if draw_rect.right < 0 or draw_rect.left > settings.WINDOW_WIDTH:
+            return
+        if draw_rect.bottom < settings.MAP_HEADER_H or draw_rect.top > settings.WINDOW_HEIGHT:
+            return
+
+        is_player = room.id == self.player_room
+        is_hovered = hasattr(self, 'hovered_room') and self.hovered_room and room.id == self.hovered_room.id
+
+        diff_colors = {
+            1: ((25, 35, 50), settings.CYAN),
+            2: ((35, 30, 20), settings.ORANGE),
+            3: ((45, 20, 20), settings.RED),
+            4: ((50, 15, 50), settings.PURPLE),
+        }
+
+        if room.type == "hub":
+            bg_color = (20, 30, 50)
+            border_color = settings.CYAN
+        elif room.type == "boss":
+            bg_color = (50, 15, 15)
+            border_color = settings.RED
+        elif room.objective == "capture_flag":
+            bg_color = (30, 35, 20)
+            border_color = (0, 220, 0)
+        elif room.type == "challenge":
+            bg_color = diff_colors.get(room.difficulty, diff_colors[1])[0]
+            border_color = diff_colors.get(room.difficulty, diff_colors[1])[1]
+        elif room.type == "side":
+            bg_color = (30, 40, 20)
+            border_color = settings.GOLD
+        else:
+            bg_color = diff_colors.get(room.difficulty, diff_colors[1])[0]
+            border_color = diff_colors.get(room.difficulty, diff_colors[1])[1]
+
+        if room.state == "completed":
+            bg_color = (15, 45, 15)
+            border_color = settings.GREEN
+        elif room.state == "locked":
+            bg_color = (15, 15, 15)
+            border_color = (40, 40, 40)
+
+        pygame.draw.rect(screen, bg_color, draw_rect, border_radius=10)
+
+        border_width = 3 if is_player else 2
+        if is_player:
+            pulse = int(180 + 75 * math.sin(room.bob_phase * 2))
+            border_color = (pulse, pulse, 255)
+        elif is_hovered:
+            border_color = settings.GOLD
+            border_width = 3
+        elif room.objective == "capture_flag" and room.state == "available":
+            border_color = (0, 255, 80)
+            border_width = 3
+
+        pygame.draw.rect(screen, border_color, draw_rect, border_width, border_radius=10)
+
+        if room.state == "completed" and not is_player:
+            glow = pygame.Surface((draw_rect.width + 4, draw_rect.height + 4), pygame.SRCALPHA)
+            glow.fill((50, 255, 50, 25))
+            screen.blit(glow, (draw_rect.x - 2, draw_rect.y - 2))
+
+        icon = self._get_room_icon(room)
+        icon_color = settings.WHITE if room.state != "locked" else (60, 60, 60)
+        if room.state == "completed":
+            icon_color = settings.GREEN
+        elif room.objective == "capture_flag" and room.state == "available":
+            icon_color = (255, 220, 40)
+        draw_text(screen, icon, (draw_rect.centerx, draw_rect.centery - 8), icon_color, 20)
+
+        star_color = settings.GOLD if room.state != "locked" else (50, 50, 50)
+        self._draw_stars(screen, draw_rect.centerx, draw_rect.centery + 8, room.difficulty, star_color)
+
+        name_color = settings.LIGHT_GRAY if room.state != "locked" else (50, 50, 50)
+        if room.state == "completed":
+            name_color = settings.GREEN
+        draw_text(screen, t(room.name),
+                 (draw_rect.centerx, draw_rect.bottom - int(10 * settings.UI_SCALE)),
+                 name_color, 8)
+
+        if room.objective == "capture_flag" and room.state != "locked":
+            obj_color = (255, 220, 40) if room.state == "available" else settings.GREEN
+            draw_text(screen, "[FLAG]",
+                     (draw_rect.centerx, draw_rect.bottom - 2),
+                     obj_color, 7)
 
     def _get_room_icon(self, room):
         if room.state == "completed":
@@ -574,8 +743,10 @@ class WorldMap:
             return "H"
         if room.type == "boss":
             return "B"
+        if room.objective == "capture_flag":
+            return "F"
         if room.type == "challenge":
-            return "!"
+            return "C"
         if room.type == "side":
             return "$"
         if room.type == "victory":

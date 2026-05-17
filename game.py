@@ -10,6 +10,7 @@ from sfx import SFX
 from floating_text import FloatingTextSystem
 from math_bg import MathBackground
 from map import WorldMap
+from music import MusicManager
 from rewind_fx import RewindEffects
 from tts_manager import TTSManager
 from save_game import save_game, load_game, save_exists
@@ -44,8 +45,11 @@ class Game:
 
         self.ui = UI()
         self.sfx = SFX()
+        self.music = MusicManager()
         self.rewind_fx = RewindEffects()
         self.tts = TTSManager()
+
+        self.prev_scene_name = None
 
         self._init_shared_state()
         
@@ -70,6 +74,7 @@ class Game:
         self.scene_manager.add("upgrades", UpgradesScene)
         self.scene_manager.add("equip_dock", EquipDockScene)
         self.scene_manager.switch("menu")
+        self.music.play_fixed("menu")
 
     def _configure_display(self):
         display_info = pygame.display.Info()
@@ -286,6 +291,9 @@ class Game:
                 self.scene_manager.current.update(dt)
 
             scene_name = self.scene_manager.current.__class__.__name__ if self.scene_manager.current else ""
+            if scene_name != self.prev_scene_name:
+                self.prev_scene_name = scene_name
+                self._update_music(scene_name)
             if not self.mp_is_multiplayer and scene_name not in {"MenuScene", "LobbyScene"}:
                 self._autosave_timer += dt
                 if self._autosave_timer >= 2.0:
@@ -319,5 +327,31 @@ class Game:
                 pygame.time.delay(10)
 
         self.tts.stop()
+        self.music.stop(fade_ms=500)
         pygame.quit()
         sys.exit()
+
+    def _update_music(self, scene_name):
+        fixed_map = {
+            "MenuScene": "menu",
+            "LobbyScene": "menu",
+            "MapScene": "map",
+            "PlayerPanelScene": "map",
+            "ShopScene": "map",
+            "EquipDockScene": "map",
+            "UpgradesScene": "map",
+            "VictoryScene": "victory",
+            "GameOverScene": "game_over",
+            "AchievementScene": "menu",
+            "LoreScene": "menu",
+        }
+        overlay_scenes = {
+            "PauseScene", "SkillTreeScene", "InventoryDockScene",
+        }
+        if scene_name in overlay_scenes:
+            return
+
+        track = fixed_map.get(scene_name)
+        if track:
+            self.music.play_fixed(track)
+        # GameplayScene handles its own music via play_room in enter()
