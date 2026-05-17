@@ -70,7 +70,9 @@ class NetworkHost:
                     except json.JSONDecodeError:
                         continue
                     self._handle_server_msg(msg)
-            except (socket.timeout, ConnectionError, OSError):
+            except socket.timeout:
+                continue
+            except (ConnectionError, OSError):
                 if not self.running:
                     break
         self.running = False
@@ -192,7 +194,9 @@ class NetworkClient:
                     except json.JSONDecodeError:
                         continue
                     self._handle_server_msg(msg)
-            except (socket.timeout, ConnectionError, OSError):
+            except socket.timeout:
+                continue
+            except (ConnectionError, OSError):
                 if not self.running:
                     break
         self.running = False

@@ -66,6 +66,8 @@ class GameplayScene(Scene):
         self.player_took_damage_this_room = False
         self.crits_this_room = 0
         self.tiles_moved_this_turn = 0
+        self.mp_local_move_target = None
+        self.mp_pending_remote_turn = None
 
     def _is_true_coop(self):
         return bool(self.game.mp_is_multiplayer)
@@ -123,12 +125,16 @@ class GameplayScene(Scene):
                 idx = alt_idx
         self.active_player_idx = idx
         self.game.player = self.players[idx]
+        self.mp_local_move_target = None
         if reset_ui:
             self.cursor_col = self.game.player.col
             self.cursor_row = self.game.player.row
             self.show_move_range = True
             self.show_action_range = False
             self.selected_skill = None
+
+    def _get_local_turn_move_target(self):
+        return self.mp_local_move_target or (self.game.player.col, self.game.player.row)
 
     def _next_living_player_idx(self, start_idx):
         self._refresh_players()
@@ -195,6 +201,9 @@ class GameplayScene(Scene):
         return False
 
     def _advance_after_player_turn(self):
+        if self._is_client_control_turn():
+            self.state = "WAIT_REMOTE_SYNC"
+            return
         # If there are no enemies, immediately restart the player turn without phase shifts
         alive_enemies = [e for e in self.game.enemies if not e.dead]
         if len(alive_enemies) == 0:
@@ -205,7 +214,6 @@ class GameplayScene(Scene):
             self.show_action_range = False
             self.selected_skill = None
             return
-
         next_idx = self._next_living_player_idx(self.active_player_idx)
         if next_idx is not None:
             self.turn_manager.start_turn()
@@ -238,6 +246,8 @@ class GameplayScene(Scene):
         self.player_took_damage_this_room = False
         self.crits_this_room = 0
         self.tiles_moved_this_turn = 0
+        self.mp_local_move_target = None
+        self.mp_pending_remote_turn = None
 
         if prev_scene and hasattr(prev_scene, "room"):
             room = prev_scene.room
@@ -569,11 +579,13 @@ class GameplayScene(Scene):
         reachable = self.grid.get_reachable_cells(pc, pr, self.game.player.move_range, extra_blocked=occupied)
 
         if (self.cursor_col, self.cursor_row) == (pc, pr):
+            self.mp_local_move_target = (pc, pr)
             self._enter_action_select()
             self.game.sfx.play("menu_select")
             return
 
         if (self.cursor_col, self.cursor_row) in reachable:
+            self.mp_local_move_target = (self.cursor_col, self.cursor_row)
             self.pending_player_col = self.cursor_col
             self.pending_player_row = self.cursor_row
             self.state = "RESOLVE_MOVE"
@@ -652,8 +664,12 @@ class GameplayScene(Scene):
     def _confirm_action_cursor(self):
         is_self = (self.cursor_col, self.cursor_row) == (self.game.player.col, self.game.player.row)
         target_enemies = self._get_enemies_at_cursor()
+        skill_id = self.selected_skill
+        move_target = self._get_local_turn_move_target()
         
         if is_self or (not target_enemies and self.selected_skill is None):
+            if self._is_client_control_turn():
+                self._send_mp_command("submit_turn", move=list(move_target), action="wait")
             self.turn_manager.player_acted = True
             self.show_action_range = False
             self.tiles_moved_this_turn = 0
@@ -677,19 +693,33 @@ class GameplayScene(Scene):
             if not success:
                 self.game.floating_text.add_info(self.game.player.x, self.game.player.y - 40, t("not_enough_rigor"), settings.RED)
                 self.game.sfx.play("error")
+            elif self._is_client_control_turn():
+                self._send_mp_command(
+                    "submit_turn",
+                    move=list(move_target),
+                    action="skill",
+                    skill_id=skill_id,
+                    target=[self.cursor_col, self.cursor_row],
+                )
         else:
             self._execute_basic_attack(target_enemies=target_enemies)
+            if self._is_client_control_turn():
+                self._send_mp_command(
+                    "submit_turn",
+                    move=list(move_target),
+                    action="basic_attack",
+                    target=[self.cursor_col, self.cursor_row],
+                )
 
     def handle_event(self, event):
         if self.game.mp_is_multiplayer and self.game.mp_client:
             if not self._is_client_control_turn() and self.state not in ("WAVE_INTRO", "NO_COMBAT"):
+                if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                    self.game.scene_manager.push("pause")
                 return
-
-            if event.type == pygame.MOUSEMOTION and self.state in ("PLAYER_INPUT", "PLAYER_ACTION_SELECT"):
-                world_x = event.pos[0] + self.camera_x
-                world_y = event.pos[1] + self.camera_y
-                col, row = self.grid.to_grid(world_x, world_y)
-                self._send_mp_command("cursor_abs", col=col, row=row)
+            if self.state == "WAIT_REMOTE_SYNC":
+                if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                    self.game.scene_manager.push("pause")
                 return
 
             if event.type == pygame.MOUSEBUTTONDOWN:
@@ -699,15 +729,10 @@ class GameplayScene(Scene):
                 if self.state == "NO_COMBAT" and event.button == 1:
                     self._send_mp_command("leave_no_combat")
                     return
-                if event.button == 1 and self.state in ("PLAYER_INPUT", "PLAYER_ACTION_SELECT"):
-                    world_x = event.pos[0] + self.camera_x
-                    world_y = event.pos[1] + self.camera_y
-                    col, row = self.grid.to_grid(world_x, world_y)
-                    self._send_mp_command("cursor_abs", col=col, row=row)
-                    self._send_mp_command("confirm")
-                    return
-                if event.button == 3 and self.state == "PLAYER_ACTION_SELECT":
-                    self._send_mp_command("cancel_action")
+
+            if event.type == pygame.KEYDOWN:
+                if self.state == "WAVE_INTRO":
+                    self._send_mp_command("begin_room")
                     return
 
             if event.type != pygame.KEYDOWN:
@@ -775,8 +800,6 @@ class GameplayScene(Scene):
                     elif event.key == pygame.K_4:
                         self._send_mp_command("select_skill", skill_id="fractal")
                 return
-
-            return
 
         if self.game.mp_is_multiplayer and self._is_remote_turn():
             if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
@@ -1338,7 +1361,8 @@ class GameplayScene(Scene):
                     elif msg.get("type") == "scene_switch":
                         self.game.scene_manager.switch(msg.get("scene", "map"))
                         return
-            return
+            if not self._is_client_control_turn() and self.state not in ("WAVE_INTRO", "NO_COMBAT"):
+                return
 
         if self.game.mp_is_multiplayer and self.game.mp_host:
             for msg in self.game.mp_host.poll():
@@ -1489,8 +1513,11 @@ class GameplayScene(Scene):
                     )
                     self.pending_player_col = None
                     self.pending_player_row = None
+                if self.mp_pending_remote_turn is not None:
+                    self.mp_pending_remote_turn["move_done"] = True
                 self._enter_action_select()
                 self._generate_enemy_intents()
+                self._process_pending_remote_turn()
 
         elif self.state == "LOCK_INDICATORS":
             self.lock_timer += dt
@@ -1569,6 +1596,7 @@ class GameplayScene(Scene):
             for msg in msgs:
                 if msg.get("type") == "gp_cmd":
                     self._apply_remote_gameplay_command(msg)
+            self._process_pending_remote_turn()
 
         if self.game.mp_is_multiplayer and self.game.mp_client:
             # Client: apply state updates from host
@@ -2010,6 +2038,17 @@ class GameplayScene(Scene):
         }
 
     def _apply_mp_state(self, msg):
+        incoming_state = msg.get("state", self.state)
+        incoming_active_idx = msg.get("active_player_idx", self.active_player_idx)
+        preserve_local_turn = self._is_client_control_turn() and self.state != "WAIT_REMOTE_SYNC"
+        if self.state == "WAIT_REMOTE_SYNC" and incoming_active_idx == self.active_player_idx and incoming_state in (
+            "PLAYER_INPUT",
+            "PLAYER_ACTION_SELECT",
+            "RESOLVE_MOVE",
+        ):
+            preserve_local_turn = True
+        local_player_idx = max(0, self.game.mp_player_index - 1)
+
         room = msg.get("room")
         if room:
             self.game.current_room = self.game.world_map.rooms.get((room[0], room[1]))
@@ -2048,6 +2087,8 @@ class GameplayScene(Scene):
             for idx, data in enumerate(players_data):
                 if idx >= len(self.players):
                     break
+                if preserve_local_turn and idx == local_player_idx:
+                    continue
                 player = self.players[idx]
                 player.col = data.get("col", player.col)
                 player.row = data.get("row", player.row)
@@ -2100,16 +2141,18 @@ class GameplayScene(Scene):
                 is_fake=data.get("is_fake", False),
             ))
 
-        self.state = msg.get("state", self.state)
-        self._set_active_player(msg.get("active_player_idx", self.active_player_idx), reset_ui=False)
-        self.cursor_col, self.cursor_row = msg.get("cursor", [self.cursor_col, self.cursor_row])
-        self.show_move_range = msg.get("show_move_range", self.show_move_range)
-        self.show_action_range = msg.get("show_action_range", self.show_action_range)
-        self.selected_skill = msg.get("selected_skill", self.selected_skill)
+        if not preserve_local_turn:
+            self.state = incoming_state
+            self._set_active_player(incoming_active_idx, reset_ui=False)
+            self.cursor_col, self.cursor_row = msg.get("cursor", [self.cursor_col, self.cursor_row])
+            self.show_move_range = msg.get("show_move_range", self.show_move_range)
+            self.show_action_range = msg.get("show_action_range", self.show_action_range)
+            self.selected_skill = msg.get("selected_skill", self.selected_skill)
         self.turn_manager.turn_number = msg.get("turn", self.turn_manager.turn_number)
         self.turn_manager.player_moved = msg.get("player_moved", self.turn_manager.player_moved)
         self.turn_manager.player_acted = msg.get("player_acted", self.turn_manager.player_acted)
-        self.camera_x, self.camera_y = msg.get("camera", [self.camera_x, self.camera_y])
+        if not preserve_local_turn:
+            self.camera_x, self.camera_y = msg.get("camera", [self.camera_x, self.camera_y])
         self.game.entropy = msg.get("entropy", self.game.entropy)
 
     def _broadcast_scene_switch(self, scene_name):
@@ -2121,6 +2164,39 @@ class GameplayScene(Scene):
             msg = {"type": "gp_cmd", "cmd": cmd}
             msg.update(payload)
             self.game.mp_client.send(msg)
+
+    def _process_pending_remote_turn(self):
+        data = self.mp_pending_remote_turn
+        if not data or not self._is_remote_turn():
+            return
+
+        if not data.get("move_done"):
+            if self.state != "PLAYER_INPUT":
+                return
+            move_col, move_row = data.get("move", (self.game.player.col, self.game.player.row))
+            self.cursor_col = move_col
+            self.cursor_row = move_row
+            self._confirm_player_cursor()
+            if self.state != "RESOLVE_MOVE":
+                data["move_done"] = True
+            return
+
+        if self.state != "PLAYER_ACTION_SELECT":
+            return
+
+        action = data.get("action")
+        target = data.get("target")
+        skill_id = data.get("skill_id")
+        if action == "skill" and skill_id:
+            self.selected_skill = None
+            self._toggle_skill(skill_id)
+        if action == "wait":
+            self.cursor_col = self.game.player.col
+            self.cursor_row = self.game.player.row
+        elif target:
+            self.cursor_col, self.cursor_row = target
+        self.mp_pending_remote_turn = None
+        self._confirm_action_cursor()
 
     def _apply_remote_gameplay_command(self, msg):
         cmd = msg.get("cmd")
@@ -2156,6 +2232,17 @@ class GameplayScene(Scene):
                 self._toggle_skill("fractal")
         elif cmd == "rewind" and self.state in ("PLAYER_INPUT", "PLAYER_ACTION_SELECT"):
             self._try_rewind()
+        elif cmd == "submit_turn" and self.state in ("PLAYER_INPUT", "PLAYER_ACTION_SELECT", "RESOLVE_MOVE"):
+            move = msg.get("move", [self.game.player.col, self.game.player.row])
+            target = msg.get("target")
+            self.mp_pending_remote_turn = {
+                "move": (int(move[0]), int(move[1])) if len(move) == 2 else (self.game.player.col, self.game.player.row),
+                "action": msg.get("action", "wait"),
+                "target": (int(target[0]), int(target[1])) if target and len(target) == 2 else None,
+                "skill_id": msg.get("skill_id"),
+                "move_done": False,
+            }
+            self._process_pending_remote_turn()
 
     def _try_rewind(self):
         if not self.game.skill_tree.is_unlocked("ctrlz"):
