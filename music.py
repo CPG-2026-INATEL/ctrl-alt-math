@@ -1,5 +1,4 @@
 import math
-import random
 import struct
 
 import pygame
@@ -13,11 +12,18 @@ def _note_freq(semitone, octave=4):
     return 440.0 * (2 ** ((semitone - 9) / 12.0)) * (2 ** (octave - 4))
 
 
-_MAJOR = [0, 2, 4, 5, 7, 9, 11]
-_MINOR = [0, 2, 3, 5, 7, 8, 10]
-_PENTATONIC_MAJOR = [0, 2, 4, 7, 9]
-_PENTATONIC_MINOR = [0, 3, 5, 7, 10]
-_PHRYGIAN = [0, 1, 3, 5, 7, 8, 10]
+_SCALES = {
+    "major":           [0, 2, 4, 5, 7, 9, 11],
+    "minor":           [0, 2, 3, 5, 7, 8, 10],
+    "phrygian":        [0, 1, 3, 5, 7, 8, 10],
+    "pentatonic_minor": [0, 3, 5, 7, 10],
+    "pentatonic_major": [0, 2, 4, 7, 9],
+    "dorian":          [0, 2, 3, 5, 7, 9, 10],
+    "lydian":          [0, 2, 4, 6, 7, 9, 11],
+    "locrian":         [0, 1, 3, 5, 6, 8, 10],
+}
+
+_WAVES = ["sine", "square", "saw", "triangle"]
 
 
 def _osc(t, wave="sine"):
@@ -42,7 +48,6 @@ def _write_sample(buf, val):
 
 
 def _generate_track(patterns, duration=4.0):
-    """patterns: list of (layer_volume, [(start_t, end_t, freq, wave), ...])"""
     n_samples = int(SAMPLE_RATE * duration)
     left = [0.0] * n_samples
     right = [0.0] * n_samples
@@ -81,14 +86,13 @@ def _generate_track(patterns, duration=4.0):
     return pygame.mixer.Sound(buffer=bytes(buf))
 
 
-def _arpeggio(scale, root_semitone, octave, beats, bpm, note_len, wave, vol, pan=0.0):
-    """Generate an arpeggio pattern walking up and down the scale."""
+def _arpeggio(scale, root_semitone, octave, beats, bpm, note_len, wave, vol, offset=0):
     notes = []
     beat_dur = 60.0 / bpm
     t = 0.0
     scale_len = len(scale)
     dir_up = True
-    idx = 0
+    idx = offset % (scale_len * 2)
     for b in range(beats):
         interval = scale[idx % scale_len]
         oct_off = idx // scale_len
@@ -108,8 +112,7 @@ def _arpeggio(scale, root_semitone, octave, beats, bpm, note_len, wave, vol, pan
     return notes
 
 
-def _bass_line(root_semitone, octave, bpm, pattern, note_len, wave, vol, pan=0.0):
-    """pattern: list of (interval, beats_duration) pairs."""
+def _bass_line(root_semitone, octave, bpm, pattern, note_len, wave, vol):
     notes = []
     beat_dur = 60.0 / bpm
     t = 0.0
@@ -120,28 +123,128 @@ def _bass_line(root_semitone, octave, bpm, pattern, note_len, wave, vol, pan=0.0
     return notes
 
 
-def _hihat(bpm, beats, vol, pan=0.0):
-    notes = []
-    beat_dur = 60.0 / bpm
-    t = 0.0
-    for b in range(beats):
-        # hi-hat on each 8th note
-        notes.append((t, t + 0.04, 8000.0, "noise"))
-        t += beat_dur * 0.5
-    # scale volume
-    return [(nt[0], nt[1], nt[2], nt[3]) for nt in notes]
+def _xor_shift(x):
+    x ^= (x << 13) & 0xFFFFFFFF
+    x ^= (x >> 17)
+    x ^= (x << 5) & 0xFFFFFFFF
+    return x & 0xFFFFFFFF
 
 
-def _kick(beats, bpm, vol, pan=0.0):
-    notes = []
-    beat_dur = 60.0 / bpm
-    t = 0.0
-    for b in range(beats):
-        if b % 2 == 0:
-            freq_sweep = 150.0 - 50.0 * (b % 4)
-            notes.append((t, t + 0.12, freq_sweep, "sine"))
-        t += beat_dur
-    return notes
+def _rand(seed):
+    s = _xor_shift(seed)
+    return s / 0xFFFFFFFF
+
+
+def _choice(seed, seq):
+    return seq[int(_rand(seed) * len(seq)) % len(seq)]
+
+
+def _rand_int(seed, lo, hi):
+    return lo + int(_rand(seed) * (hi - lo + 1))
+
+
+ROOT_NOTES = {
+    "menu": 0,       # C
+    "map": 2,        # D
+    "game_over": 9,  # A
+}
+
+
+def generate_room_track(seed):
+    """Generate a unique music track for a room based on its seed (col, row)."""
+    duration_beats = 16.0
+    bpm = 65 + int(_rand(seed + 1) * 55)
+    duration = duration_beats * 60.0 / bpm
+
+    root = int(_rand(seed + 2) * 12)
+    scale_names = list(_SCALES.keys())
+    scale_name = _choice(seed + 3, scale_names)
+    scale = _SCALES[scale_name]
+
+    arp_wave = _choice(seed + 4, _WAVES)
+    arp_oct = _rand_int(seed + 5, 3, 5)
+    arp_vol = 0.20 + _rand(seed + 6) * 0.20
+    arp_pan = -0.4 + _rand(seed + 7) * 0.8
+    arp_offset = int(_rand(seed + 8) * len(scale) * 2)
+
+    pad_wave = _choice(seed + 9, ["sine", "triangle"])
+    pad_oct = _rand_int(seed + 10, 3, 4)
+    pad_vol = 0.10 + _rand(seed + 11) * 0.12
+    pad_pan = -0.3 + _rand(seed + 12) * 0.6
+
+    pad2_wave = _choice(seed + 13, ["sine", "triangle"])
+    pad2_oct = _rand_int(seed + 14, 4, 5)
+    pad2_vol = 0.08 + _rand(seed + 15) * 0.10
+    pad2_pan = -0.4 + _rand(seed + 16) * 0.8
+
+    bass_wave = _choice(seed + 17, ["square", "saw"])
+    bass_oct = _rand_int(seed + 18, 1, 2)
+    bass_vol = 0.18 + _rand(seed + 19) * 0.20
+
+    bass_patterns = [
+        [(0, 2), (7, 1), (0, 1), (3, 2), (0, 1), (7, 1)],
+        [(0, 1), (0, 1), (7, 1), (0, 1), (3, 1), (3, 1), (0, 1), (7, 1)],
+        [(0, 2), (3, 1), (0, 1), (5, 2), (3, 1), (0, 1)],
+        [(0, 0.5), (1, 0.5), (0, 0.5), (1, 0.5), (0, 0.5), (3, 0.5), (0, 0.5), (3, 0.5)],
+        [(0, 1.5), (7, 0.5), (0, 1), (10, 1), (7, 0.5), (5, 0.5), (3, 1), (0, 1)],
+        [(0, 2), (10, 1), (7, 1), (5, 2), (3, 1), (0, 1)],
+    ]
+    bass_pat = _choice(seed + 20, bass_patterns)
+    bass_note_len = 0.75 + _rand(seed + 21) * 0.20
+
+    arp = _arpeggio(scale, root, arp_oct, int(duration_beats / (60.0 / bpm)), bpm, 0.4, arp_wave, arp_vol, offset=arp_offset)
+    pad = _bass_line(root, pad_oct, bpm, [(0, duration_beats)], 0.97, pad_wave, pad_vol)
+    pad2_int = _choice(seed + 22, [4, 5, 7, 8, 10, 11])
+    pad2 = _bass_line(root + pad2_int, pad2_oct, bpm, [(0, duration_beats)], 0.97, pad2_wave, pad2_vol)
+    bass = _bass_line(root, bass_oct, bpm, bass_pat, bass_note_len, bass_wave, bass_vol)
+
+    return _generate_track(
+        [(arp_pan, arp), (pad_pan, pad), (pad2_pan, pad2), (0.0, bass)],
+        duration=duration,
+    )
+
+
+def generate_fixed_track(ref_name):
+    """Generate a non-room track (menu, map, game_over) deterministically."""
+    if ref_name == "victory":
+        bpm = 100
+        root = 0
+        scale = _SCALES["pentatonic_major"]
+        notes = []
+        beat_dur = 60.0 / bpm
+        for i, interval in enumerate(scale * 2):
+            freq = _note_freq(root + interval, 4 + i // len(scale))
+            t = i * beat_dur * 0.6
+            notes.append((t, t + beat_dur * 0.55, freq * 0.35, "sine"))
+        final_t = len(scale) * 2 * beat_dur * 0.6
+        for interval in scale:
+            freq = _note_freq(root + interval, 5)
+            notes.append((final_t, final_t + 1.5, freq * 0.22, "triangle"))
+        duration = final_t + 1.8
+        bass = []
+        for i in range(4):
+            bass.append((i * 2 * beat_dur, (i * 2 + 1.8) * beat_dur, _note_freq(root, 2 + i // 2) * 0.28, "sine"))
+        return _generate_track([(0.0, notes), (0.0, bass)], duration=duration)
+
+    elif ref_name == "game_over":
+        bpm = 50
+        root = ROOT_NOTES["game_over"]
+        scale = _SCALES["minor"]
+        duration_beats = 8.0
+        duration = duration_beats * 60.0 / bpm
+        notes = []
+        beat_dur = 60.0 / bpm
+        for i, interval in enumerate(reversed(scale * 2)):
+            freq = _note_freq(root + interval, 3 + (len(scale) * 2 - i) // len(scale))
+            t = i * beat_dur * 0.8
+            notes.append((t, t + beat_dur * 0.7, freq * 0.30, "sine"))
+        pad = _bass_line(root, 3, bpm, [(0, duration_beats)], 0.97, "sine", 0.15)
+        bass = _bass_line(root, 2, bpm, [(0, 2), (7, 1), (5, 1), (3, 2), (0, 2)], 0.80, "triangle", 0.20)
+        return _generate_track([(0.0, notes), (0.0, pad), (0.0, bass)], duration=duration)
+
+    else:
+        seed = abs(hash(ref_name)) % 100000
+        return generate_room_track(seed + 1000)
 
 
 class MusicTrack:
@@ -169,167 +272,23 @@ class MusicTrack:
             self.sound.fadeout(fade_ms)
 
 
-class MenuMusic(MusicTrack):
-    def __init__(self):
-        super().__init__("menu")
-        self._sample = None
+class FixedTrack(MusicTrack):
+    def __init__(self, ref_name):
+        super().__init__(ref_name)
+        self.ref_name = ref_name
 
     def generate(self):
-        bpm = 72
-        root = 0  # C
-        scale = _PENTATONIC_MINOR
-        notes = []
-        duration_beats = 8.0
-        duration = duration_beats * 60.0 / bpm
-
-        arp1 = _arpeggio(scale, root, 3, int(duration_beats * 2), bpm, 0.5, "triangle", 0.35, 0.0)
-        arp2 = _arpeggio(scale, root, 4, int(duration_beats * 2), bpm, 0.5, "sine", 0.22, -0.3)
-        pad1 = _bass_line(root, 3, bpm, [(0, duration_beats)], 0.98, "sine", 0.20, 0.4)
-        pad2 = _bass_line(root + 7, 4, bpm, [(0, duration_beats)], 0.98, "sine", 0.15, -0.4)
-        bass = _bass_line(root, 2, bpm, [
-            (0, 2), (7, 1), (0, 1),
-            (3, 2), (0, 1), (7, 1),
-        ], 0.85, "square", 0.25, 0.0)
-
-        self.sound = _generate_track(
-            [(0.0, arp1), (-0.3, arp2), (0.4, pad1), (-0.4, pad2), (0.0, bass)],
-            duration=duration,
-        )
+        self.sound = generate_fixed_track(self.ref_name)
 
 
-class MapMusic(MusicTrack):
-    def __init__(self):
-        super().__init__("map")
+class RoomTrack(MusicTrack):
+    def __init__(self, room_key):
+        super().__init__(room_key)
+        self.room_key = room_key
 
     def generate(self):
-        bpm = 80
-        root = 2  # D
-        scale = _PHRYGIAN
-        notes = []
-        duration_beats = 16.0
-        duration = duration_beats * 60.0 / bpm
-
-        arp = _arpeggio(scale, root, 3, int(duration_beats * 2), bpm, 0.4, "sine", 0.30, 0.0)
-        pad1 = _bass_line(root, 3, bpm, [(0, duration_beats)], 0.97, "triangle", 0.18, 0.2)
-        pad2 = _bass_line(root + 7, 4, bpm, [(0, duration_beats)], 0.97, "sine", 0.12, -0.3)
-        bass = _bass_line(root, 2, bpm, [
-            (0, 2), (1, 1), (0, 1), (3, 2), (1, 1), (0, 1),
-        ], 0.80, "square", 0.22, 0.0)
-
-        self.sound = _generate_track(
-            [(0.0, arp), (0.2, pad1), (-0.3, pad2), (0.0, bass)],
-            duration=duration,
-        )
-
-
-class CombatMusic(MusicTrack):
-    def __init__(self):
-        super().__init__("combat")
-
-    def generate(self):
-        bpm = 120
-        root = 4  # E
-        scale = _MINOR
-        duration_beats = 16.0
-        duration = duration_beats * 60.0 / bpm
-
-        arp1 = _arpeggio(scale, root, 4, int(duration_beats * 4), bpm, 0.25, "square", 0.30, -0.2)
-        arp2 = _arpeggio(scale, root, 5, int(duration_beats * 4), bpm, 0.25, "saw", 0.18, 0.2)
-        pad = _bass_line(root, 3, bpm, [(0, duration_beats)], 0.97, "saw", 0.12, 0.0)
-        bass = _bass_line(root, 2, bpm, [
-            (0, 1), (0, 1), (7, 1), (0, 1),
-            (3, 1), (3, 1), (0, 1), (7, 1),
-        ], 0.75, "square", 0.28, 0.0)
-
-        self.sound = _generate_track(
-            [(-0.2, arp1), (0.2, arp2), (0.0, pad), (0.0, bass)],
-            duration=duration,
-        )
-
-
-class BossMusic(MusicTrack):
-    def __init__(self):
-        super().__init__("boss")
-
-    def generate(self):
-        bpm = 140
-        root = 6  # F#
-        scale = _PHRYGIAN
-        duration_beats = 16.0
-        duration = duration_beats * 60.0 / bpm
-
-        arp1 = _arpeggio(scale, root, 4, int(duration_beats * 4), bpm, 0.2, "square", 0.35, 0.0)
-        arp2 = _arpeggio(scale, root, 5, int(duration_beats * 4), bpm, 0.2, "saw", 0.25, -0.2)
-        pad = _bass_line(root, 3, bpm, [(0, duration_beats)], 0.97, "saw", 0.18, 0.0)
-        bass = _bass_line(root, 1, bpm, [
-            (0, 0.5), (1, 0.5), (0, 0.5), (1, 0.5),
-            (0, 0.5), (3, 0.5), (0, 0.5), (3, 0.5),
-        ] * 2, 0.65, "square", 0.35, 0.0)
-
-        self.sound = _generate_track(
-            [(0.0, arp1), (-0.2, arp2), (0.0, pad), (0.0, bass)],
-            duration=duration,
-        )
-
-
-class VictoryMusic(MusicTrack):
-    def __init__(self):
-        super().__init__("victory")
-
-    def generate(self):
-        bpm = 100
-        root = 0  # C
-        scale = _PENTATONIC_MAJOR
-        notes = []
-        # ascending then held
-        beat_dur = 60.0 / bpm
-        for i, interval in enumerate(scale * 2):
-            freq = _note_freq(root + interval, 4 + i // len(scale))
-            t = i * beat_dur * 0.6
-            notes.append((t, t + beat_dur * 0.55, freq * 0.35, "sine"))
-        # final chord
-        final_t = len(scale) * 2 * beat_dur * 0.6
-        for interval in scale:
-            freq = _note_freq(root + interval, 5)
-            notes.append((final_t, final_t + 1.5, freq * 0.22, "triangle"))
-        duration = final_t + 1.8
-
-        bass = []
-        for i in range(4):
-            bass.append((i * 2 * beat_dur, (i * 2 + 1.8) * beat_dur, _note_freq(root, 2 + i // 2) * 0.28, "sine"))
-
-        self.sound = _generate_track(
-            [(0.0, notes), (0.0, bass)],
-            duration=duration,
-        )
-
-
-class GameOverMusic(MusicTrack):
-    def __init__(self):
-        super().__init__("game_over")
-
-    def generate(self):
-        bpm = 50
-        root = 9  # A
-        scale = _MINOR
-        duration_beats = 8.0
-        duration = duration_beats * 60.0 / bpm
-
-        notes = []
-        beat_dur = 60.0 / bpm
-        for i, interval in enumerate(reversed(scale * 2)):
-            freq = _note_freq(root + interval, 3 + (len(scale) * 2 - i) // len(scale))
-            t = i * beat_dur * 0.8
-            notes.append((t, t + beat_dur * 0.7, freq * 0.30, "sine"))
-        pad = _bass_line(root, 3, bpm, [(0, duration_beats)], 0.97, "sine", 0.15, 0.0)
-        bass = _bass_line(root, 2, bpm, [
-            (0, 2), (7, 1), (5, 1), (3, 2), (0, 2),
-        ], 0.80, "triangle", 0.20, 0.0)
-
-        self.sound = _generate_track(
-            [(0.0, notes), (0.0, pad), (0.0, bass)],
-            duration=duration,
-        )
+        seed = abs(hash(self.room_key)) % 100000
+        self.sound = generate_room_track(seed)
 
 
 class MusicManager:
@@ -337,7 +296,7 @@ class MusicManager:
         self.enabled = True
         self.volume = 0.35
         self.tracks = {}
-        self.current_name = None
+        self.current_key = None
 
         if not pygame.mixer.get_init():
             try:
@@ -345,45 +304,46 @@ class MusicManager:
             except Exception:
                 self.enabled = False
 
-    def _get_or_create(self, cls, name):
-        if name not in self.tracks:
-            track = cls()
+    def _get_or_create(self, key, factory):
+        if key not in self.tracks:
+            track = factory(key)
             track.generate()
-            self.tracks[name] = track
-        return self.tracks[name]
+            self.tracks[key] = track
+        return self.tracks[key]
 
-    def play(self, name, fade_ms=400):
+    def play_fixed(self, name, fade_ms=400):
         if not self.enabled:
             return
-        if self.current_name is not None and self.current_name in self.tracks:
-            self.tracks[self.current_name].stop(fade_ms=fade_ms)
-
-        track_map = {
-            "menu": (MenuMusic, "menu"),
-            "map": (MapMusic, "map"),
-            "gameplay": (CombatMusic, "combat"),
-            "combat": (CombatMusic, "combat"),
-            "boss": (BossMusic, "boss"),
-            "victory": (VictoryMusic, "victory"),
-            "game_over": (GameOverMusic, "game_over"),
-        }
-
-        if name in track_map:
-            cls, key = track_map[name]
-            track = self._get_or_create(cls, key)
-            track.play(volume=self.volume, loops=-1)
-            self.current_name = name if name in track_map else key
-        elif name not in track_map and name != "stop":
+        key = "fixed:" + name
+        if key == self.current_key:
             return
+        self._stop_current(fade_ms)
+        track = self._get_or_create(key, lambda k: FixedTrack(k.split(":", 1)[1]))
+        track.play(volume=self.volume, loops=-1)
+        self.current_key = key
+
+    def play_room(self, col, row, fade_ms=400):
+        if not self.enabled:
+            return
+        key = f"room:{col}:{row}"
+        if key == self.current_key:
+            return
+        self._stop_current(fade_ms)
+        track = self._get_or_create(key, lambda k: RoomTrack(k))
+        track.play(volume=self.volume, loops=-1)
+        self.current_key = key
+
+    def _stop_current(self, fade_ms):
+        if self.current_key and self.current_key in self.tracks:
+            self.tracks[self.current_key].stop(fade_ms=fade_ms)
 
     def stop(self, fade_ms=400):
-        if self.current_name and self.current_name in self.tracks:
-            self.tracks[self.current_name].stop(fade_ms=fade_ms)
-        self.current_name = None
+        self._stop_current(fade_ms)
+        self.current_key = None
 
     def set_volume(self, vol):
         self.volume = max(0.0, min(1.0, vol))
-        if self.current_name and self.current_name in self.tracks:
-            snd = self.tracks[self.current_name].sound
+        if self.current_key and self.current_key in self.tracks:
+            snd = self.tracks[self.current_key].sound
             if snd:
                 snd.set_volume(self.volume)

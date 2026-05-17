@@ -74,7 +74,7 @@ class Game:
         self.scene_manager.add("upgrades", UpgradesScene)
         self.scene_manager.add("equip_dock", EquipDockScene)
         self.scene_manager.switch("menu")
-        self.music.play("menu")
+        self.music.play_fixed("menu")
 
     def _configure_display(self):
         display_info = pygame.display.Info()
@@ -313,7 +313,7 @@ class Game:
         sys.exit()
 
     def _update_music(self, scene_name):
-        music_map = {
+        fixed_map = {
             "MenuScene": "menu",
             "LobbyScene": "menu",
             "MapScene": "map",
@@ -321,21 +321,18 @@ class Game:
             "ShopScene": "map",
             "EquipDockScene": "map",
             "UpgradesScene": "map",
-            "GameplayScene": "gameplay",
-            "SkillTreeScene": "gameplay",
-            "InventoryDockScene": "gameplay",
             "VictoryScene": "victory",
             "GameOverScene": "game_over",
             "AchievementScene": "menu",
             "LoreScene": "menu",
         }
-        # Don't change music for overlay/push scenes
         overlay_scenes = {
-            "PauseScene", "HowToPlayScene",
+            "PauseScene", "SkillTreeScene", "InventoryDockScene",
         }
         if scene_name in overlay_scenes:
             return
 
-        track = music_map.get(scene_name)
-        if track and track != self.music.current_name:
-            self.music.play(track)
+        track = fixed_map.get(scene_name)
+        if track:
+            self.music.play_fixed(track)
+        # GameplayScene handles its own music via play_room in enter()
