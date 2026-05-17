@@ -138,7 +138,7 @@ class EquipDockScene(Scene):
             equipped_id = player.equipment.get(slot_name)
             item_data = data_source.get(equipped_id, {})
 
-            desc = t(item_data.get("desc", "eq_empty_slot"))
+            desc = t(item_data.get("desc", "No description available."))
             effect = item_data.get("effect", "Standard gear.")
             
             # Draw Description and formula

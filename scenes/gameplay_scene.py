@@ -49,6 +49,8 @@ class GameplayScene(Scene):
         self.victory_timer = 0
         self.qed_position = None
         self.game_over_timer = 0
+        self.flag = None
+        self.objective = "kill_all"
 
         self.turn_log = []
         self.last_enemy_death_pos = None
@@ -204,11 +206,12 @@ class GameplayScene(Scene):
         if self._is_client_control_turn():
             self.state = "WAIT_REMOTE_SYNC"
             return
-        # If there are no enemies, trigger victory
+        # If there are no enemies, check victory but don't block movement in CTF
         alive_enemies = [e for e in self.game.enemies if not e.dead and not getattr(e, 'is_decoy', False)]
         if len(alive_enemies) == 0:
             self._check_victory()
-            return
+            if self.state == "VICTORY_TRANSITION":
+                return
         next_idx = self._next_living_player_idx(self.active_player_idx)
         if next_idx is not None:
             self.turn_manager.start_turn()
@@ -267,13 +270,27 @@ class GameplayScene(Scene):
             self.game.enemies = []
             # Increase amount of enemies proportional to area increase
             enemy_multiplier = (new_cols * new_rows) / (settings.GRID_COLS * settings.GRID_ROWS)
-            # Give it a bit more punch
             enemy_multiplier *= 1.2
+
+            self.objective = getattr(room, 'objective', 'kill_all')
+            flag_col = flag_row = None
+            if self.objective == "capture_flag":
+                flag_col = random.randint(3, max(3, self.grid.cols - 4))
+                flag_row = random.randint(1, max(1, self.grid.rows // 3))
+                while self.grid.is_blocked(flag_col, flag_row):
+                    flag_col = random.randint(2, max(2, self.grid.cols - 3))
+                    flag_row = random.randint(1, max(1, self.grid.rows // 3))
+                self.flag = {"col": flag_col, "row": flag_row}
+                self.flag["x"], self.flag["y"] = self.grid.to_pixel(flag_col, flag_row)
+                self.flag["carried_by"] = None
             
             for enemy_type, count in room.enemies:
                 increased_count = max(1, int(count * enemy_multiplier))
                 for _ in range(increased_count):
-                    ex, ey = self._get_spawn_position()
+                    if flag_col is not None:
+                        ex, ey = self._get_ctf_spawn_position(flag_col, flag_row)
+                    else:
+                        ex, ey = self._get_spawn_position()
                     enemy = Enemy(ex, ey, enemy_type)
                     if enemy_type == "boss":
                         size_factor = enemy_multiplier
@@ -317,9 +334,19 @@ class GameplayScene(Scene):
 
         self._set_active_player(0)
 
+        if self.flag:
+            self.flag["home_col"] = pcol
+            self.flag["home_row"] = prow
+            self.game.player.has_flag = False
+
         for enemy in self.game.enemies:
             if not enemy.dead:
-                ec, er = self._find_spawn_grid_cell()
+                if self.objective == "capture_flag" and self.flag:
+                    ec, er = self.grid.to_grid(enemy.x, enemy.y)
+                    if not self.grid.is_valid(ec, er) or self.grid.is_blocked(ec, er):
+                        ec, er = self._find_spawn_grid_cell_near(self.flag["col"], self.flag["row"])
+                else:
+                    ec, er = self._find_spawn_grid_cell()
                 enemy.set_grid_position(ec, er, self.grid)
 
     def _get_spawn_position(self):
@@ -341,6 +368,17 @@ class GameplayScene(Scene):
         else:
             x = ox + aw - 10
             y = random.randint(oy + margin, oy + ah - margin)
+        return x, y
+
+    def _get_ctf_spawn_position(self, flag_col, flag_row):
+        fx, fy = self.grid.to_pixel(flag_col, flag_row)
+        ox = settings.ARENA_OFFSET_X
+        oy = settings.ARENA_OFFSET_Y
+        spread = 80
+        x = fx + random.randint(-spread, spread)
+        y = fy + random.randint(-spread, spread)
+        x = max(ox + 10, min(ox + int(self.grid.width) - 10, x))
+        y = max(oy + 10, min(oy + int(self.grid.height) - 10, y))
         return x, y
 
     def _find_spawn_grid_cell(self):
@@ -382,6 +420,21 @@ class GameplayScene(Scene):
                     return col_idx, row_idx
 
         return col, row
+
+    def _find_spawn_grid_cell_near(self, center_col, center_row):
+        occupied = {
+            (player.col, player.row)
+            for player in self.players
+            if self.grid.is_valid(player.col, player.row)
+        }
+        for radius in range(1, 6):
+            for dc in range(-radius, radius + 1):
+                for dr in range(-radius, radius + 1):
+                    nc, nr = center_col + dc, center_row + dr
+                    if self.grid.is_valid(nc, nr) and not self.grid.is_blocked(nc, nr) and (nc, nr) not in occupied:
+                        occupied.add((nc, nr))
+                        return nc, nr
+        return center_col, center_row
 
     def _generate_tilemap(self):
         seed = 42
@@ -596,13 +649,7 @@ class GameplayScene(Scene):
             )
             self.game.sfx.play("menu_select")
         else:
-            # Feedback for invalid move target
-            self.game.floating_text.add_info(
-                self.grid.to_pixel(self.cursor_col, self.cursor_row)[0],
-                self.grid.to_pixel(self.cursor_col, self.cursor_row)[1] - 30,
-                t("out_of_reach"),
-                settings.GRAY
-            )
+            self._show_error_toast(t("out_of_reach"))
 
     def _get_enemy_at_cursor(self):
         enemies = [
@@ -660,6 +707,15 @@ class GameplayScene(Scene):
 
         return self._get_enemy_at_cursor() is not None
 
+    def _show_error_toast(self, text):
+        self.game.floating_text.add(
+            settings.WINDOW_WIDTH // 2, settings.WINDOW_HEIGHT // 2 - 100,
+            text, settings.RED, size=22, lifetime=2.0, bounce=True, shadow=True
+        )
+        self.game.sfx.play("error")
+        self.game.screen_shake = 0.08
+        self.game.shake_intensity = 4
+
     def _confirm_action_cursor(self):
         is_self = (self.cursor_col, self.cursor_row) == (self.game.player.col, self.game.player.row)
         target_enemies = self._get_enemies_at_cursor()
@@ -679,19 +735,13 @@ class GameplayScene(Scene):
             return
 
         if not self._can_execute_cursor_action():
-            self.game.floating_text.add_info(
-                self.game.player.x,
-                self.game.player.y - 30,
-                t("out_of_range"),
-                settings.GRAY,
-            )
+            self._show_error_toast(t("out_of_range"))
             return
 
         if self.selected_skill:
             success = self._execute_skill()
             if not success:
-                self.game.floating_text.add_info(self.game.player.x, self.game.player.y - 40, t("not_enough_rigor"), settings.RED)
-                self.game.sfx.play("error")
+                self._show_error_toast(t("not_enough_rigor"))
             elif self._is_client_control_turn():
                 self._send_mp_command(
                     "submit_turn",
@@ -962,15 +1012,23 @@ class GameplayScene(Scene):
         elif k == pygame.K_1:
             if self.game.skill_tree.is_unlocked("pitagoras"):
                 self._toggle_skill("pitagoras")
+            else:
+                self._show_error_toast(t("skill_locked"))
         elif k == pygame.K_2:
             if self.game.skill_tree.is_unlocked("reflexao"):
                 self._toggle_skill("reflexao")
+            else:
+                self._show_error_toast(t("skill_locked"))
         elif k == pygame.K_3:
             if self.game.skill_tree.is_unlocked("integral"):
                 self._toggle_skill("integral")
+            else:
+                self._show_error_toast(t("skill_locked"))
         elif k == pygame.K_4:
             if self.game.skill_tree.is_unlocked("fractal"):
                 self._toggle_skill("fractal")
+            else:
+                self._show_error_toast(t("skill_locked"))
 
     def _execute_basic_attack(self, target_enemies=None):
         pc = self.game.player.col
@@ -1359,42 +1417,58 @@ class GameplayScene(Scene):
                         self.turn_log.append("Clone moved")
 
     def _check_victory(self):
-        alive = [e for e in self.game.enemies if not e.dead and not getattr(e, 'is_decoy', False)]
-        if len(alive) == 0 and self.state != "VICTORY_TRANSITION":
-            self.state = "VICTORY_TRANSITION"
-            self.victory_timer = 0
-            pos = self.last_enemy_death_pos or (self.game.player.x, self.game.player.y)
-            self.game.particles.emit_burst(pos[0], pos[1], settings.GOLD, 30, 100, 0.8)
-            
-            if self.game.skill_tree:
-                self.game.skill_tree.add_points(1)
-            self.game.floating_text.add_info(pos[0], pos[1] - 40, 
-                                            t("earned_skill_point"), settings.GOLD)
-            self.game.tts.speak(t("earned_skill_point"), lang=settings.LANGUAGE)
+        if self.objective == "capture_flag" and self.flag:
+            flag = self.flag
+            carrier = flag.get("carried_by")
+            if carrier and carrier.has_flag:
+                if (carrier.col, carrier.row) == (flag["home_col"], flag["home_row"]):
+                    self._trigger_victory()
+                    self.game.floating_text.add_info(carrier.x, carrier.y - 40,
+                                                    "FLAG RETURNED!", settings.GOLD)
+                    return
 
-            if self.game.current_room:
-                gold_reward = getattr(self.game.current_room, 'gold_reward', 20)
-                self.game.player.gold += gold_reward
-                self.game.gold = self.game.player.gold
-                self.game.floating_text.add_info(
-                    self.game.player.x, self.game.player.y - 60,
-                    f"+{gold_reward} gold", settings.GOLD)
+        if self.objective != "capture_flag":
+            alive = [e for e in self.game.enemies if not e.dead and not getattr(e, 'is_decoy', False)]
+            if len(alive) == 0 and self.state != "VICTORY_TRANSITION":
+                self._trigger_victory()
 
-                if hasattr(self.game, "save_progress"):
-                    self.game.save_progress()
+    def _trigger_victory(self):
+        self.state = "VICTORY_TRANSITION"
+        self.victory_timer = 0
+        pos = self.last_enemy_death_pos or (self.game.player.x, self.game.player.y)
+        self.game.particles.emit_burst(pos[0], pos[1], settings.GOLD, 30, 100, 0.8)
+        
+        if self.game.skill_tree:
+            self.game.skill_tree.add_points(1)
+        self.game.floating_text.add_info(pos[0], pos[1] - 40, 
+                                        t("earned_skill_point"), settings.GOLD)
+        self.game.tts.speak(t("earned_skill_point"), lang=settings.LANGUAGE)
 
-            from achievement_manager import AchievementManager
-            mgr = AchievementManager()
-            mgr.unlock("first_room", settings.DIFFICULTY)
+        if self.game.current_room:
+            gold_reward = getattr(self.game.current_room, 'gold_reward', 20)
+            if self.objective == "capture_flag":
+                gold_reward = int(gold_reward * 1.5)
+            self.game.player.gold += gold_reward
+            self.game.gold = self.game.player.gold
+            self.game.floating_text.add_info(
+                self.game.player.x, self.game.player.y - 60,
+                f"+{gold_reward} gold", settings.GOLD)
+
+            if hasattr(self.game, "save_progress"):
+                self.game.save_progress()
+
+        from achievement_manager import AchievementManager
+        mgr = AchievementManager()
+        mgr.unlock("first_room", settings.DIFFICULTY)
+        
+        if not self.player_took_damage_this_room:
+            mgr.unlock("no_damage", settings.DIFFICULTY)
+        
+        if self.turn_manager.turn_number < 10:
+            mgr.unlock("fast_win", settings.DIFFICULTY)
             
-            if not self.player_took_damage_this_room:
-                mgr.unlock("no_damage", settings.DIFFICULTY)
-            
-            if self.turn_manager.turn_number < 10:
-                mgr.unlock("fast_win", settings.DIFFICULTY)
-                
-            if self.game.current_room and (self.game.current_room.type == "victory" or getattr(self.game.current_room, "is_final_gate", False)):
-                mgr.unlock("math_god", settings.DIFFICULTY)
+        if self.game.current_room and (self.game.current_room.type == "victory" or getattr(self.game.current_room, "is_final_gate", False)):
+            mgr.unlock("math_god", settings.DIFFICULTY)
 
     def _start_enemy_turn(self):
         if self.state == "VICTORY_TRANSITION":
@@ -1567,6 +1641,12 @@ class GameplayScene(Scene):
                     )
                     self.pending_player_col = None
                     self.pending_player_row = None
+                if self.flag and not self.flag.get("carried_by"):
+                    if (self.game.player.col, self.game.player.row) == (self.flag["col"], self.flag["row"]):
+                        self.flag["carried_by"] = self.game.player
+                        self.game.player.has_flag = True
+                        self.game.floating_text.add_info(self.game.player.x, self.game.player.y - 30, "FLAG CAPTURED!", settings.GOLD)
+                        self.game.sfx.play("skill_unlock")
                 if self.mp_pending_remote_turn is not None:
                     self.mp_pending_remote_turn["move_done"] = True
                 self._enter_action_select()
@@ -1943,19 +2023,17 @@ class GameplayScene(Scene):
         self._tick_enemy_status_effects()
         self._tick_decoy_clones()
 
-        # Check for room completion or death before taking snapshot for next turn
-        alive = [e for e in self.game.enemies if not e.dead and not getattr(e, 'is_decoy', False)]
-        if len(alive) == 0:
-            self.state = "VICTORY_TRANSITION"
-            self.victory_timer = 0
-            self.game.particles.emit_burst(
-                self.last_enemy_death_pos[0] if self.last_enemy_death_pos else self.game.player.x,
-                self.last_enemy_death_pos[1] if self.last_enemy_death_pos else self.game.player.y,
-                settings.GOLD, 30, 100, 0.8
-            )
+        self._check_victory()
+        if self.state == "VICTORY_TRANSITION":
             return
 
         if not self._living_players():
+            if self.flag and self.flag.get("carried_by"):
+                self.flag["col"] = self.flag["carried_by"].col
+                self.flag["row"] = self.flag["carried_by"].row
+                self.flag["x"], self.flag["y"] = self.grid.to_pixel(self.flag["col"], self.flag["row"])
+                self.flag["carried_by"] = None
+                self.game.player.has_flag = False
             self.state = "GAME_OVER_TRANSITION"
             self.game_over_timer = 0
             self.game.particles.emit_burst(
@@ -2134,10 +2212,11 @@ class GameplayScene(Scene):
         players_data = msg.get("players")
         if players_data and len(self.players) != len(players_data):
             self.players = [Player() for _ in players_data]
-            for idx, player in enumerate(self.players):
-                player.player_id = idx + 1
-                if idx == 1:
-                    player.skin_index = 1
+
+        for idx, player in enumerate(self.players):
+            player.player_id = idx + 1
+            if idx == 1:
+                player.skin_index = 1
             self.game.players = self.players
             self.game.player2 = self.players[1] if len(self.players) > 1 else self.players[0]
 
@@ -2304,18 +2383,10 @@ class GameplayScene(Scene):
 
     def _try_rewind(self):
         if not self.game.skill_tree.is_unlocked("ctrlz"):
-            self.game.floating_text.add_info(
-                self.game.player.x, self.game.player.y - 40,
-                t("rewind_locked"), settings.RED
-            )
-            self.game.sfx.play("error")
+            self._show_error_toast(t("rewind_locked"))
             return
         if not self.turn_manager.can_undo():
-            self.game.floating_text.add_info(
-                self.game.player.x, self.game.player.y - 40,
-                t("no_rewind_available"), settings.GRAY
-            )
-            self.game.sfx.play("error")
+            self._show_error_toast(t("no_rewind_available"))
             return
 
         steps = 2 if len(self.turn_manager.history) >= 2 else 1
@@ -2716,6 +2787,33 @@ class GameplayScene(Scene):
         for enemy in self.game.enemies:
             enemy.draw(temp, offset=world_offset)
 
+        if self.flag and not self.flag.get("carried_by"):
+            flag_x = int(self.flag["x"] + world_offset[0])
+            flag_y = int(self.flag["y"] + world_offset[1])
+            t_val = pygame.time.get_ticks() / 1000.0
+            pulse = int(200 + 55 * math.sin(t_val * 4))
+            flag_color = (pulse, 220, 80)
+            flag_rect = pygame.Rect(flag_x - 14, flag_y - 18, 28, 36)
+            pygame.draw.rect(temp, (10, 40, 10), flag_rect, border_radius=3)
+            pygame.draw.rect(temp, flag_color, flag_rect, 2, border_radius=3)
+            draw_text(temp, "F", (flag_x, flag_y), flag_color, 18)
+            self._draw_flag_arrow(temp, world_offset)
+
+        if self.flag and self.flag.get("carried_by"):
+            carrier = self.flag["carried_by"]
+            cx = int(carrier.x + world_offset[0])
+            cy = int(carrier.y + world_offset[1] - carrier.size - 10)
+            draw_text(temp, "[F]", (cx, cy), (255, 220, 80), 14)
+
+        if self.objective == "capture_flag" and self.flag:
+            home_x = int(self.grid.to_pixel(self.flag["home_col"], self.flag["home_row"])[0] + world_offset[0])
+            home_y = int(self.grid.to_pixel(self.flag["home_col"], self.flag["home_row"])[1] + world_offset[1])
+            home_surf = pygame.Surface((44, 44), pygame.SRCALPHA)
+            pygame.draw.circle(home_surf, (0, 200, 0, 80), (22, 22), 20)
+            pygame.draw.circle(home_surf, (0, 255, 0, 140), (22, 22), 20, 2)
+            temp.blit(home_surf, (home_x - 22, home_y - 22))
+            draw_text(temp, "HOME", (home_x, home_y - 24), settings.GREEN, 11)
+
         for idx, player in enumerate(self.players):
             if player.hp <= 0:
                 continue
@@ -3018,6 +3116,47 @@ class GameplayScene(Scene):
             screen.blit(img, (log_x, log_y + i * 14))
 
     def _draw_bar_sleek(self, screen, x, y, w, h, pct, fill_color, bg_color):
+        pygame.draw.rect(screen, bg_color, (x, y, w, h), border_radius=4)
+        if pct > 0:
+            filled_w = int(w * min(1.0, pct))
+            if filled_w > 0:
+                pygame.draw.rect(screen, fill_color, (x, y, filled_w, h), border_radius=4)
+                shine_surf = pygame.Surface((filled_w, h // 2), pygame.SRCALPHA)
+                shine_surf.fill((255, 255, 255, 40))
+                screen.blit(shine_surf, (x, y))
+        pygame.draw.rect(screen, (80, 100, 130, 180), (x, y, w, h), 1, border_radius=4)
+
+    def _draw_flag_arrow(self, screen, offset):
+        if not self.flag or self.flag.get("carried_by"):
+            return
+        fx = int(self.flag["x"] + offset[0])
+        fy = int(self.flag["y"] + offset[1])
+        cx = settings.WINDOW_WIDTH // 2
+        cy = settings.WINDOW_HEIGHT // 2
+        margin = 40
+        if margin < fx < settings.WINDOW_WIDTH - margin and margin < fy < settings.WINDOW_HEIGHT - margin - settings.UI_BAR_HEIGHT:
+            return
+        dx = fx - cx
+        dy = fy - cy
+        dist = math.hypot(dx, dy)
+        if dist < 1:
+            return
+        ndx, ndy = dx / dist, dy / dist
+        ex = cx + ndx * (settings.WINDOW_WIDTH // 2 - 60)
+        ey = cy + ndy * (settings.WINDOW_HEIGHT // 2 - 120)
+        ex = max(30, min(settings.WINDOW_WIDTH - 30, ex))
+        ey = max(30, min(settings.WINDOW_HEIGHT - settings.UI_BAR_HEIGHT - 30, ey))
+        angle = math.atan2(ndy, ndx)
+        size = 8
+        p1 = (ex + math.cos(angle) * size, ey + math.sin(angle) * size)
+        p2 = (ex + math.cos(angle + 2.4) * size, ey + math.sin(angle + 2.4) * size)
+        p3 = (ex + math.cos(angle - 2.4) * size, ey + math.sin(angle - 2.4) * size)
+        t_val = pygame.time.get_ticks() / 1000.0
+        alpha = int(180 + 75 * math.sin(t_val * 3))
+        color = (min(255, alpha), 220, 80)
+        s = pygame.Surface((size * 3, size * 3), pygame.SRCALPHA)
+        pygame.draw.polygon(s, (*color, 180), [(p[0] - ex + size * 1.5, p[1] - ey + size * 1.5) for p in [p1, p2, p3]])
+        screen.blit(s, (ex - size * 1.5, ey - size * 1.5))
         pygame.draw.rect(screen, bg_color, (x, y, w, h), border_radius=4)
         if pct > 0:
             filled_w = int(w * min(1.0, pct))

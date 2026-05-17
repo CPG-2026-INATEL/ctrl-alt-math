@@ -160,8 +160,8 @@ class Game:
         self.mp_host = None
         self.mp_client = None
         self.player.gold = 0
-        self.player.equipment = {"weapon": "basic_sword", "shield": "wooden_shield"}
-        self.player.inventory = [{"id": "hp_potion_small", "count": 2}, {"id": "atk_tonic", "count": 1}]
+        self.player.equipment = {"weapon": "linear_blade", "shield": "cartesian_plane_shield"}
+        self.player.inventory = [{"id": "linear_hp_formula", "count": 2}, {"id": "force_derivative", "count": 1}]
 
         self.screen_shake = 0.0
         self.shake_intensity = 0
@@ -198,8 +198,8 @@ class Game:
         self.rewind_fx_timer = 0
         self.gold = 0
         self.player.gold = 0
-        self.player.equipment = {"weapon": "basic_sword", "shield": "wooden_shield"}
-        self.player.inventory = [{"id": "hp_potion_small", "count": 2}, {"id": "atk_tonic", "count": 1}]
+        self.player.equipment = {"weapon": "linear_blade", "shield": "cartesian_plane_shield"}
+        self.player.inventory = [{"id": "linear_hp_formula", "count": 2}, {"id": "force_derivative", "count": 1}]
 
         self.screen_shake = 0.0
         self.shake_intensity = 0
@@ -262,6 +262,22 @@ class Game:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     self.running = False
+                elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 3:  # Global Right-Click Text Speaker
+                    mx, my = event.pos
+                    clicked_text = None
+                    if hasattr(settings, 'DRAWN_TEXTS') and settings.DRAWN_TEXTS:
+                        for item in reversed(settings.DRAWN_TEXTS):
+                            if item["rect"].collidepoint(mx, my):
+                                clicked_text = item["text"]
+                                break
+                    
+                    if clicked_text:
+                        self.tts.speak(clicked_text, lang=settings.LANGUAGE)
+                        self.sfx.play("menu_select")
+                        continue
+                    
+                    if self.scene_manager.current:
+                        self.scene_manager.current.handle_event(event)
                 else:
                     if self.scene_manager.current:
                         self.scene_manager.current.handle_event(event)
@@ -291,6 +307,9 @@ class Game:
             # Use get_active to check if window is visible/focused
             # This helps preventing black screen glitches on some systems
             if pygame.display.get_active():
+                if hasattr(settings, 'DRAWN_TEXTS') and settings.DRAWN_TEXTS is not None:
+                    settings.DRAWN_TEXTS.clear()
+
                 self.screen.fill(self.math_bg.get_bg_color())
                 if self.scene_manager.current:
                     self.scene_manager.current.draw(self.screen)

@@ -186,7 +186,33 @@ class SkillTree:
         pygame.draw.rect(screen, settings.GOLD, points_rect.inflate(20, 6), 2, border_radius=10)
         screen.blit(points_surf, points_rect)
         
-        # Draw Connections First
+        # Draw Nodes - Phase 1: hover glow (behind connections)
+        hover_info = []
+        for sid, skill in self.skills.items():
+            rect = self.get_node_rect(skill)
+            is_hovered = (self.hovered_id == sid)
+            level = skill["level"]
+            
+            if level > 0:
+                bg_color = (20, 80, 20)
+                border_color = settings.GREEN
+                text_color = settings.WHITE
+            elif self.can_unlock(sid):
+                bg_color = (80, 70, 20)
+                border_color = settings.GOLD
+                text_color = settings.WHITE
+            else:
+                bg_color = (30, 30, 40)
+                border_color = (70, 70, 90)
+                text_color = (130, 130, 150)
+
+            if is_hovered:
+                bg_color = tuple(min(255, c + 40) for c in bg_color)
+                border_color = settings.WHITE
+
+            hover_info.append((sid, skill, rect, bg_color, border_color, text_color, level))
+
+        # Draw Connections (on top of hover glow, behind box fills)
         for sid, skill in self.skills.items():
             for prereq in skill["prereqs"]:
                 if prereq in self.skills:
@@ -212,30 +238,8 @@ class SkillTree:
                         py = start[1] + (end[1] - start[1]) * time_mod
                         pygame.draw.circle(screen, settings.WHITE, (int(px), int(py)), 2)
 
-        # Draw Nodes
-        for sid, skill in self.skills.items():
-            rect = self.get_node_rect(skill)
-            is_hovered = (self.hovered_id == sid)
-            level = skill["level"]
-            
-            if level > 0:
-                bg_color = (20, 80, 20)
-                border_color = settings.GREEN
-                text_color = settings.WHITE
-            elif self.can_unlock(sid):
-                bg_color = (80, 70, 20)
-                border_color = settings.GOLD
-                text_color = settings.WHITE
-            else:
-                bg_color = (30, 30, 40)
-                border_color = (70, 70, 90)
-                text_color = (130, 130, 150)
-
-            if is_hovered:
-                pygame.draw.rect(screen, settings.WHITE, rect.inflate(6, 6), 2, border_radius=8)
-                bg_color = tuple(min(255, c + 40) for c in bg_color)
-                border_color = settings.WHITE
-
+        # Draw Nodes - Phase 2: box fills, borders, text, badges (on top of connections)
+        for sid, skill, rect, bg_color, border_color, text_color, level in hover_info:
             pygame.draw.rect(screen, bg_color, rect, border_radius=6)
             pygame.draw.rect(screen, border_color, rect, 2, border_radius=6)
 
