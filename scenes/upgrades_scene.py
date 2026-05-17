@@ -104,22 +104,22 @@ class UpgradesScene(Scene):
         pygame.draw.rect(screen, settings.GOLD, (px, py, panel_w, panel_h), 2, border_radius=12)
 
         # Header Title
-        draw_text(screen, "UPGRADES", (px + 20, py + 25), settings.WHITE, 22, center=False)
+        draw_text(screen, t("upgrades_title"), (px + 20, py + 25), settings.WHITE, 22, center=False)
         
         tickets = getattr(player, "upgrade_tickets", 0)
         gold = player.gold
         
         # Tickets and Gold Indicators
-        stats_str = f"Tickets: {tickets}  |  Gold: {gold}g"
+        stats_str = t("upgrades_stats", tickets=tickets, gold=gold)
         draw_text(screen, stats_str, (px + 20, py + 50), settings.GOLD, 11, center=False)
         pygame.draw.line(screen, (60, 60, 90), (px + 15, py + 68), (px + panel_w - 15, py + 68), 1)
 
         # Draw Upgrades List
         upgrades = [
-            ("atk", "ATK", "+3 damage/level", settings.RED),
-            ("def", "DEF", "+2 defense/level", settings.BLUE),
-            ("hp", "HP", "+15 max hp/level", settings.GREEN),
-            ("range", "RANGE", "+1 move tile/level", settings.CYAN),
+            ("atk", t("upgrade_atk_name"), t("upgrade_atk_desc"), settings.RED),
+            ("def", t("upgrade_def_name"), t("upgrade_def_desc"), settings.BLUE),
+            ("hp", t("upgrade_hp_name"), t("upgrade_hp_desc"), settings.GREEN),
+            ("range", t("upgrade_range_name"), t("upgrade_range_desc"), settings.CYAN),
         ]
 
         for i, (utype, name, desc, color) in enumerate(upgrades):
@@ -152,7 +152,7 @@ class UpgradesScene(Scene):
             if tickets > 0:
                 buy_color = settings.GREEN
                 buy_text_color = settings.BLACK
-                button_label = "FREE"
+                button_label = t("upgrades_free")
             else:
                 buy_color = settings.GREEN if can_afford else settings.DARK_GRAY
                 buy_text_color = settings.BLACK if can_afford else settings.GRAY
@@ -167,7 +167,7 @@ class UpgradesScene(Scene):
         pygame.draw.rect(screen, (10, 10, 20), desc_box_rect, border_radius=8)
         pygame.draw.rect(screen, (50, 50, 75), desc_box_rect, 1, border_radius=8)
 
-        draw_text(screen, "STAT PROJECTION & SCALING", (px + 25, py + 390), settings.GOLD, 11, center=False)
+        draw_text(screen, t("upgrades_projection_title"), (px + 25, py + 390), settings.GOLD, 11, center=False)
         pygame.draw.line(screen, (40, 40, 60), (px + 25, py + 403), (px + panel_w - 25, py + 403), 1)
 
         if self.hovered_idx is not None and self.hovered_idx < len(upgrades):
@@ -179,21 +179,20 @@ class UpgradesScene(Scene):
             base_cost = cost_data["base_cost"]
             scale = cost_data["cost_scale"]
             
-            formula_label = f"Cost(L) = {base_cost} * ({scale})^L"
+            formula_label = t("upgrades_formula_label", base_cost=base_cost, scale=scale)
             next_cost = int(base_cost * (scale ** (level + 1)))
 
             draw_text(screen, f"{name}: {desc}", (px + 25, py + 413), settings.WHITE, 11, center=False)
-            draw_text(screen, f"Current Level: {level} (Next cost: {next_cost}g)", (px + 25, py + 430), settings.LIGHT_GRAY, 11, center=False)
+            draw_text(screen, t("upgrades_current_level_cost", level=level, next_cost=next_cost), (px + 25, py + 430), settings.LIGHT_GRAY, 11, center=False)
             
             # Mathematical Function graph description or representation
-            draw_text(screen, "Scaling Function:", (px + 25, py + 455), settings.CYAN, 11, center=False)
+            draw_text(screen, t("upgrades_scaling_function"), (px + 25, py + 455), settings.CYAN, 11, center=False)
             draw_text(screen, formula_label, (px + 25, py + 472), settings.CYAN, 12, center=False)
             
-            growth_txt = f"Exponential growth rate: +{int((scale - 1) * 100)}% per level"
+            growth_txt = t("upgrades_exponential_rate", rate=int((scale - 1) * 100))
             draw_text(screen, growth_txt, (px + 25, py + 495), settings.GRAY, 10, center=False)
         else:
-            draw_text(screen, "Hover over a stat to see math scaling.", (px + panel_w // 2, py + 440), settings.GRAY, 11)
-            draw_text(screen, "Passe o mouse para ver a formula de custo.", (px + panel_w // 2, py + 465), settings.GRAY, 11)
+            draw_text(screen, t("upgrades_hover_hint"), (px + panel_w // 2, py + 450), settings.GRAY, 11)
 
         # Footer Instruction
-        draw_text(screen, "Press U or ESC to close / fechar", (px + panel_w // 2, py + panel_h - 15), settings.GRAY, 11)
+        draw_text(screen, t("upgrades_close_hint"), (px + panel_w // 2, py + panel_h - 15), settings.GRAY, 11)

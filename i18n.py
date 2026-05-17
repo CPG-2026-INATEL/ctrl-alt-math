@@ -345,6 +345,90 @@ STRINGS = {
     "stat_entropia": {LANG_EN: "Entropy Gain: -{red}%", LANG_PT: "Ganho de Entropia: -{red}%"},
     "stat_derivada": {LANG_EN: "Damage Buff: +{percent}% per tile", LANG_PT: "Bônus de Dano: +{percent}% por bloco"},
     "stat_teoria_jogos": {LANG_EN: "Crit Chance Bonus: +{percent}%", LANG_PT: "Bônus de Chance Crítica: +{percent}%"},
+
+    # Shop Screen
+    "shop_title": {LANG_EN: "FORBIDDEN BAZAAR", LANG_PT: "BAZAR PROIBIDO"},
+    "shop_gold": {LANG_EN: "Gold: {gold}", LANG_PT: "Ouro: {gold}"},
+    "shop_tab_weapons": {LANG_EN: "WEAPONS", LANG_PT: "ARMAS"},
+    "shop_tab_shields": {LANG_EN: "SHIELDS", LANG_PT: "ESCUDOS"},
+    "shop_tab_consumables": {LANG_EN: "ITEMS", LANG_PT: "ITENS"},
+    "shop_already_equipped": {LANG_EN: "Already equipped!", LANG_PT: "Já equipado!"},
+    "shop_insufficient_funds": {LANG_EN: "Insufficient Gold/SP!", LANG_PT: "Ouro/SP insuficiente!"},
+    "shop_equipped_feedback": {LANG_EN: "{name} equipped!", LANG_PT: "{name} equipado!"},
+    "shop_added_feedback": {LANG_EN: "{name} added!", LANG_PT: "{name} adicionado!"},
+    "shop_purchased_feedback": {LANG_EN: "{name} purchased!", LANG_PT: "{name} comprado!"},
+    "shop_equipped_status": {LANG_EN: "EQUIPPED", LANG_PT: "EQUIPADO"},
+    "shop_select_prompt": {LANG_EN: "Select an item", LANG_PT: "Selecione um item"},
+    "shop_atk_multiplier": {LANG_EN: "ATK Multiplier: x{mult}", LANG_PT: "Multiplicador ATK: x{mult}"},
+    "shop_effect_label": {LANG_EN: "Effect: {effect}", LANG_PT: "Efeito: {effect}"},
+    "shop_buy_button": {LANG_EN: "BUY {cost}", LANG_PT: "COMPRAR {cost}"},
+    "shop_defense_bonus": {LANG_EN: "+{defense} DEF", LANG_PT: "+{defense} DEF"},
+    
+    # Weapon effects
+    "effect_burn": {LANG_EN: "Burn (3 dmg/2t)", LANG_PT: "Queimadura (3 dmg/2t)"},
+    "effect_slow": {LANG_EN: "Slow (-1 mov, 1t)", LANG_PT: "Lentidão (-1 mov, 1t)"},
+    "effect_stun": {LANG_EN: "Stun (35% chance)", LANG_PT: "Atordoador (35% chance)"},
+    "effect_aoe": {LANG_EN: "Area (hits adjacent)", LANG_PT: "Área (atinge adjacentes)"},
+    "effect_poison": {LANG_EN: "Poison (2 dmg/3t)", LANG_PT: "Veneno (2 dmg/3t)"},
+    "effect_reflect": {LANG_EN: "Reflect 25% of damage", LANG_PT: "Reflete 25% do dano"},
+    
+    # Consumable effects
+    "effect_heal": {LANG_EN: "Restores {value} HP", LANG_PT: "Restaura {value} PV"},
+    "effect_atk_buff": {LANG_EN: "+{value} ATK", LANG_PT: "+{value} ATK"},
+    "effect_def_buff": {LANG_EN: "+{value} DEF", LANG_PT: "+{value} DEF"},
+    "effect_range_buff": {LANG_EN: "+{value} Range", LANG_PT: "+{value} alcance"},
+    "effect_max_hp_buff": {LANG_EN: "+{value} Max HP", LANG_PT: "+{value} vida máxima"},
+    
+    # Consumable scope
+    "scope_instant": {LANG_EN: "Instant use", LANG_PT: "Uso imediato"},
+    "scope_room": {LANG_EN: "Lasts until room exit", LANG_PT: "Dura até sair da sala"},
+    "scope_turns": {LANG_EN: "Lasts {duration} turns", LANG_PT: "Dura {duration} turnos"},
+
+    # Upgrades Screen
+    "upgrades_title": {LANG_EN: "UPGRADES", LANG_PT: "MELHORIAS"},
+    "upgrades_stats": {LANG_EN: "Tickets: {tickets}  |  Gold: {gold}g", LANG_PT: "Tickets: {tickets}  |  Ouro: {gold}g"},
+    "upgrades_free": {LANG_EN: "FREE", LANG_PT: "GRÁTIS"},
+    "upgrades_projection_title": {LANG_EN: "STAT PROJECTION & SCALING", LANG_PT: "PROJEÇÃO DE ATRIBUTOS & ESCALAMENTO"},
+    "upgrades_formula_label": {LANG_EN: "Cost(L) = {base_cost} * ({scale})^L", LANG_PT: "Custo(L) = {base_cost} * ({scale})^L"},
+    "upgrades_current_level_cost": {LANG_EN: "Current Level: {level} (Next cost: {next_cost}g)", LANG_PT: "Nível Atual: {level} (Próximo custo: {next_cost}g)"},
+    "upgrades_scaling_function": {LANG_EN: "Scaling Function:", LANG_PT: "Função de Escalamento:"},
+    "upgrades_exponential_rate": {LANG_EN: "Exponential growth rate: +{rate}% per level", LANG_PT: "Taxa de crescimento exponencial: +{rate}% por nível"},
+    "upgrades_hover_hint": {LANG_EN: "Hover over a stat to see math scaling.", LANG_PT: "Passe o mouse sobre um atributo para ver o escalamento."},
+    "upgrades_close_hint": {LANG_EN: "Press U or ESC to close", LANG_PT: "Pressione U ou ESC para fechar"},
+    
+    "upgrade_atk_name": {LANG_EN: "ATK", LANG_PT: "ATAQUE"},
+    "upgrade_atk_desc": {LANG_EN: "+3 damage/level", LANG_PT: "+3 de dano/nível"},
+    "upgrade_def_name": {LANG_EN: "DEF", LANG_PT: "DEFESA"},
+    "upgrade_def_desc": {LANG_EN: "+2 defense/level", LANG_PT: "+2 de defesa/nível"},
+    "upgrade_hp_name": {LANG_EN: "HP", LANG_PT: "PV"},
+    "upgrade_hp_desc": {LANG_EN: "+15 max hp/level", LANG_PT: "+15 PV máximo/nível"},
+    "upgrade_range_name": {LANG_EN: "RANGE", LANG_PT: "ALCANCE"},
+    "upgrade_range_desc": {LANG_EN: "+1 move tile/level", LANG_PT: "+1 bloco de movimento/nível"},
+
+    # Inventory Screen
+    "inv_title": {LANG_EN: "INVENTORY", LANG_PT: "INVENTÁRIO"},
+    "inv_subtitle": {LANG_EN: "Select consumable items", LANG_PT: "Selecione itens consumíveis"},
+    "inv_empty": {LANG_EN: "Empty", LANG_PT: "Vazio"},
+    "inv_use_button": {LANG_EN: "Use", LANG_PT: "Usar"},
+    "inv_details_title": {LANG_EN: "DETAILS", LANG_PT: "DETALHES"},
+    "inv_effect_formula": {LANG_EN: "Effect function: f(x) -> {effect}", LANG_PT: "Função de efeito: f(x) -> {effect}"},
+    "inv_hover_hint": {LANG_EN: "Hover over an item to inspect formulas.", LANG_PT: "Passe o mouse sobre um item para inspecionar fórmulas."},
+    "inv_close_hint": {LANG_EN: "Press I or ESC to close", LANG_PT: "Pressione I ou ESC para fechar"},
+
+    # Equipment Screen
+    "eq_title": {LANG_EN: "EQUIPMENT", LANG_PT: "EQUIPAMENTO"},
+    "eq_subtitle": {LANG_EN: "Active combat loadout", LANG_PT: "Configuração de combate ativa"},
+    "eq_empty_slot": {LANG_EN: "Empty Slot", LANG_PT: "Espaço Vazio"},
+    "eq_dmg_mult": {LANG_EN: "Damage multiplier: x{mult}", LANG_PT: "Multiplicador de dano: x{mult}"},
+    "eq_base_def": {LANG_EN: "Base Defense rating: +{defense}", LANG_PT: "Classificação de defesa base: +{defense}"},
+    "eq_details_title": {LANG_EN: "EQUIPMENT DETAILS & LORE", LANG_PT: "DETALHES DO EQUIPAMENTO & HISTÓRIA"},
+    "eq_lore_prefix": {LANG_EN: "Lore: {desc}", LANG_PT: "História: {desc}"},
+    "eq_effect_prefix": {LANG_EN: "Special Effect: {effect}", LANG_PT: "Efeito Especial: {effect}"},
+    "eq_mechanics_title": {LANG_EN: "Combat Mechanics:", LANG_PT: "Mecânicas de Combate:"},
+    "eq_hover_hint": {LANG_EN: "Hover over a slot to inspect gear.", LANG_PT: "Passe o mouse sobre um espaço para inspecionar o equipamento."},
+    "eq_close_hint": {LANG_EN: "Press E or ESC to close", LANG_PT: "Pressione E ou ESC para fechar"},
+    "eq_weapon_label": {LANG_EN: "WEAPON", LANG_PT: "ARMA"},
+    "eq_shield_label": {LANG_EN: "SHIELD", LANG_PT: "ESCUDO"},
 }
 
 # Merge Lore Strings

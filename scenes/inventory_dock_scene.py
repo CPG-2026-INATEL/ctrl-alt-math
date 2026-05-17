@@ -3,6 +3,7 @@ import pygame
 import settings
 from utils import draw_text
 from scenes.scene import Scene
+from i18n import t
 
 
 class InventoryDockScene(Scene):
@@ -97,13 +98,13 @@ class InventoryDockScene(Scene):
         pygame.draw.rect(screen, (80, 100, 220), (px, py, panel_w, panel_h), 2, border_radius=12)
 
         # Header Title
-        draw_text(screen, "INVENTORY", (px + 20, py + 25), settings.GOLD, 22, center=False)
-        draw_text(screen, "Select consumable items", (px + 20, py + 50), settings.GRAY, 11, center=False)
+        draw_text(screen, t("inv_title"), (px + 20, py + 25), settings.GOLD, 22, center=False)
+        draw_text(screen, t("inv_subtitle"), (px + 20, py + 50), settings.GRAY, 11, center=False)
         pygame.draw.line(screen, (60, 60, 90), (px + 15, py + 68), (px + panel_w - 15, py + 68), 1)
 
         # Draw Items List
         if not player.inventory:
-            draw_text(screen, "Empty / Vazio", (px + panel_w // 2, py + 200), settings.GRAY, 16)
+            draw_text(screen, t("inv_empty"), (px + panel_w // 2, py + 200), settings.GRAY, 16)
         else:
             for i, item in enumerate(player.inventory):
                 row_y = py + 80 + i * 70
@@ -132,14 +133,14 @@ class InventoryDockScene(Scene):
                 use_rect = pygame.Rect(px + panel_w - 85, row_y + 17, 60, 26)
                 bg_btn = (40, 120, 50) if self.hovered_idx == i else (30, 75, 35)
                 pygame.draw.rect(screen, bg_btn, use_rect, border_radius=4)
-                draw_text(screen, "Usar", use_rect.center, settings.WHITE, 12)
+                draw_text(screen, t("inv_use_button"), use_rect.center, settings.WHITE, 12)
 
         # Draw Bottom Description/Details Box
         desc_box_rect = pygame.Rect(px + 15, py + 415, panel_w - 30, 110)
         pygame.draw.rect(screen, (10, 10, 20), desc_box_rect, border_radius=8)
         pygame.draw.rect(screen, (50, 50, 75), desc_box_rect, 1, border_radius=8)
 
-        draw_text(screen, "DETAILS / DETALHES", (px + 25, py + 425), settings.GOLD, 11, center=False)
+        draw_text(screen, t("inv_details_title"), (px + 25, py + 425), settings.GOLD, 11, center=False)
         pygame.draw.line(screen, (40, 40, 60), (px + 25, py + 438), (px + panel_w - 25, py + 438), 1)
 
         if self.hovered_idx is not None and self.hovered_idx < len(player.inventory):
@@ -165,11 +166,10 @@ class InventoryDockScene(Scene):
 
             # Mathematical metadata if present
             if effect:
-                formula_label = f"Effect function: f(x) -> {effect}"
+                formula_label = t("inv_effect_formula", effect=effect)
                 draw_text(screen, formula_label, (px + 25, py + 482), settings.CYAN, 10, center=False)
         else:
-            draw_text(screen, "Hover over an item to inspect formulas.", (px + panel_w // 2, py + 455), settings.GRAY, 11)
-            draw_text(screen, "Passe o mouse para ler as equacoes.", (px + panel_w // 2, py + 475), settings.GRAY, 11)
+            draw_text(screen, t("inv_hover_hint"), (px + panel_w // 2, py + 460), settings.GRAY, 11)
 
         # Footer Instruction
-        draw_text(screen, "Press I or ESC to close / fechar", (px + panel_w // 2, py + panel_h - 15), settings.GRAY, 11)
+        draw_text(screen, t("inv_close_hint"), (px + panel_w // 2, py + panel_h - 15), settings.GRAY, 11)

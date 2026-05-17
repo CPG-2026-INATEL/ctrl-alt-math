@@ -80,14 +80,14 @@ class EquipDockScene(Scene):
         pygame.draw.rect(screen, (80, 100, 220), (px, py, panel_w, panel_h), 2, border_radius=12)
 
         # Header Title
-        draw_text(screen, "EQUIPMENT", (px + 20, py + 25), settings.GOLD, 22, center=False)
-        draw_text(screen, "Active combat loadout", (px + 20, py + 50), settings.GRAY, 11, center=False)
+        draw_text(screen, t("eq_title"), (px + 20, py + 25), settings.GOLD, 22, center=False)
+        draw_text(screen, t("eq_subtitle"), (px + 20, py + 50), settings.GRAY, 11, center=False)
         pygame.draw.line(screen, (60, 60, 90), (px + 15, py + 68), (px + panel_w - 15, py + 68), 1)
 
         # Draw Equipment Slots
         slots = [
-            ("weapon", "WEAPON / ARMA", 0, settings.ORANGE),
-            ("shield", "SHIELD / ESCUDO", 90, settings.BLUE),
+            ("weapon", t("eq_weapon_label"), 0, settings.ORANGE),
+            ("shield", t("eq_shield_label"), 90, settings.BLUE),
         ]
 
         for slot_name, label, y_off, color in slots:
@@ -112,23 +112,23 @@ class EquipDockScene(Scene):
             equipped_id = player.equipment.get(slot_name)
             item_data = data_source.get(equipped_id, {})
 
-            name = item_data.get("name", "Empty Slot")
+            name = item_data.get("name", t("eq_empty_slot"))
             draw_text(screen, name, (px + 30, slot_y + 26), settings.WHITE, 16, center=False)
 
             # Stats line
             if is_weapon:
                 mult = item_data.get("multiplier", 1.0)
-                draw_text(screen, f"Damage multiplier: x{mult:.1f}", (px + 30, slot_y + 48), settings.RED, 12, center=False)
+                draw_text(screen, t("eq_dmg_mult", mult=f"{mult:.1f}"), (px + 30, slot_y + 48), settings.RED, 12, center=False)
             else:
                 defense = item_data.get("defense", 0)
-                draw_text(screen, f"Base Defense rating: +{defense}", (px + 30, slot_y + 48), settings.CYAN, 12, center=False)
+                draw_text(screen, t("eq_base_def", defense=defense), (px + 30, slot_y + 48), settings.CYAN, 12, center=False)
 
         # Draw Bottom Description/Details Box
         desc_box_rect = pygame.Rect(px + 15, py + 380, panel_w - 30, 145)
         pygame.draw.rect(screen, (10, 10, 20), desc_box_rect, border_radius=8)
         pygame.draw.rect(screen, (50, 50, 75), desc_box_rect, 1, border_radius=8)
 
-        draw_text(screen, "EQUIPMENT DETAILS & LORE", (px + 25, py + 390), settings.GOLD, 11, center=False)
+        draw_text(screen, t("eq_details_title"), (px + 25, py + 390), settings.GOLD, 11, center=False)
         pygame.draw.line(screen, (40, 40, 60), (px + 25, py + 403), (px + panel_w - 25, py + 403), 1)
 
         if self.hovered_slot is not None:
@@ -149,15 +149,14 @@ class EquipDockScene(Scene):
                 formula = f"Damage Taken = Max(0, Incoming - {item_data.get('defense', 0)})"
                 note = "Shield defense lowers base damage per strike."
 
-            draw_text(screen, f"Lore: {desc}", (px + 25, py + 413), settings.WHITE, 11, center=False)
-            draw_text(screen, f"Special Effect: {effect}", (px + 25, py + 432), settings.LIGHT_GRAY, 11, center=False)
+            draw_text(screen, t("eq_lore_prefix", desc=desc), (px + 25, py + 413), settings.WHITE, 11, center=False)
+            draw_text(screen, t("eq_effect_prefix", effect=effect), (px + 25, py + 432), settings.LIGHT_GRAY, 11, center=False)
             
-            draw_text(screen, "Combat Mechanics:", (px + 25, py + 458), settings.YELLOW, 11, center=False)
+            draw_text(screen, t("eq_mechanics_title"), (px + 25, py + 458), settings.YELLOW, 11, center=False)
             draw_text(screen, formula, (px + 25, py + 475), settings.CYAN, 12, center=False)
             draw_text(screen, note, (px + 25, py + 495), settings.GRAY, 10, center=False)
         else:
-            draw_text(screen, "Hover over a slot to inspect gear.", (px + panel_w // 2, py + 440), settings.GRAY, 11)
-            draw_text(screen, "Passe o mouse para ler as informacoes.", (px + panel_w // 2, py + 465), settings.GRAY, 11)
+            draw_text(screen, t("eq_hover_hint"), (px + panel_w // 2, py + 450), settings.GRAY, 11)
 
         # Footer Instruction
-        draw_text(screen, "Press E or ESC to close / fechar", (px + panel_w // 2, py + panel_h - 15), settings.GRAY, 11)
+        draw_text(screen, t("eq_close_hint"), (px + panel_w // 2, py + panel_h - 15), settings.GRAY, 11)

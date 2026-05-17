@@ -3,12 +3,13 @@ import pygame
 import settings
 from utils import draw_text
 from scenes.scene import Scene
+from i18n import t
 
 SHOP_WEAPONS = 0
 SHOP_SHIELDS = 1
 SHOP_CONSUMABLES = 2
 
-SHOP_TAB_LABELS = ["ARMAS", "ESCUDOS", "ITENS"]
+SHOP_TAB_LABELS = ["shop_tab_weapons", "shop_tab_shields", "shop_tab_consumables"]
 SHOP_TAB_COLORS = [settings.RED, settings.BLUE, settings.GREEN]
 
 
@@ -22,6 +23,7 @@ class ShopScene(Scene):
         self.selected_item = None
         self.buy_feedback = ""
         self.buy_feedback_timer = 0
+        self.buy_success = False
 
     def enter(self, prev_scene=None):
         self.active_tab = SHOP_WEAPONS
@@ -29,6 +31,7 @@ class ShopScene(Scene):
         self.selected_item = None
         self.buy_feedback = ""
         self.buy_feedback_timer = 0
+        self.buy_success = False
 
     def handle_event(self, event):
         if event.type == pygame.KEYDOWN:
@@ -97,43 +100,49 @@ class ShopScene(Scene):
             if not data:
                 return
             if player.equipment.get("weapon") == item_id:
-                self.buy_feedback = "Ja equipado!"
+                self.buy_feedback = t("shop_already_equipped")
                 self.buy_feedback_timer = 1.5
+                self.buy_success = False
                 return
             cost = data.get("cost", 0)
             sp_cost = data.get("sp_cost", 0)
             sp = self.game.skill_tree.skill_points if self.game.skill_tree else 0
             if player.gold < cost or sp < sp_cost:
-                self.buy_feedback = "Ouro/SP insuficiente!"
+                self.buy_feedback = t("shop_insufficient_funds")
                 self.buy_feedback_timer = 1.5
+                self.buy_success = False
                 return
             player.gold -= cost
             if sp_cost > 0 and self.game.skill_tree:
                 self.game.skill_tree.skill_points -= sp_cost
             player.equipment["weapon"] = item_id
-            self.buy_feedback = f"{data['name']} equipado!"
+            self.buy_feedback = t("shop_equipped_feedback", name=data['name'])
             self.buy_feedback_timer = 1.5
+            self.buy_success = True
         elif self.active_tab == SHOP_SHIELDS:
             data = settings.EQUIPMENT_DATA["shields"].get(item_id)
             if not data:
                 return
             if player.equipment.get("shield") == item_id:
-                self.buy_feedback = "Ja equipado!"
+                self.buy_feedback = t("shop_already_equipped")
                 self.buy_feedback_timer = 1.5
+                self.buy_success = False
                 return
             cost = data.get("cost", 0)
             sp_cost = data.get("sp_cost", 0)
             sp = self.game.skill_tree.skill_points if self.game.skill_tree else 0
             if player.gold < cost or sp < sp_cost:
-                self.buy_feedback = "Ouro/SP insuficiente!"
+                self.buy_feedback = t("shop_insufficient_funds")
                 self.buy_feedback_timer = 1.5
+                self.buy_success = False
                 return
             player.gold -= cost
             if sp_cost > 0 and self.game.skill_tree:
                 self.game.skill_tree.skill_points -= sp_cost
             player.equipment["shield"] = item_id
-            self.buy_feedback = f"{data['name']} equipado!"
+            self.buy_feedback = t("shop_equipped_feedback", name=data['name'])
             self.buy_feedback_timer = 1.5
+            self.buy_success = True
         elif self.active_tab == SHOP_CONSUMABLES:
             data = settings.CONSUMABLE_DATA.get(item_id)
             if not data:
@@ -142,8 +151,9 @@ class ShopScene(Scene):
             sp_cost = data.get("sp_cost", 0)
             sp = self.game.skill_tree.skill_points if self.game.skill_tree else 0
             if player.gold < cost or sp < sp_cost:
-                self.buy_feedback = "Ouro/SP insuficiente!"
+                self.buy_feedback = t("shop_insufficient_funds")
                 self.buy_feedback_timer = 1.5
+                self.buy_success = False
                 return
             player.gold -= cost
             if sp_cost > 0 and self.game.skill_tree:
@@ -151,12 +161,14 @@ class ShopScene(Scene):
             for inv_item in player.inventory:
                 if inv_item["id"] == item_id:
                     inv_item["count"] = inv_item.get("count", 1) + 1
-                    self.buy_feedback = f"{data['name']} adicionado!"
+                    self.buy_feedback = t("shop_added_feedback", name=data['name'])
                     self.buy_feedback_timer = 1.5
+                    self.buy_success = True
                     return
             player.inventory.append({"id": item_id, "count": 1})
-            self.buy_feedback = f"{data['name']} comprado!"
+            self.buy_feedback = t("shop_purchased_feedback", name=data['name'])
             self.buy_feedback_timer = 1.5
+            self.buy_success = True
         game = self.game
         game.gold = player.gold
 
@@ -199,7 +211,7 @@ class ShopScene(Scene):
         detail_x = settings.WINDOW_WIDTH // 2 + 20
         self._draw_detail(screen, detail_x)
 
-        draw_text(screen, f"Ouro: {self.game.player.gold}", (settings.WINDOW_WIDTH // 2 + 30, settings.WINDOW_HEIGHT - 30), settings.GOLD, 14, center=False)
+        draw_text(screen, t("shop_gold", gold=self.game.player.gold), (settings.WINDOW_WIDTH // 2 + 30, settings.WINDOW_HEIGHT - 30), settings.GOLD, 14, center=False)
         sp = self.game.skill_tree.skill_points if self.game.skill_tree else 0
         draw_text(screen, f"SP: {sp}", (settings.WINDOW_WIDTH // 2 + 160, settings.WINDOW_HEIGHT - 30), settings.CYAN, 14, center=False)
 
@@ -214,11 +226,11 @@ class ShopScene(Scene):
             border_color = SHOP_TAB_COLORS[i] if i == self.active_tab else (60, 60, 80)
             pygame.draw.rect(screen, border_color, tab_rect, 2, border_radius=4)
             label_font = pygame.font.Font(None, 18)
-            label = label_font.render(SHOP_TAB_LABELS[i], True, SHOP_TAB_COLORS[i] if i == self.active_tab else (120, 120, 140))
+            label = label_font.render(t(SHOP_TAB_LABELS[i]), True, SHOP_TAB_COLORS[i] if i == self.active_tab else (120, 120, 140))
             screen.blit(label, (tab_rect.centerx - label.get_width() // 2, tab_rect.centery - label.get_height() // 2))
 
     def _draw_list(self, screen, list_x, list_w):
-        draw_text(screen, "LOJA", (list_x + 10, 48), settings.WHITE, 20, center=False)
+        draw_text(screen, t("shop_title"), (list_x + 10, 48), settings.WHITE, 20, center=False)
 
         items = self._get_items()
         sy = int(self.scroll_y)
@@ -254,7 +266,7 @@ class ShopScene(Scene):
             draw_text(screen, cost_str, (list_x + 15, row_y + 30), cost_color, 13, center=False)
 
             if is_equipped:
-                draw_text(screen, "EQUIPADO", (list_x + list_w - 90, row_y + 20), settings.CYAN, 12, center=False)
+                draw_text(screen, t("shop_equipped_status"), (list_x + list_w - 90, row_y + 20), settings.CYAN, 12, center=False)
 
     def _is_equipped(self, item_id):
         if self.active_tab == SHOP_WEAPONS:
@@ -267,7 +279,7 @@ class ShopScene(Scene):
         detail_w = settings.WINDOW_WIDTH // 2 - 40
 
         if not self.selected_item:
-            draw_text(screen, "Selecione um item", (detail_x + 10, 80), settings.GRAY, 16, center=False)
+            draw_text(screen, t("shop_select_prompt"), (detail_x + 10, 80), settings.GRAY, 16, center=False)
             return
 
         item_data = self._get_item_data(self.selected_item)
@@ -287,35 +299,48 @@ class ShopScene(Scene):
 
         if self.active_tab == SHOP_WEAPONS:
             mult = item_data.get("multiplier", 1.0)
-            draw_text(screen, f"Multiplicador ATK: x{mult:.2f}", (detail_x + 10, y), settings.RED, 16, center=False)
+            draw_text(screen, t("shop_atk_multiplier", mult=f"{mult:.2f}"), (detail_x + 10, y), settings.RED, 16, center=False)
             y += 22
             effect = item_data.get("effect")
             if effect:
-                effect_names = {"burn": "Queimadura (3 dmg/2t)", "slow": "Lentidao (-1 mov, 1t)",
-                                "stun": "Atordoador (35% chance)", "aoe": "Area (atinge adjacentes)",
-                                "poison": "Veneno (2 dmg/3t)"}
-                draw_text(screen, f"Efeito: {effect_names.get(effect, effect)}", (detail_x + 10, y), settings.ORANGE, 14, center=False)
+                effect_names = {
+                    "burn": t("effect_burn"),
+                    "slow": t("effect_slow"),
+                    "stun": t("effect_stun"),
+                    "aoe": t("effect_aoe"),
+                    "poison": t("effect_poison")
+                }
+                draw_text(screen, t("shop_effect_label", effect=effect_names.get(effect, effect)), (detail_x + 10, y), settings.ORANGE, 14, center=False)
                 y += 20
         elif self.active_tab == SHOP_SHIELDS:
             defense = item_data.get("defense", 0)
-            draw_text(screen, f"+{defense} DEF", (detail_x + 10, y), settings.BLUE, 16, center=False)
+            draw_text(screen, t("shop_defense_bonus", defense=defense), (detail_x + 10, y), settings.BLUE, 16, center=False)
             y += 22
             effect = item_data.get("effect")
             if effect:
-                effect_names = {"reflect": "Reflete 25% do dano"}
-                draw_text(screen, f"Efeito: {effect_names.get(effect, effect)}", (detail_x + 10, y), settings.CYAN, 14, center=False)
+                effect_names = {
+                    "reflect": t("effect_reflect")
+                }
+                draw_text(screen, t("shop_effect_label", effect=effect_names.get(effect, effect)), (detail_x + 10, y), settings.CYAN, 14, center=False)
                 y += 20
         elif self.active_tab == SHOP_CONSUMABLES:
             value = item_data.get("value", 0)
             effect = item_data.get("effect", "")
-            effect_labels = {"heal": f"Restaura {value} HP", "atk_buff": f"+{value} ATK",
-                             "def_buff": f"+{value} DEF", "range_buff": f"+{value} alcance",
-                             "max_hp_buff": f"+{value} vida maxima"}
+            effect_labels = {
+                "heal": t("effect_heal", value=value),
+                "atk_buff": t("effect_atk_buff", value=value),
+                "def_buff": t("effect_def_buff", value=value),
+                "range_buff": t("effect_range_buff", value=value),
+                "max_hp_buff": t("effect_max_hp_buff", value=value)
+            }
             draw_text(screen, effect_labels.get(effect, f"{effect}: {value}"), (detail_x + 10, y), settings.GREEN, 16, center=False)
             y += 22
             scope = item_data.get("scope", "")
-            scope_labels = {"instant": "Uso imediato", "room": "Dura ate sair da sala",
-                            "turns": f"Dura {item_data.get('duration', 0)} turnos"}
+            scope_labels = {
+                "instant": t("scope_instant"),
+                "room": t("scope_room"),
+                "turns": t("scope_turns", duration=item_data.get('duration', 0))
+            }
             draw_text(screen, scope_labels.get(scope, scope), (detail_x + 10, y), settings.GRAY, 13, center=False)
             y += 20
 
@@ -330,19 +355,19 @@ class ShopScene(Scene):
 
         if is_equipped:
             pygame.draw.rect(screen, (60, 60, 60), pygame.Rect(detail_x, buy_y, 120, 32), border_radius=6)
-            draw_text(screen, "EQUIPADO", (detail_x + 12, buy_y + 8), settings.GRAY, 14, center=False)
+            draw_text(screen, t("shop_equipped_status"), (detail_x + 12, buy_y + 8), settings.GRAY, 14, center=False)
         elif can_afford:
             pygame.draw.rect(screen, settings.GREEN, pygame.Rect(detail_x, buy_y, 120, 32), border_radius=6)
             cost_label = f"{cost}g"
             if sp_cost > 0:
                 cost_label += f" +{sp_cost}SP"
-            draw_text(screen, f"COMPRAR {cost_label}", (detail_x + 8, buy_y + 8), settings.WHITE, 12, center=False)
+            draw_text(screen, t("shop_buy_button", cost=cost_label), (detail_x + 8, buy_y + 8), settings.WHITE, 12, center=False)
         else:
             pygame.draw.rect(screen, (60, 30, 30), pygame.Rect(detail_x, buy_y, 120, 32), border_radius=6)
             draw_text(screen, f"{cost}g", (detail_x + 12, buy_y + 8), (150, 80, 80), 13, center=False)
 
         if self.buy_feedback_timer > 0:
-            fb_color = settings.GREEN if "comprado" in self.buy_feedback or "equipado" in self.buy_feedback or "adicionado" in self.buy_feedback else settings.RED
+            fb_color = settings.GREEN if self.buy_success else settings.RED
             draw_text(screen, self.buy_feedback, (detail_x, buy_y - 25), fb_color, 14, center=False)
 
     def _get_item_data(self, item_id):
