@@ -78,7 +78,7 @@ class GameplayGridHelpers:
         )
 
         if (cc, cr) in reachable and (cc, cr) != (pc, pr):
-            path = scene.grid.find_path(
+            path = scene.grid.pathfind(
                 pc, pr,
                 cc, cr,
                 extra_blocked=scene._other_player_occupied_cells(game.player)
