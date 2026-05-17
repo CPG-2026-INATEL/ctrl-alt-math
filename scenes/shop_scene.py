@@ -116,7 +116,7 @@ class ShopScene(Scene):
             if sp_cost > 0 and self.game.skill_tree:
                 self.game.skill_tree.skill_points -= sp_cost
             player.equipment["weapon"] = item_id
-            self.buy_feedback = t("shop_equipped_feedback", name=data['name'])
+            self.buy_feedback = t("shop_equipped_feedback", name=t(data['name']))
             self.buy_feedback_timer = 1.5
             self.buy_success = True
         elif self.active_tab == SHOP_SHIELDS:
@@ -140,7 +140,7 @@ class ShopScene(Scene):
             if sp_cost > 0 and self.game.skill_tree:
                 self.game.skill_tree.skill_points -= sp_cost
             player.equipment["shield"] = item_id
-            self.buy_feedback = t("shop_equipped_feedback", name=data['name'])
+            self.buy_feedback = t("shop_equipped_feedback", name=t(data['name']))
             self.buy_feedback_timer = 1.5
             self.buy_success = True
         elif self.active_tab == SHOP_CONSUMABLES:
@@ -161,12 +161,12 @@ class ShopScene(Scene):
             for inv_item in player.inventory:
                 if inv_item["id"] == item_id:
                     inv_item["count"] = inv_item.get("count", 1) + 1
-                    self.buy_feedback = t("shop_added_feedback", name=data['name'])
+                    self.buy_feedback = t("shop_added_feedback", name=t(data['name']))
                     self.buy_feedback_timer = 1.5
                     self.buy_success = True
                     return
             player.inventory.append({"id": item_id, "count": 1})
-            self.buy_feedback = t("shop_purchased_feedback", name=data['name'])
+            self.buy_feedback = t("shop_purchased_feedback", name=t(data['name']))
             self.buy_feedback_timer = 1.5
             self.buy_success = True
         game = self.game
@@ -260,7 +260,7 @@ class ShopScene(Scene):
                 pygame.draw.rect(screen, tab_color, row_rect, 2, border_radius=6)
 
             name_color = settings.WHITE if not is_equipped else (100, 100, 100)
-            draw_text(screen, item_data.get("name", item_data["id"]), (list_x + 15, row_y + 8), name_color, 16, center=False)
+            draw_text(screen, t(item_data.get("name", item_data["id"])), (list_x + 15, row_y + 8), name_color, 16, center=False)
 
             cost = item_data.get("cost", 0)
             sp_cost = item_data.get("sp_cost", 0)
@@ -296,10 +296,10 @@ class ShopScene(Scene):
             return
 
         y = 55
-        draw_text(screen, item_data.get("name", self.selected_item), (detail_x + 10, y), settings.WHITE, 22, center=False)
+        draw_text(screen, t(item_data.get("name", self.selected_item)), (detail_x + 10, y), settings.WHITE, 22, center=False)
         y += 35
 
-        desc = item_data.get("desc", "")
+        desc = t(item_data.get("desc", ""))
         draw_text(screen, desc, (detail_x + 10, y), settings.LIGHT_GRAY, 14, center=False)
         y += 30
 

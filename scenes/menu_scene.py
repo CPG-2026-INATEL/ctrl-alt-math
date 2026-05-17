@@ -53,6 +53,24 @@ class MenuScene(Scene):
         item_text, _ = self.menu_items[self.selected]
         self.game.tts.speak(item_text, lang=settings.LANGUAGE)
 
+    def _speak_how_to_play(self):
+        keys = [
+            "how_to_title", "how_to_intro", "how_to_move", "how_to_combat",
+            "how_to_space", "how_to_1", "how_to_2", "how_to_r",
+            "how_to_skills", "how_to_tab", "how_to_spend", "how_to_prereq",
+            "how_to_enemies", "how_to_censor", "how_to_strawman", "how_to_bayesian",
+            "how_to_boss", "how_to_win", "how_to_return"
+        ]
+        cleaned_lines = []
+        for key in keys:
+            line = t(key)
+            cleaned = line.strip().lstrip("-").strip()
+            if cleaned:
+                cleaned_lines.append(cleaned)
+        
+        full_text = ". ".join(cleaned_lines)
+        self.game.tts.speak(full_text, lang=settings.LANGUAGE)
+
     def _activate_selected(self):
         self.game.sfx.play("menu_confirm")
         _, action = self.menu_items[self.selected]
@@ -68,6 +86,7 @@ class MenuScene(Scene):
             self.game.scene_manager.switch("lobby")
         elif action == "how_to":
             self.showing_how_to_play = True
+            self._speak_how_to_play()
         elif action == "lore":
             self.game.scene_manager.switch("lore")
         elif action == "achievements":
@@ -95,12 +114,17 @@ class MenuScene(Scene):
 
     def handle_event(self, event):
         if self.showing_how_to_play:
-            if event.type == pygame.KEYDOWN and event.key in (pygame.K_ESCAPE, pygame.K_RETURN):
-                self.showing_how_to_play = False
-                self.game.sfx.play("menu_select")
+            if event.type == pygame.KEYDOWN:
+                if event.key in (pygame.K_ESCAPE, pygame.K_RETURN):
+                    self.showing_how_to_play = False
+                    self.game.sfx.play("menu_select")
+                    self._speak_selection()
+                elif event.key == pygame.K_SPACE:
+                    self._speak_how_to_play()
             elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                 self.showing_how_to_play = False
                 self.game.sfx.play("menu_select")
+                self._speak_selection()
             return
 
         if event.type == pygame.MOUSEMOTION:

@@ -110,7 +110,7 @@ class InventoryDockScene(Scene):
                 row_y = py + 80 + i * 70
                 item_data = settings.CONSUMABLE_DATA.get(item.get("id"), {})
                 color = item_data.get("color", settings.GRAY)
-                name = item_data.get("name", item.get("id", "?"))
+                name = t(item_data.get("name", item.get("id", "?")))
                 count = item.get("count", 0)
 
                 card_rect = pygame.Rect(px + 15, row_y, panel_w - 30, 60)
@@ -146,7 +146,7 @@ class InventoryDockScene(Scene):
         if self.hovered_idx is not None and self.hovered_idx < len(player.inventory):
             hovered_item = player.inventory[self.hovered_idx]
             item_data = settings.CONSUMABLE_DATA.get(hovered_item.get("id"), {})
-            desc = item_data.get("desc", "")
+            desc = t(item_data.get("desc", ""))
             effect = item_data.get("effect", "")
             
             # Simple text wrap / draw for description
