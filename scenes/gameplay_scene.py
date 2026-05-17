@@ -3047,16 +3047,16 @@ class GameplayScene(Scene):
         draw_text(screen, f"HP: {current_player.hp}/{current_player.get_max_hp()}", (x1 + w1 // 2, panel_y + 32), settings.WHITE, 14)
 
         # Rigor Bar
-        self._draw_bar_sleek(screen, x1 + 8, panel_y + 49, bar_w, 12, rigor_pct, settings.BLUE, (15, 15, 45))
+        self._draw_bar_sleek(screen, x1 + 8, panel_y + 49, w1 - 16, 12, rigor_pct, settings.BLUE, (15, 15, 45))
         draw_text(screen, f"{t('rigor')}: {current_player.rigor:.0f}/{current_player.max_rigor}", (x1 + w1 // 2, panel_y + 55), settings.WHITE, 14)
 
         # EXP Bar
-        self._draw_bar_sleek(screen, x1 + 8, panel_y + 72, bar_w, 12, exp_pct, settings.GOLD, (30, 25, 10))
+        self._draw_bar_sleek(screen, x1 + 8, panel_y + 72, w1 - 16, 12, exp_pct, settings.GOLD, (30, 25, 10))
         draw_text(screen, f"EXP: {current_player.exp}/{current_player.next_level_exp} ({int(exp_pct*100)}%)", (x1 + w1 // 2, panel_y + 78), settings.WHITE, 13)
 
         # Entropy Bar
         entropy_color = settings.COLOR_ENTROPY_BAR if entropy_pct < 0.75 else settings.RED
-        self._draw_bar_sleek(screen, x1 + 8, panel_y + 95, bar_w, 12, entropy_pct, entropy_color, (40, 10, 40))
+        self._draw_bar_sleek(screen, x1 + 8, panel_y + 95, w1 - 16, 12, entropy_pct, entropy_color, (40, 10, 40))
         draw_text(screen, f"{t('entropy')}: {self.game.entropy:.0f}/{settings.MAX_ENTROPY}", (x1 + w1 // 2, panel_y + 101), settings.WHITE, 13)
 
 
