@@ -4,10 +4,10 @@ import math
 import settings
 
 ENEMY_POOL_BY_DIFFICULTY = {
-    1: [("censor", 1, 2)],
-    2: [("censor", 1, 2), ("ortogonal", 1, 1)],
-    3: [("censor", 1, 2), ("ortogonal", 1, 1), ("atirador", 1, 1), ("strawman", 1, 1)],
-    4: [("censor", 2, 3), ("ortogonal", 1, 2), ("atirador", 1, 2), ("strawman", 1, 1), ("granadeiro", 1, 1), ("bayesian", 1, 1)],
+    1: [("censor", 2, 3)],
+    2: [("censor", 1, 2), ("ortogonal", 1, 2)],
+    3: [("censor", 2, 3), ("ortogonal", 1, 2), ("atirador", 1, 2), ("strawman", 1, 1)],
+    4: [("censor", 3, 4), ("ortogonal", 2, 3), ("atirador", 1, 2), ("strawman", 1, 2), ("granadeiro", 1, 2), ("bayesian", 1, 1)],
 }
 
 OBSTACLE_TEMPLATES = {
@@ -110,26 +110,26 @@ class MapGenerator:
         for layer_idx in range(1, depth + 1):
             is_boss_layer = (layer_idx == depth)
             is_pre_boss = (layer_idx == depth - 1)
-
             if is_boss_layer:
                 num_rooms = 1
             else:
                 progress = layer_idx / depth
+                diff_boost = 0 if settings.DIFFICULTY == "easy" else (1 if settings.DIFFICULTY == "medium" else 2)
                 if progress < 0.5:
-                    min_rooms = 2
-                    max_rooms = max_branches
+                    min_rooms = 2 + diff_boost
+                    max_rooms = max_branches + diff_boost
                 elif progress < 0.8:
-                    min_rooms = 2
-                    max_rooms = max_branches + 1
+                    min_rooms = 2 + diff_boost
+                    max_rooms = max_branches + 1 + diff_boost
                 else:
-                    min_rooms = 1
-                    max_rooms = max(2, max_branches - 1)
+                    min_rooms = 1 + diff_boost
+                    max_rooms = max(2, max_branches - 1) + diff_boost
 
                 if is_pre_boss:
-                    max_rooms = max(2, max_branches)
+                    max_rooms = max(2, max_branches + diff_boost)
                     min_rooms = 2
 
-                num_rooms = rng.randint(min_rooms, min(max_rooms, max_branches + 1))
+                num_rooms = rng.randint(min_rooms, min(max_rooms, max_branches + 2))
 
             layer_room_ids = []
             for i in range(num_rooms):
@@ -226,7 +226,12 @@ class MapGenerator:
                     connections[layer_room_ids[i]].append(layer_room_ids[i + 1])
 
             if not is_boss_layer and layer_idx >= 2:
-                side_chance = 0.45 if layer_idx <= depth - 2 else 0.25
+                if settings.DIFFICULTY == "easy":
+                    side_chance = 0.45 if layer_idx <= depth - 2 else 0.25
+                elif settings.DIFFICULTY == "medium":
+                    side_chance = 0.55 if layer_idx <= depth - 2 else 0.30
+                else:
+                    side_chance = 0.65 if layer_idx <= depth - 2 else 0.35
                 if rng.random() < side_chance:
                     num_side = rng.randint(1, 2)
                     for _ in range(num_side):

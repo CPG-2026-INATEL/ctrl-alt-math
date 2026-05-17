@@ -169,6 +169,15 @@ class Enemy:
             "granadeiro": "lore_granadeiro",
         }.get(enemy_type, "lore_unknown")
 
+        diff = settings.DIFFICULTY_SCALING[settings.DIFFICULTY]
+        if enemy_type == "boss":
+            self.hp = int(self.hp * diff["boss_hp_mult"])
+            self.max_hp = self.hp
+        else:
+            self.hp = int(self.hp * diff["enemy_hp_mult"])
+            self.max_hp = int(self.max_hp * diff["enemy_hp_mult"])
+        self.damage = int(self.damage * diff["enemy_dmg_mult"])
+
         self.decoy_lifetime = 0
         self.is_decoy = False
         self.intended_action = None
@@ -176,23 +185,22 @@ class Enemy:
         self.last_crit = False
 
     def roll_damage(self, entropy=0):
-        # entropy_ratio: 0.0 at calm → 1.0 at max chaos
-        entropy_ratio = max(0.0, min(1.0, entropy / settings.MAX_ENTROPY))
+        diff = settings.DIFFICULTY_SCALING[settings.DIFFICULTY]
+        base_crit = diff["enemy_crit_chance"]
+        crit_mult = diff["enemy_crit_multiplier"]
 
-        # Crit chance scales from base → 100% at full entropy
-        effective_crit_chance = settings.ENEMY_CRIT_CHANCE + entropy_ratio * (1.0 - settings.ENEMY_CRIT_CHANCE)
+        entropy_ratio = max(0.0, min(1.0, entropy / settings.MAX_ENTROPY))
+        effective_crit_chance = base_crit + entropy_ratio * (1.0 - base_crit)
         self.last_crit = random.random() < effective_crit_chance
 
         base = self.damage
         variance = max(1, int(base * settings.ENEMY_DAMAGE_VARIANCE))
         amount = base + random.randint(-variance, variance)
 
-        # Damage bonus: +0% at 0 entropy, +100% at max entropy
         amount = int(amount * (1.0 + entropy_ratio))
 
-        # Crit is always ×2
         if self.last_crit:
-            amount *= 2
+            amount = int(amount * crit_mult)
 
         return max(1, amount)
 
