@@ -311,8 +311,8 @@ STRINGS = {
     "mp_waiting_partner": {LANG_EN: "Waiting for partner to confirm this room...", LANG_PT: "Aguardando parceiro confirmar esta sala..."},
     "mp_vote_mismatch": {LANG_EN: "Partner wants: {room} — navigate to agree!", LANG_PT: "Parceiro quer: {room} — navegue para concordar!"},
     "mp_vote_entering": {LANG_EN: "Both agreed! Entering room...", LANG_PT: "Ambos concordaram! Entrando na sala..."},
-    "menu_multiplayer": {LANG_EN: "Online Co-op", LANG_PT: "Co-op Online"},
-    "menu_achievements": {LANG_EN: "Achievements", LANG_PT: "Conquistas"},
+    "menu_multiplayer": {LANG_EN: "ONLINE MULTIPLAYER", LANG_PT: "MULTIPLAYER ONLINE"},
+    "menu_achievements": {LANG_EN: "ACHIEVEMENTS", LANG_PT: "CONQUISTAS"},
     "achievements_title": {LANG_EN: "ACHIEVEMENTS", LANG_PT: "CONQUISTAS"},
 
     # Achievements
