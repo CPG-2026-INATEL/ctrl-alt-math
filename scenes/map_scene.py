@@ -210,6 +210,10 @@ class MapScene(Scene):
             self.game.sfx.play("menu_select")
             self.game.scene_manager.push("upgrades")
             return
+        elif event.key == pygame.K_e:
+            self.game.sfx.play("menu_select")
+            self.game.scene_manager.push("equip_dock")
+            return
 
         if moved:
             self.game.sfx.play("menu_select")

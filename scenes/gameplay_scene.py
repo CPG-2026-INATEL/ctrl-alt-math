@@ -707,6 +707,10 @@ class GameplayScene(Scene):
                 self.game.scene_manager.push("inventory_dock")
                 return
 
+            if event.key == pygame.K_e and self.state not in ("VICTORY_TRANSITION", "GAME_OVER_TRANSITION"):
+                self.game.scene_manager.push("equip_dock")
+                return
+
             if event.key == pygame.K_r and self.state in ("PLAYER_INPUT", "PLAYER_ACTION_SELECT"):
                 self._send_mp_command("rewind")
                 return
@@ -831,6 +835,10 @@ class GameplayScene(Scene):
 
         if event.key == pygame.K_i and self.state in ("PLAYER_INPUT", "PLAYER_ACTION_SELECT"):
             self.game.scene_manager.push("inventory_dock")
+            return
+
+        if event.key == pygame.K_e and self.state not in ("VICTORY_TRANSITION", "GAME_OVER_TRANSITION"):
+            self.game.scene_manager.push("equip_dock")
             return
 
         if event.key == pygame.K_r and self.state in ("PLAYER_INPUT", "PLAYER_ACTION_SELECT"):
