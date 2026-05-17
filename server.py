@@ -7,7 +7,7 @@ from network import generate_room_code
 
 
 class MatchServer:
-    def __init__(self, host="0.0.0.0", port=settings.MATCH_SERVER_PORT):
+    def __init__(self, host=settings.MATCH_SERVER_BIND_HOST, port=settings.MATCH_SERVER_BIND_PORT):
         self.host = host
         self.port = port
         self.server_socket = None

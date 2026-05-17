@@ -386,6 +386,9 @@ class LobbyScene(Scene):
                 draw_text(screen, label, (settings.WINDOW_WIDTH // 2, y), color, 24)
             draw_text(screen, t("lobby_choose_help"),
                       (settings.WINDOW_WIDTH // 2, 360), settings.GRAY, 16)
+            if self.status:
+                draw_text(screen, self.status,
+                          (settings.WINDOW_WIDTH // 2, 410), self.status_color, 16)
 
         elif self.mode == "hosting":
             draw_text(screen, t("lobby_hosting"),
