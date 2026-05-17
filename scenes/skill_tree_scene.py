@@ -97,5 +97,8 @@ class SkillTreeScene(Scene):
         self.last_hovered = current_hovered
 
     def draw(self, screen):
-        self.game.scene_manager.get("gameplay").draw(screen)
+        if self.game.scene_manager.stack:
+            self.game.scene_manager.stack[-1].draw(screen)
+        else:
+            self.game.scene_manager.get("gameplay").draw(screen)
         self.game.skill_tree.draw(screen)

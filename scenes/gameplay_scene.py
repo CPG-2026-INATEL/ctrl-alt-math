@@ -699,6 +699,10 @@ class GameplayScene(Scene):
                 self.game.scene_manager.push("player_panel")
                 return
 
+            if event.key == pygame.K_s and self.state not in ("VICTORY_TRANSITION", "GAME_OVER_TRANSITION"):
+                self.game.scene_manager.push("skill_tree")
+                return
+
             if event.key == pygame.K_i and self.state in ("PLAYER_INPUT", "PLAYER_ACTION_SELECT"):
                 self.game.scene_manager.push("inventory_dock")
                 return
@@ -819,6 +823,10 @@ class GameplayScene(Scene):
 
         if event.key == pygame.K_TAB and self.state not in ("VICTORY_TRANSITION", "GAME_OVER_TRANSITION"):
             self.game.scene_manager.push("player_panel")
+            return
+
+        if event.key == pygame.K_s and self.state not in ("VICTORY_TRANSITION", "GAME_OVER_TRANSITION"):
+            self.game.scene_manager.push("skill_tree")
             return
 
         if event.key == pygame.K_i and self.state in ("PLAYER_INPUT", "PLAYER_ACTION_SELECT"):

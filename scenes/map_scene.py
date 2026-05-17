@@ -208,7 +208,7 @@ class MapScene(Scene):
             return
         elif event.key == pygame.K_s:
             self.game.sfx.play("menu_select")
-            self.game.scene_manager.push("shop")
+            self.game.scene_manager.push("skill_tree")
             return
 
         if moved:

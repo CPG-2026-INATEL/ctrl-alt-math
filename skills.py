@@ -126,10 +126,10 @@ class SkillTree:
         return self.skills.get(skill_id)
 
     def get_node_rect(self, skill):
-        w, h = 160, 46
-        # Design width is 800, center the nodes if window is wider
-        offset_x = (settings.WINDOW_WIDTH - 800) // 2
-        return pygame.Rect(skill["x"] + offset_x - w // 2, skill["y"] - h // 2, w, h)
+        w, h = 100, 32
+        x = (skill["x"] - 400) * 0.65 + 200
+        y = skill["y"]
+        return pygame.Rect(x - w // 2, y - h // 2, w, h)
 
     def update_hover(self, pos):
         self.hovered_id = None
@@ -150,32 +150,34 @@ class SkillTree:
         return False
 
     def draw(self, screen):
-        # Semi-transparent background with a dark tint
-        overlay = pygame.Surface((settings.WINDOW_WIDTH, settings.WINDOW_HEIGHT), pygame.SRCALPHA)
-        overlay.fill((10, 10, 20, 230))
+        # Semi-transparent background with a dark tint on the left half only
+        panel_w = 400
+        overlay = pygame.Surface((panel_w, settings.WINDOW_HEIGHT), pygame.SRCALPHA)
+        overlay.fill((10, 10, 20, 240))
         screen.blit(overlay, (0, 0))
 
-        # Title and Points
-        center_x = settings.WINDOW_WIDTH // 2
-        draw_text(screen, t("skill_tree_title"), (center_x, 25), settings.WHITE, 42)
+        # Gold dividing line on the right edge of the panel
+        pygame.draw.line(screen, settings.GOLD, (panel_w, 0), (panel_w, settings.WINDOW_HEIGHT), 2)
+
+        # Title and Points centered at x = 200
+        center_x = 200
+        draw_text(screen, t("skill_tree_title"), (center_x, 25), settings.WHITE, 28)
         
         # Points indicator with a small box
         points_text = f"{t('skill_points')}: {self.skill_points}"
-        points_surf = pygame.font.Font(None, int(30 * settings.UI_SCALE)).render(points_text, True, settings.GOLD)
-        points_rect = points_surf.get_rect(center=(center_x, 75))
-        pygame.draw.rect(screen, (40, 40, 60), points_rect.inflate(30, 10), border_radius=15)
-        pygame.draw.rect(screen, settings.GOLD, points_rect.inflate(30, 10), 2, border_radius=15)
+        points_surf = pygame.font.Font(None, int(20 * settings.UI_SCALE)).render(points_text, True, settings.GOLD)
+        points_rect = points_surf.get_rect(center=(center_x, 60))
+        pygame.draw.rect(screen, (40, 40, 60), points_rect.inflate(20, 6), border_radius=10)
+        pygame.draw.rect(screen, settings.GOLD, points_rect.inflate(20, 6), 2, border_radius=10)
         screen.blit(points_surf, points_rect)
-
-        offset_x = (settings.WINDOW_WIDTH - 800) // 2
         
         # Draw Connections First
         for sid, skill in self.skills.items():
             for prereq in skill["prereqs"]:
                 if prereq in self.skills:
                     p = self.skills[prereq]
-                    start = (p["x"] + offset_x, p["y"])
-                    end = (skill["x"] + offset_x, skill["y"])
+                    start = ((p["x"] - 400) * 0.65 + 200, p["y"])
+                    end = ((skill["x"] - 400) * 0.65 + 200, skill["y"])
 
                     if skill["level"] > 0:
                         color = settings.GREEN
@@ -215,7 +217,7 @@ class SkillTree:
                 text_color = (130, 130, 150)
 
             if is_hovered:
-                pygame.draw.rect(screen, settings.WHITE, rect.inflate(10, 10), 2, border_radius=8)
+                pygame.draw.rect(screen, settings.WHITE, rect.inflate(6, 6), 2, border_radius=8)
                 bg_color = tuple(min(255, c + 40) for c in bg_color)
                 border_color = settings.WHITE
 
@@ -226,7 +228,7 @@ class SkillTree:
             name_text = t(skill["name"])
             if level > 0:
                 name_text += f" (Lv.{level})"
-            name_size = 20 if len(name_text) < 15 else 16
+            name_size = 13 if len(name_text) < 15 else 11
             draw_text(screen, name_text, rect.center, text_color, name_size)
 
             # Cost Badge
@@ -234,36 +236,36 @@ class SkillTree:
             if level < skill["max_level"]:
                 cost_color = settings.GOLD if self.skill_points >= cost else settings.RED
                 cost_label = str(cost)
-                badge_rect = pygame.Rect(rect.right - 25, rect.bottom - 20, 20, 18)
-                pygame.draw.rect(screen, (20, 20, 30), badge_rect, border_radius=4)
-                pygame.draw.rect(screen, cost_color, badge_rect, 1, border_radius=4)
-                draw_text(screen, cost_label, badge_rect.center, cost_color, 14)
+                badge_rect = pygame.Rect(rect.right - 18, rect.bottom - 14, 15, 13)
+                pygame.draw.rect(screen, (20, 20, 30), badge_rect, border_radius=3)
+                pygame.draw.rect(screen, cost_color, badge_rect, 1, border_radius=3)
+                draw_text(screen, cost_label, badge_rect.center, cost_color, 10)
 
             if level > 0:
-                pygame.draw.circle(screen, settings.GREEN, (rect.right - 10, rect.top + 10), 4)
+                pygame.draw.circle(screen, settings.GREEN, (rect.right - 6, rect.top + 6), 3)
 
-        # Detailed Info Panel
+        # Detailed Info Panel inside the left side
         if self.hovered_id:
             skill = self.skills[self.hovered_id]
-            panel_w, panel_h = 500, 260
-            panel_rect = pygame.Rect((settings.WINDOW_WIDTH - panel_w) // 2, 
-                                     settings.WINDOW_HEIGHT - panel_h - 60, 
+            panel_w, panel_h = 360, 220
+            panel_rect = pygame.Rect(20, 
+                                     settings.WINDOW_HEIGHT - panel_h - 40, 
                                      panel_w, panel_h)
             
-            pygame.draw.rect(screen, (15, 15, 30, 250), panel_rect, border_radius=15)
-            pygame.draw.rect(screen, settings.CYAN, panel_rect, 2, border_radius=15)
+            pygame.draw.rect(screen, (15, 15, 30, 250), panel_rect, border_radius=12)
+            pygame.draw.rect(screen, settings.CYAN, panel_rect, 2, border_radius=12)
             
-            title_y = panel_rect.top + 30
+            title_y = panel_rect.top + 22
             title_text = t(skill["name"]).upper()
             if skill["level"] > 0:
                 title_text += f" - LV.{skill['level']}"
-            draw_text(screen, title_text, (panel_rect.centerx, title_y), settings.CYAN, 28)
+            draw_text(screen, title_text, (panel_rect.centerx, title_y), settings.CYAN, 20)
             
-            desc_y = title_y + 45
-            draw_text(screen, t(skill["desc"]), (panel_rect.centerx, desc_y), settings.WHITE, 18)
+            desc_y = title_y + 35
+            draw_text(screen, t(skill["desc"]), (panel_rect.centerx, desc_y), settings.WHITE, 14)
             
             # Show Stat Summary
-            stats_y = desc_y + 50
+            stats_y = desc_y + 40
             txt = ""
             if self.hovered_id == "axioma":
                 txt = f"Base Damage: {settings.PLAYER_ATTACK_DAMAGE + (max(0, skill['level']-1)*3)}"
@@ -276,17 +278,17 @@ class SkillTree:
                 txt = f"Dmg Multiplier: x{mult:.2f} per tile"
             
             if txt:
-                draw_text(screen, txt, (panel_rect.centerx, stats_y), settings.GREEN, 16)
+                draw_text(screen, txt, (panel_rect.centerx, stats_y), settings.GREEN, 14)
 
             # Show Next Level Buff
             if skill["level"] < skill["max_level"]:
                 buff_text = f"Next Level: +Buff (Cost: {self.get_upgrade_cost(self.hovered_id)} SP)"
-                draw_text(screen, buff_text, (panel_rect.centerx, stats_y + 30), settings.GOLD, 16)
+                draw_text(screen, buff_text, (panel_rect.centerx, stats_y + 22), settings.GOLD, 14)
 
             flavor_key = f"skill_{self.hovered_id}_flavor"
-            draw_text(screen, f"\"{t(flavor_key)}\"", (panel_rect.centerx, panel_rect.bottom - 35), 
-                      (100, 200, 200), 15)
+            draw_text(screen, f"\"{t(flavor_key)}\"", (panel_rect.centerx, panel_rect.bottom - 25), 
+                      (100, 200, 200), 12)
 
         draw_text(screen, t("skill_tree_footer"),
-                  (settings.WINDOW_WIDTH // 2, settings.WINDOW_HEIGHT - 20),
-                  settings.GRAY, 14)
+                  (200, settings.WINDOW_HEIGHT - 20),
+                  settings.GRAY, 11)
