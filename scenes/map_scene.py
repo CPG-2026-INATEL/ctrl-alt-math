@@ -31,7 +31,6 @@ class MapScene(Scene):
         self._drag_moved = False
         self._hovered_room = None
         self._mouse_pos = (0, 0)
-        self._host_enter_pending = False
 
     def enter(self, prev_scene=None):
         self.room = None
@@ -42,7 +41,6 @@ class MapScene(Scene):
         self._dragging = False
         self._drag_moved = False
         self._hovered_room = None
-        self._host_enter_pending = False
         self._speak_room()
 
         if self.game.mp_is_multiplayer:
@@ -103,27 +101,17 @@ class MapScene(Scene):
                     if room and self.game.scene_manager.current is self:
                         self.room = room
                         self.game.sfx.play("menu_confirm")
-                        self._net_send({"type": "map_enter_confirm"})
                         self.game.scene_manager.switch("gameplay")
-            elif mtype == "map_enter_confirm":
-                if self.game.mp_host and self._host_enter_pending:
-                    self._host_enter_pending = False
-                    self.game.sfx.play("menu_confirm")
-                    self.game.scene_manager.switch("gameplay")
 
     def _check_votes(self):
         if self._local_voted_room and self._remote_voted_room and self._local_voted_room == self._remote_voted_room:
             room = self.game.world_map.rooms.get(self._local_voted_room)
             if room and room.state in ("available", "completed"):
+                self.room = room
+                self.game.sfx.play("menu_confirm")
                 if self.game.mp_host:
-                    self.room = room
-                    self.game.sfx.play("menu_confirm")
                     self._net_send({"type": "map_enter_room", "room": [room.col, room.row]})
-                    self._host_enter_pending = True
-                elif not self.game.mp_is_multiplayer:
-                    self.room = room
-                    self.game.sfx.play("menu_confirm")
-                    self.game.scene_manager.switch("gameplay")
+                self.game.scene_manager.switch("gameplay")
 
     def _cast_vote(self, room_id):
         if not self.game.mp_is_multiplayer:
