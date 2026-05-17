@@ -207,7 +207,6 @@ class SkillTree:
                 text_color = (130, 130, 150)
 
             if is_hovered:
-                pygame.draw.rect(screen, settings.WHITE, rect.inflate(6, 6), 2, border_radius=8)
                 bg_color = tuple(min(255, c + 40) for c in bg_color)
                 border_color = settings.WHITE
 
