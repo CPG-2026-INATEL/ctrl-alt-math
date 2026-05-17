@@ -305,34 +305,35 @@ class SkillTree:
             # Draw stats/formulas inside the box
             txt = ""
             if self.hovered_id == "axioma":
-                txt = f"Base Damage: {settings.PLAYER_ATTACK_DAMAGE + (max(0, skill['level']-1)*3)}"
+                base_dmg = settings.PLAYER_ATTACK_DAMAGE + (max(0, skill['level']-1)*3)
+                txt = t("stat_base_dmg", dmg=base_dmg)
             elif self.hovered_id == "pitagoras":
                 dmg = self.get_skill_value(self.hovered_id, 'damage', settings.PITAGORAS_DAMAGE)
                 rng = self.get_skill_value(self.hovered_id, 'range', settings.PITAGORAS_RANGE)
-                txt = f"Dmg: {dmg}  |  Range: {rng} tiles"
+                txt = t("stat_pitagoras", dmg=dmg, rng=rng)
             elif self.hovered_id == "reflexao":
                 dmg = self.get_skill_value(self.hovered_id, 'damage', settings.REFLEXAO_DAMAGE)
                 rng = self.get_skill_value(self.hovered_id, 'range', settings.REFLEXAO_RANGE)
-                txt = f"Area Dmg: {dmg}  |  Radius: {rng} tiles"
+                txt = t("stat_reflexao", dmg=dmg, rng=rng)
             elif self.hovered_id == "ctrlz":
                 undo = self.get_skill_value(self.hovered_id, 'undo_turns', settings.REWIND_UNDO_TURNS)
                 heal = self.get_skill_value(self.hovered_id, 'heal', settings.REWIND_HEAL_AMOUNT)
-                txt = f"Rewind: {undo} turns  |  Heal: +{heal} HP"
+                txt = t("stat_ctrlz", undo=undo, heal=heal)
             elif self.hovered_id == "entropia":
                 red = self.get_skill_value(self.hovered_id, 'reduction', 0.5)
-                txt = f"Entropy Gain: -{int(red * 100)}%"
+                txt = t("stat_entropia", red=int(red * 100))
             elif self.hovered_id == "derivada":
                 mult = self.get_skill_value(self.hovered_id, 'move_damage_mult', 1.0)
-                txt = f"Damage Buff: +{int((mult - 1.0)*100)}% per tile"
+                txt = t("stat_derivada", percent=int((mult - 1.0)*100))
             elif self.hovered_id == "teoria_jogos":
                 crit = self.get_skill_value(self.hovered_id, 'crit_bonus', 0.05)
-                txt = f"Crit Chance Bonus: +{int(crit*100)}%"
+                txt = t("stat_teoria_jogos", percent=int(crit*100))
             
             # If no custom text, show default status
             if not txt:
-                txt = "State: Fully Operational"
+                txt = t("skill_operational")
                 
-            formula_label = "FORMULA STATS"
+            formula_label = t("skill_stats_title")
             draw_text(screen, formula_label, (stats_rect.centerx, stats_rect.top + 16), settings.GOLD, 11)
             draw_text(screen, txt, (stats_rect.centerx, stats_rect.top + 38), settings.GREEN, 14)
             
@@ -341,10 +342,10 @@ class SkillTree:
             if skill["level"] < skill["max_level"]:
                 cost = self.get_upgrade_cost(self.hovered_id)
                 cost_color = settings.GOLD if self.skill_points >= cost else settings.RED
-                upgrade_text = f"Next Level cost: {cost} SP"
+                upgrade_text = t("skill_next_level_cost", cost=cost)
                 draw_text(screen, upgrade_text, (panel_rect.centerx, cost_y), cost_color, 13)
             else:
-                draw_text(screen, "THEOREM MAXED OUT", (panel_rect.centerx, cost_y), settings.GREEN, 13)
+                draw_text(screen, t("skill_maxed"), (panel_rect.centerx, cost_y), settings.GREEN, 13)
                 
             # --- FLAVOR TEXT SECTION ---
             flavor_key = f"skill_{self.hovered_id}_flavor"

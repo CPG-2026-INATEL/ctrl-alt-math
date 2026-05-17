@@ -302,6 +302,19 @@ STRINGS = {
     "lore_toast_title": {LANG_EN: "BERNOULLI LOG", LANG_PT: "REGISTRO BERNOULLI"},
     "ach_reset_hint": {LANG_EN: "Press R to Reset All Achievements", LANG_PT: "Pressione R para Reiniciar Conquistas"},
     "map_title": {LANG_EN: "WORLD ARCHIVE", LANG_PT: "ARQUIVO MUNDIAL"},
+    
+    # Skill tree Theorem Card details
+    "skill_stats_title": {LANG_EN: "FORMULA STATS", LANG_PT: "ATRIBUTOS DA FÓRMULA"},
+    "skill_operational": {LANG_EN: "State: Fully Operational", LANG_PT: "Estado: Totalmente Operacional"},
+    "skill_maxed": {LANG_EN: "THEOREM MAXED OUT", LANG_PT: "TEOREMA NO MÁXIMO"},
+    "skill_next_level_cost": {LANG_EN: "Next Level cost: {cost} SP", LANG_PT: "Custo do próximo nível: {cost} PH"},
+    "stat_base_dmg": {LANG_EN: "Base Damage: {dmg}", LANG_PT: "Dano Base: {dmg}"},
+    "stat_pitagoras": {LANG_EN: "Dmg: {dmg}  |  Range: {rng} tiles", LANG_PT: "Dano: {dmg}  |  Alcance: {rng} blocos"},
+    "stat_reflexao": {LANG_EN: "Area Dmg: {dmg}  |  Radius: {rng} tiles", LANG_PT: "Dano em Área: {dmg}  |  Raio: {rng} blocos"},
+    "stat_ctrlz": {LANG_EN: "Rewind: {undo} turns  |  Heal: +{heal} HP", LANG_PT: "Desfazer: {undo} turnos  |  Cura: +{heal} PV"},
+    "stat_entropia": {LANG_EN: "Entropy Gain: -{red}%", LANG_PT: "Ganho de Entropia: -{red}%"},
+    "stat_derivada": {LANG_EN: "Damage Buff: +{percent}% per tile", LANG_PT: "Bônus de Dano: +{percent}% por bloco"},
+    "stat_teoria_jogos": {LANG_EN: "Crit Chance Bonus: +{percent}%", LANG_PT: "Bônus de Chance Crítica: +{percent}%"},
 }
 
 # Merge Lore Strings
