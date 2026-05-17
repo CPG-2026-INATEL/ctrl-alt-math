@@ -7,6 +7,47 @@ from i18n import t
 from map_generator import MapGenerator
 
 
+# --- Pre-rendered symbol cache ---
+_symbol_cache = {}
+
+def _get_symbol_surface(symbol, size, color):
+    key = (symbol, size, color)
+    if key not in _symbol_cache:
+        font = pygame.font.Font(None, size)
+        _symbol_cache[key] = font.render(symbol, True, color)
+    return _symbol_cache[key]
+
+
+# --- Pre-rendered gradient cache ---
+_gradient_cache = {}
+
+def _get_gradient_surface(w, h, bg_color):
+    key = (w, h, bg_color)
+    if key not in _gradient_cache:
+        surf = pygame.Surface((w, h), pygame.SRCALPHA)
+        for y in range(h):
+            ratio = y / h
+            r = int(bg_color[0] * (1 - ratio * 0.3))
+            g = int(bg_color[1] * (1 - ratio * 0.3))
+            b = int(bg_color[2] * (1 - ratio * 0.3))
+            pygame.draw.line(surf, (r, g, b, 220), (0, y), (w, y))
+        pygame.draw.rect(surf, (255, 255, 255, 8), (1, 1, w - 2, h // 3), border_radius=10)
+        _gradient_cache[key] = surf
+    return _gradient_cache[key]
+
+
+# --- Pre-rendered glow surfaces ---
+_glow_cache = {}
+
+def _get_glow_surface(w, h, color, alpha, radius):
+    key = (w, h, color, alpha, radius)
+    if key not in _glow_cache:
+        surf = pygame.Surface((w, h), pygame.SRCALPHA)
+        pygame.draw.rect(surf, (*color, alpha), (0, 0, w, h), border_radius=radius)
+        _glow_cache[key] = surf
+    return _glow_cache[key]
+
+
 # --- Shape drawing helpers ---
 def _draw_hexagon(surface, cx, cy, radius, color, width=2):
     pts = []
@@ -69,6 +110,7 @@ def _draw_victory_crown(surface, cx, cy, size, color, width=2):
 # --- Particle classes ---
 class _MathParticle:
     MATH_SYMBOLS = ["∫", "∂", "∑", "π", "√", "Δ", "∞", "λ", "θ", "φ", "∇", "±", "≈", "≠", "α", "β", "ε", "σ"]
+    SYMBOL_COLOR = (100, 140, 200)
 
     def __init__(self, w, h):
         self.x = random.uniform(0, w)
@@ -99,10 +141,10 @@ class _MathParticle:
     def draw(self, screen, sx, sy, offset_y=0):
         if self.alpha <= 0:
             return
-        font = pygame.font.Font(None, self.size)
-        surf = font.render(self.symbol, True, (100, 140, 200))
-        surf.set_alpha(int(self.alpha))
-        screen.blit(surf, (int(self.x - sx), int(self.y - sy + offset_y)))
+        surf = _get_symbol_surface(self.symbol, self.size, self.SYMBOL_COLOR)
+        surf_copy = surf.copy()
+        surf_copy.set_alpha(int(self.alpha))
+        screen.blit(surf_copy, (int(self.x - sx), int(self.y - sy + offset_y)))
 
 
 class _FlowParticle:
@@ -129,11 +171,11 @@ class _FlowParticle:
 
     def draw(self, screen, sx, sy, offset_y=0):
         pos = self.get_pos()
-        alpha = int(255 * (1 - self.t))
-        glow = pygame.Surface((8, 8), pygame.SRCALPHA)
-        pygame.draw.circle(glow, (*self.color, alpha), (4, 4), 4)
-        screen.blit(glow, (int(pos[0] - sx - 4), int(pos[1] - sy + offset_y - 4)))
-        pygame.draw.circle(screen, self.color, (int(pos[0] - sx), int(pos[1] - sy + offset_y)), 2)
+        alpha = max(0, min(255, int(255 * (1 - self.t))))
+        px = int(pos[0] - sx)
+        py = int(pos[1] - sy + offset_y)
+        pygame.draw.circle(screen, (*self.color, alpha), (px, py), 4)
+        pygame.draw.circle(screen, self.color, (px, py), 2)
 
 
 class Room:
@@ -224,9 +266,16 @@ class WorldMap:
         self._flow_particles = []
         self._avatar_trail = []
         self._bg_grad = None
+        self._grid_surf = None
+        self._header_surf = None
+        self._bottom_bar_surf = None
+        self._star_surf_cache = {}
 
         self._generate_map(seed)
         self._init_bg_particles()
+        self._build_grid_surface()
+        self._build_header_surface()
+        self._build_bottom_bar_surface()
 
     def _init_bg_particles(self):
         self._bg_particles = [_MathParticle(settings.WINDOW_WIDTH, settings.WINDOW_HEIGHT) for _ in range(25)]
@@ -294,12 +343,48 @@ class WorldMap:
             pygame.draw.line(grad, (r, g, b), (0, y), (settings.WINDOW_WIDTH, y))
         self._bg_grad = grad
 
+    def _build_grid_surface(self):
+        self._grid_surf = pygame.Surface((settings.WINDOW_WIDTH, settings.WINDOW_HEIGHT), pygame.SRCALPHA)
+        grid_spacing = 60
+        for x in range(0, settings.WINDOW_WIDTH + grid_spacing, grid_spacing):
+            pygame.draw.line(self._grid_surf, (30, 40, 60), (x, settings.MAP_HEADER_H), (x, settings.WINDOW_HEIGHT), 1)
+        for y in range(settings.MAP_HEADER_H, settings.WINDOW_HEIGHT + grid_spacing, grid_spacing):
+            pygame.draw.line(self._grid_surf, (30, 40, 60), (0, y), (settings.WINDOW_WIDTH, y), 1)
+
+    def _build_header_surface(self):
+        self._header_surf = pygame.Surface((settings.WINDOW_WIDTH, settings.MAP_HEADER_H), pygame.SRCALPHA)
+        for y in range(settings.MAP_HEADER_H):
+            ratio = y / settings.MAP_HEADER_H
+            alpha = int(220 + 35 * (1 - ratio))
+            pygame.draw.line(self._header_surf, (8, 10, 30, alpha), (0, y), (settings.WINDOW_WIDTH, y))
+        pygame.draw.line(self._header_surf, (50, 255, 255, 80),
+                         (0, settings.MAP_HEADER_H - 1), (settings.WINDOW_WIDTH, settings.MAP_HEADER_H - 1), 2)
+
+    def _build_bottom_bar_surface(self):
+        bar_y = 0
+        self._bottom_bar_surf = pygame.Surface((settings.WINDOW_WIDTH, 24), pygame.SRCALPHA)
+        self._bottom_bar_surf.fill((8, 10, 30, 180))
+        pygame.draw.line(self._bottom_bar_surf, (50, 255, 255, 40), (0, bar_y), (settings.WINDOW_WIDTH, bar_y), 1)
+
+    def _get_star_surface(self, color):
+        if color in self._star_surf_cache:
+            return self._star_surf_cache[color]
+        size = 5
+        surf = pygame.Surface((size * 3, size * 3), pygame.SRCALPHA)
+        pygame.draw.circle(surf, (*color, 40), (size * 1.5, size * 1.5), size * 1.5)
+        self._star_surf_cache[color] = surf
+        return surf
+
     def regenerate(self, seed=None):
         self._generate_map(seed)
         self.anim_timer = 0
         self._init_bg_particles()
         self._flow_particles = []
         self._avatar_trail = []
+        self._star_surf_cache = {}
+        self._build_grid_surface()
+        self._build_header_surface()
+        self._build_bottom_bar_surface()
 
     def _update_scroll_to_player(self):
         room = self.rooms.get(self.player_room)
@@ -541,17 +626,12 @@ class WorldMap:
         self._draw_bottom_bar(screen)
 
     def _draw_grid(self, screen, sx, sy):
-        grid_spacing = 60
+        if self._grid_surf is None:
+            return
         alpha = int(25 + 15 * math.sin(self.anim_timer * 0.5))
-        grid_color = (30, 40, 60, alpha)
-
-        start_x = -(sx % grid_spacing)
-        start_y = settings.MAP_HEADER_H - (sy % grid_spacing)
-
-        for x in range(start_x, settings.WINDOW_WIDTH + grid_spacing, grid_spacing):
-            pygame.draw.line(screen, grid_color[:3], (x, settings.MAP_HEADER_H), (x, settings.WINDOW_HEIGHT), 1)
-        for y in range(start_y, settings.WINDOW_HEIGHT + grid_spacing, grid_spacing):
-            pygame.draw.line(screen, grid_color[:3], (0, y), (settings.WINDOW_WIDTH, y), 1)
+        grid_copy = self._grid_surf.copy()
+        grid_copy.set_alpha(alpha)
+        screen.blit(grid_copy, (0, 0))
 
     def _draw_connections(self, screen, sx, sy):
         drawn = set()
@@ -579,9 +659,7 @@ class WorldMap:
                     else:
                         color = (40, 40, 40)
 
-                    glow_surf = pygame.Surface((settings.WINDOW_WIDTH, settings.WINDOW_HEIGHT), pygame.SRCALPHA)
-                    pygame.draw.line(glow_surf, (*color, 40), (start_x, start_y), (end_x, end_y), 8)
-                    screen.blit(glow_surf, (0, 0))
+                    pygame.draw.line(screen, (*color, 40), (start_x, start_y), (end_x, end_y), 8)
 
                     if room.state == "locked" or conn_room.state == "locked":
                         dx = end_x - start_x
@@ -609,16 +687,13 @@ class WorldMap:
         for x, y, a in self._avatar_trail:
             trail_x = x - sx
             trail_y = y - sy + settings.MAP_HEADER_H + bob_y
-            trail_surf = pygame.Surface((avatar_size, avatar_size), pygame.SRCALPHA)
             trail_alpha = max(0, min(255, int(a * 60)))
-            trail_color = (50, 255, 255, trail_alpha)
-            pygame.draw.circle(trail_surf, trail_color, (avatar_size // 2, avatar_size // 2), avatar_size // 2)
-            screen.blit(trail_surf, (int(trail_x) - avatar_size // 2, int(trail_y) - avatar_size // 2))
+            pygame.draw.circle(screen, (50, 255, 255, trail_alpha),
+                               (int(trail_x), int(trail_y)), avatar_size // 2)
 
-        glow_surf = pygame.Surface((avatar_size + 16, avatar_size + 16), pygame.SRCALPHA)
         pulse = int(40 + 30 * math.sin(self.anim_timer * 5))
-        pygame.draw.circle(glow_surf, (50, 255, 255, pulse), (avatar_size // 2 + 8, avatar_size // 2 + 8), avatar_size // 2 + 6)
-        screen.blit(glow_surf, (int(avatar_draw_x) - avatar_size // 2 - 8, int(avatar_draw_y) - avatar_size // 2 - 8))
+        pygame.draw.circle(screen, (50, 255, 255, pulse),
+                           (int(avatar_draw_x), int(avatar_draw_y)), avatar_size // 2 + 6)
 
         if player:
             sprite = player.get_current_sprite()
@@ -639,14 +714,8 @@ class WorldMap:
                             (int(avatar_draw_x) - avatar_size // 2, int(avatar_draw_y) - avatar_size // 2, avatar_size, avatar_size), 2, border_radius=8)
 
     def _draw_header(self, screen):
-        header_surf = pygame.Surface((settings.WINDOW_WIDTH, settings.MAP_HEADER_H), pygame.SRCALPHA)
-        for y in range(settings.MAP_HEADER_H):
-            ratio = y / settings.MAP_HEADER_H
-            alpha = int(220 + 35 * (1 - ratio))
-            pygame.draw.line(header_surf, (8, 10, 30, alpha), (0, y), (settings.WINDOW_WIDTH, y))
-        screen.blit(header_surf, (0, 0))
-
-        pygame.draw.line(screen, (50, 255, 255, 80), (0, settings.MAP_HEADER_H - 1), (settings.WINDOW_WIDTH, settings.MAP_HEADER_H - 1), 2)
+        if self._header_surf:
+            screen.blit(self._header_surf, (0, 0))
 
         title_y = int(28 * settings.UI_SCALE)
         draw_text(screen, t("map_title"),
@@ -683,21 +752,17 @@ class WorldMap:
         draw_text(screen, "[E] Equip", (265, settings.MAP_HEADER_H - 18), settings.GRAY, 12, center=False)
 
     def _draw_bottom_bar(self, screen):
-        bar_y = settings.WINDOW_HEIGHT - 24
-        bar_surf = pygame.Surface((settings.WINDOW_WIDTH, 24), pygame.SRCALPHA)
-        bar_surf.fill((8, 10, 30, 180))
-        screen.blit(bar_surf, (0, bar_y))
-
-        pygame.draw.line(screen, (50, 255, 255, 40), (0, bar_y), (settings.WINDOW_WIDTH, bar_y), 1)
+        if self._bottom_bar_surf:
+            screen.blit(self._bottom_bar_surf, (0, settings.WINDOW_HEIGHT - 24))
 
         diff_labels = {settings.DIFFICULTY_EASY: "EASY", settings.DIFFICULTY_MEDIUM: "MEDIUM", settings.DIFFICULTY_HARD: "HARD"}
         diff_colors = {settings.DIFFICULTY_EASY: settings.GREEN, settings.DIFFICULTY_MEDIUM: settings.GOLD, settings.DIFFICULTY_HARD: settings.RED}
         diff_label = diff_labels.get(settings.DIFFICULTY, "MEDIUM")
         diff_color = diff_colors.get(settings.DIFFICULTY, settings.GOLD)
 
-        draw_text(screen, f"DIFFICULTY: {diff_label}", (settings.WINDOW_WIDTH // 2, bar_y + 12), diff_color, 12)
+        draw_text(screen, f"DIFFICULTY: {diff_label}", (settings.WINDOW_WIDTH // 2, settings.WINDOW_HEIGHT - 12), diff_color, 12)
 
-        draw_text(screen, "ESC Menu", (settings.WINDOW_WIDTH - 55, bar_y + 12), settings.GRAY, 12, center=False)
+        draw_text(screen, "ESC Menu", (settings.WINDOW_WIDTH - 55, settings.WINDOW_HEIGHT - 12), settings.GRAY, 12, center=False)
 
     def _draw_room(self, screen, room, sx, sy):
         draw_x = room.rect.x - sx
@@ -715,35 +780,19 @@ class WorldMap:
         bg_color, border_color = self._get_room_colors(room)
 
         if room.state == "completed":
-            glow = pygame.Surface((draw_rect.width + 8, draw_rect.height + 8), pygame.SRCALPHA)
             glow_alpha = int(30 + 15 * math.sin(room.bob_phase))
-            pygame.draw.rect(glow, (50, 255, 50, glow_alpha), (0, 0, draw_rect.width + 8, draw_rect.height + 8), border_radius=12)
+            glow = _get_glow_surface(draw_rect.width + 8, draw_rect.height + 8, (50, 255, 50), glow_alpha, 12)
             screen.blit(glow, (draw_rect.x - 4, draw_rect.y - 4))
 
         if is_player:
             self._draw_room_pulse(screen, draw_rect, border_color, room.bob_phase)
 
         if is_hovered:
-            hover_glow = pygame.Surface((draw_rect.width + 12, draw_rect.height + 12), pygame.SRCALPHA)
-            pygame.draw.rect(hover_glow, (255, 215, 0, 40), (0, 0, draw_rect.width + 12, draw_rect.height + 12), border_radius=14)
+            hover_glow = _get_glow_surface(draw_rect.width + 12, draw_rect.height + 12, (255, 215, 0), 40, 14)
             screen.blit(hover_glow, (draw_rect.x - 6, draw_rect.y - 6))
 
-        room_surf = pygame.Surface((draw_rect.width, draw_rect.height), pygame.SRCALPHA)
-
-        for y in range(draw_rect.height):
-            ratio = y / draw_rect.height
-            r = int(bg_color[0] * (1 - ratio * 0.3))
-            g = int(bg_color[1] * (1 - ratio * 0.3))
-            b = int(bg_color[2] * (1 - ratio * 0.3))
-            a = 220
-            pygame.draw.line(room_surf, (r, g, b, a), (0, y), (draw_rect.width, y))
-
-        pygame.draw.rect(room_surf, (255, 255, 255, 8), (1, 1, draw_rect.width - 2, draw_rect.height // 3), border_radius=10)
-
-        room_surf_final = pygame.Surface((draw_rect.width, draw_rect.height), pygame.SRCALPHA)
-        room_surf_final.blit(room_surf, (0, 0))
-
-        screen.blit(room_surf_final, (draw_rect.x, draw_rect.y))
+        room_grad = _get_gradient_surface(draw_rect.width, draw_rect.height, bg_color)
+        screen.blit(room_grad, (draw_rect.x, draw_rect.y))
 
         border_width = 3 if is_player else (3 if is_hovered else 2)
         pygame.draw.rect(screen, border_color, draw_rect, border_width, border_radius=10)
@@ -817,8 +866,7 @@ class WorldMap:
 
         for i in range(3, 0, -1):
             alpha = int(20 * i)
-            glow = pygame.Surface((w + i * 8, h + i * 8), pygame.SRCALPHA)
-            pygame.draw.rect(glow, (*color, alpha), (0, 0, w + i * 8, h + i * 8), border_radius=10 + i * 2)
+            glow = _get_glow_surface(w + i * 8, h + i * 8, color, alpha, 10 + i * 2)
             screen.blit(glow, (draw_rect.x + ox - i * 4, draw_rect.y + oy - i * 4))
 
     def _draw_stars(self, screen, cx, cy, count, color):
@@ -826,6 +874,7 @@ class WorldMap:
         spacing = 12
         total_width = count * spacing
         start_x = cx - total_width // 2 + spacing // 2
+        star_glow = self._get_star_surface(color)
         for i in range(count):
             x = start_x + i * spacing
             points = []
@@ -836,9 +885,7 @@ class WorldMap:
                 py = cy + r * math.sin(angle)
                 points.append((px, py))
             if len(points) >= 3:
-                glow = pygame.Surface((star_size * 3, star_size * 3), pygame.SRCALPHA)
-                pygame.draw.circle(glow, (*color, 40), (star_size * 1.5, star_size * 1.5), star_size * 1.5)
-                screen.blit(glow, (x - star_size * 1.5, cy - star_size * 1.5))
+                screen.blit(star_glow, (x - star_size * 1.5, cy - star_size * 1.5))
                 pygame.draw.polygon(screen, color, points)
 
     def _draw_mp_avatar(self, screen, info, avatar_size, bob_y, sx, sy):
@@ -848,9 +895,8 @@ class WorldMap:
         color = info.get("color", settings.GOLD)
         remote_player = info.get("player")
 
-        glow_surf = pygame.Surface((avatar_size + 12, avatar_size + 12), pygame.SRCALPHA)
-        pygame.draw.circle(glow_surf, (*color, 50), (avatar_size // 2 + 6, avatar_size // 2 + 6), avatar_size // 2 + 4)
-        screen.blit(glow_surf, (int(ax) - avatar_size // 2 - 6, int(ay) - avatar_size // 2 - 6))
+        pygame.draw.circle(screen, (*color, 50),
+                           (int(ax), int(ay)), avatar_size // 2 + 4)
 
         if remote_player is not None:
             sprite = remote_player.get_current_sprite()
@@ -865,11 +911,10 @@ class WorldMap:
                 pygame.draw.rect(screen, settings.WHITE,
                                  (int(ax) - avatar_size // 2, int(ay) - avatar_size // 2, avatar_size, avatar_size), 2, border_radius=8)
 
-        font = pygame.font.Font(None, 18)
-        tag = font.render(label, True, settings.BLACK)
-        badge_w = tag.get_width() + 10
-        badge_h = tag.get_height() + 6
+        tag_surf = _get_symbol_surface(label, 18, settings.BLACK)
+        badge_w = tag_surf.get_width() + 10
+        badge_h = tag_surf.get_height() + 6
         badge_x = int(ax) - badge_w // 2
         badge_y = int(ay) - avatar_size // 2 - badge_h - 4
         pygame.draw.rect(screen, color, (badge_x, badge_y, badge_w, badge_h), border_radius=5)
-        screen.blit(tag, (badge_x + 5, badge_y + 3))
+        screen.blit(tag_surf, (badge_x + 5, badge_y + 3))
