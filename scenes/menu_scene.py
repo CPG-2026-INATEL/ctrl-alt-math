@@ -148,24 +148,6 @@ class MenuScene(Scene):
                     self.game.sfx.play("menu_select")
             return
 
-        if event.type == pygame.MOUSEMOTION:
-            for i in range(len(self.menu_items)):
-                if self._menu_item_rect(i).collidepoint(event.pos):
-                    if self.selected != i:
-                        self.selected = i
-                        self.game.sfx.play("menu_select")
-                        self._speak_selection()
-                    return
-            return
-
-        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            for i in range(len(self.menu_items)):
-                if self._menu_item_rect(i).collidepoint(event.pos):
-                    self.selected = i
-                    self._activate_selected()
-                    return
-            return
-
         if event.type != pygame.KEYDOWN:
             return
 
