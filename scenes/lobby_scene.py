@@ -171,6 +171,9 @@ class LobbyScene(Scene):
         self.game.mp_player_index = mp_player_index
         self.game.seed = mp_seed
         self.game.mp_is_multiplayer = True
+        # Regenerate world map with shared seed so both players have identical maps
+        if mp_seed is not None:
+            self.game.world_map.regenerate(mp_seed)
         # Go to the map so the normal room-selection flow works
         self.game.scene_manager.switch("map")
 
