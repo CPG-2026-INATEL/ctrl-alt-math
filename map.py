@@ -1,9 +1,139 @@
 import pygame
 import math
+import random
 import settings
 from utils import draw_text
 from i18n import t
 from map_generator import MapGenerator
+
+
+# --- Shape drawing helpers ---
+def _draw_hexagon(surface, cx, cy, radius, color, width=2):
+    pts = []
+    for i in range(6):
+        angle = math.radians(60 * i - 30)
+        pts.append((cx + radius * math.cos(angle), cy + radius * math.sin(angle)))
+    pygame.draw.polygon(surface, color, pts, width)
+
+
+def _draw_diamond(surface, cx, cy, size, color, width=2):
+    pts = [(cx, cy - size), (cx + size * 0.7, cy), (cx, cy + size), (cx - size * 0.7, cy)]
+    pygame.draw.polygon(surface, color, pts, width)
+
+
+def _draw_triangle(surface, cx, cy, size, color, width=2):
+    pts = [(cx, cy - size), (cx + size * 0.87, cy + size * 0.5), (cx - size * 0.87, cy + size * 0.5)]
+    pygame.draw.polygon(surface, color, pts, width)
+
+
+def _draw_pentagon(surface, cx, cy, radius, color, width=2):
+    pts = []
+    for i in range(5):
+        angle = math.radians(72 * i - 90)
+        pts.append((cx + radius * math.cos(angle), cy + radius * math.sin(angle)))
+    pygame.draw.polygon(surface, color, pts, width)
+
+
+def _draw_checkmark(surface, cx, cy, size, color, width=3):
+    start = (cx - size * 0.5, cy)
+    mid = (cx - size * 0.1, cy + size * 0.4)
+    end = (cx + size * 0.5, cy - size * 0.5)
+    pygame.draw.line(surface, color, start, mid, width)
+    pygame.draw.line(surface, color, mid, end, width)
+
+
+def _draw_lock_icon(surface, cx, cy, size, color, width=2):
+    body = pygame.Rect(cx - size * 0.4, cy, size * 0.8, size * 0.6)
+    pygame.draw.rect(surface, color, body, width, border_radius=2)
+    arc_rect = pygame.Rect(cx - size * 0.3, cy - size * 0.5, size * 0.6, size * 0.5)
+    pygame.draw.arc(surface, color, arc_rect, math.pi, 0, width)
+
+
+def _draw_circle_icon(surface, cx, cy, radius, color, width=2):
+    pygame.draw.circle(surface, color, (int(cx), int(cy)), radius, width)
+
+
+def _draw_victory_crown(surface, cx, cy, size, color, width=2):
+    pts = [
+        (cx - size, cy + size * 0.5),
+        (cx - size, cy - size * 0.3),
+        (cx - size * 0.5, cy + size * 0.1),
+        (cx, cy - size * 0.6),
+        (cx + size * 0.5, cy + size * 0.1),
+        (cx + size, cy - size * 0.3),
+        (cx + size, cy + size * 0.5),
+    ]
+    pygame.draw.polygon(surface, color, pts, width)
+
+
+# --- Particle classes ---
+class _MathParticle:
+    MATH_SYMBOLS = ["∫", "∂", "∑", "π", "√", "Δ", "∞", "λ", "θ", "φ", "∇", "±", "≈", "≠", "α", "β", "ε", "σ"]
+
+    def __init__(self, w, h):
+        self.x = random.uniform(0, w)
+        self.y = random.uniform(0, h)
+        self.vx = random.uniform(-8, 8)
+        self.vy = random.uniform(-12, -3)
+        self.symbol = random.choice(self.MATH_SYMBOLS)
+        self.alpha = random.uniform(20, 60)
+        self.size = random.randint(10, 16)
+        self.w = w
+        self.h = h
+
+    def update(self, dt):
+        self.x += self.vx * dt
+        self.y += self.vy * dt
+        self.alpha -= 10 * dt
+        if self.y < -20 or self.alpha <= 0:
+            self.reset()
+
+    def reset(self):
+        self.x = random.uniform(0, self.w)
+        self.y = self.h + random.uniform(0, 30)
+        self.vx = random.uniform(-8, 8)
+        self.vy = random.uniform(-12, -3)
+        self.alpha = random.uniform(20, 60)
+        self.symbol = random.choice(self.MATH_SYMBOLS)
+
+    def draw(self, screen, sx, sy, offset_y=0):
+        if self.alpha <= 0:
+            return
+        font = pygame.font.Font(None, self.size)
+        surf = font.render(self.symbol, True, (100, 140, 200))
+        surf.set_alpha(int(self.alpha))
+        screen.blit(surf, (int(self.x - sx), int(self.y - sy + offset_y)))
+
+
+class _FlowParticle:
+    def __init__(self, start_pos, end_pos, color, speed=60):
+        self.start = start_pos
+        self.end = end_pos
+        self.t = 0.0
+        self.color = color
+        self.speed = speed
+        dx = end_pos[0] - start_pos[0]
+        dy = end_pos[1] - start_pos[1]
+        self.length = math.sqrt(dx * dx + dy * dy)
+        self.duration = self.length / speed if self.length > 0 else 1.0
+
+    def update(self, dt):
+        self.t += dt / self.duration if self.duration > 0 else 0
+        return self.t < 1.0
+
+    def get_pos(self):
+        t = max(0, min(1, self.t))
+        x = self.start[0] + (self.end[0] - self.start[0]) * t
+        y = self.start[1] + (self.end[1] - self.start[1]) * t
+        return (x, y)
+
+    def draw(self, screen, sx, sy, offset_y=0):
+        pos = self.get_pos()
+        alpha = int(255 * (1 - self.t))
+        glow = pygame.Surface((8, 8), pygame.SRCALPHA)
+        pygame.draw.circle(glow, (*self.color, alpha), (4, 4), 4)
+        screen.blit(glow, (int(pos[0] - sx - 4), int(pos[1] - sy + offset_y - 4)))
+        pygame.draw.circle(screen, self.color, (int(pos[0] - sx), int(pos[1] - sy + offset_y)), 2)
 
 
 class Room:
@@ -90,7 +220,16 @@ class WorldMap:
         self.avatar_y = 0
         self.mp_avatars = []
 
+        self._bg_particles = []
+        self._flow_particles = []
+        self._avatar_trail = []
+        self._bg_grad = None
+
         self._generate_map(seed)
+        self._init_bg_particles()
+
+    def _init_bg_particles(self):
+        self._bg_particles = [_MathParticle(settings.WINDOW_WIDTH, settings.WINDOW_HEIGHT) for _ in range(25)]
 
     def _generate_map(self, seed=None):
         gen = MapGenerator(seed)
@@ -143,10 +282,24 @@ class WorldMap:
         self.avatar_x = float(start_room.rect.centerx)
         self.avatar_y = float(start_room.rect.top + 20)
         self._update_scroll_to_player()
+        self._build_bg_gradient()
+
+    def _build_bg_gradient(self):
+        grad = pygame.Surface((settings.WINDOW_WIDTH, settings.WINDOW_HEIGHT))
+        for y in range(settings.WINDOW_HEIGHT):
+            ratio = y / settings.WINDOW_HEIGHT
+            r = int(5 + ratio * 10)
+            g = int(5 + ratio * 5)
+            b = int(25 + ratio * 15)
+            pygame.draw.line(grad, (r, g, b), (0, y), (settings.WINDOW_WIDTH, y))
+        self._bg_grad = grad
 
     def regenerate(self, seed=None):
         self._generate_map(seed)
         self.anim_timer = 0
+        self._init_bg_particles()
+        self._flow_particles = []
+        self._avatar_trail = []
 
     def _update_scroll_to_player(self):
         room = self.rooms.get(self.player_room)
@@ -207,6 +360,7 @@ class WorldMap:
                     player.current_anim = "walk"
                     if abs(dx) > 1:
                         player.dir_x = 1 if dx > 0 else -1
+                self._avatar_trail.append((self.avatar_x, self.avatar_y, 1.0))
         else:
             self.avatar_x = target_x
             self.avatar_y = target_y
@@ -215,6 +369,39 @@ class WorldMap:
 
         if player:
             player.update_animation(dt)
+
+        for p in self._bg_particles:
+            p.update(dt)
+
+        self._avatar_trail = [(x, y, a - dt * 2) for x, y, a in self._avatar_trail if a > 0]
+
+        self._update_flow_particles(dt)
+
+    def _update_flow_particles(self, dt):
+        self._flow_particles = [p for p in self._flow_particles if p.update(dt)]
+
+        if random.random() < 0.08:
+            rooms_in_order = sorted(self.rooms.values(), key=lambda r: (r.screen_y, r.screen_x))
+            for room in rooms_in_order:
+                for conn_id in room.directional_connections.values():
+                    if conn_id is None:
+                        continue
+                    conn_room = self.rooms.get(conn_id)
+                    if conn_room and conn_room.col >= room.col:
+                        if room.state == "completed" and conn_room.state == "completed":
+                            color = settings.GREEN
+                        elif room.state != "locked" and conn_room.state != "locked":
+                            color = settings.CYAN
+                        else:
+                            continue
+                        start = (room.rect.centerx, room.rect.centery)
+                        end = (conn_room.rect.centerx, conn_room.rect.centery)
+                        self._flow_particles.append(_FlowParticle(start, end, color, speed=80))
+                        break
+
+    def _draw_flow_particles(self, screen, sx, sy):
+        for p in self._flow_particles:
+            p.draw(screen, sx, sy, settings.MAP_HEADER_H)
 
     def navigate(self, direction):
         current_room = self.rooms.get(self.player_room)
@@ -237,7 +424,6 @@ class WorldMap:
         adjusted_x = pos[0] + self.scroll_x
         adjusted_y = pos[1] - settings.MAP_HEADER_H + self.scroll_y
         adjusted_pos = (adjusted_x, adjusted_y)
-        # Match hit testing to visual stacking so overlapping mid-row rooms are selectable.
         rooms = sorted(self.rooms.values(), key=lambda room: (room.screen_y, room.screen_x), reverse=True)
         for room in rooms:
             if room.rect.collidepoint(adjusted_pos):
@@ -293,169 +479,11 @@ class WorldMap:
                 room.state = state
         self._update_scroll_to_player()
 
-    def draw(self, screen, player=None, mp_info=None):
-        screen.fill(settings.DARK_BLUE)
-
-        title_y = int(30 * settings.UI_SCALE)
-        map_height = settings.WINDOW_HEIGHT - settings.MAP_HEADER_H
-
-        map_clip = pygame.Rect(0, settings.MAP_HEADER_H,
-                                settings.WINDOW_WIDTH, map_height)
-        screen.set_clip(map_clip)
-
-        sx = int(self.scroll_x)
-        sy = int(self.scroll_y)
-
-        rooms_in_draw_order = sorted(self.rooms.values(), key=lambda room: (room.screen_y, room.screen_x))
-        for room in rooms_in_draw_order:
-            for conn_id in room.directional_connections.values():
-                if conn_id is None:
-                    continue
-                conn_room = self.rooms.get(conn_id)
-                if conn_room and conn_room.col >= room.col:
-                    start_x = room.rect.centerx - sx
-                    start_y = room.rect.centery - sy + settings.MAP_HEADER_H
-                    end_x = conn_room.rect.centerx - sx
-                    end_y = conn_room.rect.centery - sy + settings.MAP_HEADER_H
-
-                    if room.state == "completed" and conn_room.state == "completed":
-                        color = settings.GREEN
-                    elif room.state != "locked" and conn_room.state != "locked":
-                        color = settings.GRAY
-                    else:
-                        color = (40, 40, 40)
-
-                    pygame.draw.line(screen, color, (start_x, start_y), (end_x, end_y), 2)
-
-        for room in rooms_in_draw_order:
-            self._draw_room(screen, room, sx, sy)
-
-        player_room = self.rooms[self.player_room]
-        bob_y = int(math.sin(self.anim_timer * 4) * 4)
-        avatar_draw_y = self.avatar_y - sy + settings.MAP_HEADER_H + bob_y
-        avatar_draw_x = self.avatar_x - sx
-        avatar_size = max(36, int(48 * settings.UI_SCALE))
-
-        if player:
-            sprite = player.get_current_sprite()
-            if sprite:
-                if player.dir_x < 0:
-                    sprite = pygame.transform.flip(sprite, True, False)
-                sprite = pygame.transform.scale(sprite, (avatar_size, avatar_size))
-                screen.blit(sprite, (int(avatar_draw_x) - avatar_size // 2, int(avatar_draw_y) - avatar_size // 2))
-            else:
-                pygame.draw.rect(screen, settings.CYAN,
-                                (int(avatar_draw_x) - avatar_size // 2, int(avatar_draw_y) - avatar_size // 2, avatar_size, avatar_size))
-                pygame.draw.rect(screen, settings.WHITE,
-                                (int(avatar_draw_x) - avatar_size // 2, int(avatar_draw_y) - avatar_size // 2, avatar_size, avatar_size), 1)
-        else:
-            pygame.draw.rect(screen, settings.CYAN,
-                            (int(avatar_draw_x) - avatar_size // 2, int(avatar_draw_y) - avatar_size // 2, avatar_size, avatar_size))
-            pygame.draw.rect(screen, settings.WHITE,
-                            (int(avatar_draw_x) - avatar_size // 2, int(avatar_draw_y) - avatar_size // 2, avatar_size, avatar_size), 1)
-
-        if mp_info:
-            for info in mp_info:
-                self._draw_mp_avatar(screen, info, avatar_size, bob_y, sx, sy)
-
-        screen.set_clip(None)
-
-        header_surf = pygame.Surface((settings.WINDOW_WIDTH, settings.MAP_HEADER_H), pygame.SRCALPHA)
-        header_surf.fill((10, 10, 40, 245))
-        screen.blit(header_surf, (0, 0))
-
-        draw_text(screen, t("map_title"),
-                 (settings.WINDOW_WIDTH // 2, title_y),
-                 settings.CYAN, 32)
-        gold_str = f"Gold: {self._get_gold()}"
-        draw_text(screen, gold_str,
-                 (settings.WINDOW_WIDTH - 100, title_y),
-                 settings.GOLD, 18)
-
-        draw_text(screen, "[TAB] Player", (15, 12), settings.GRAY, 13, center=False)
-        draw_text(screen, "[S] Shop",    (15, 33), settings.GRAY, 13, center=False)
-
     def _get_gold(self):
         try:
             return self._game.gold
         except:
             return 0
-
-    def _draw_room(self, screen, room, sx, sy):
-        draw_x = room.rect.x - sx
-        draw_y = room.rect.y - sy + settings.MAP_HEADER_H
-        draw_rect = pygame.Rect(draw_x, draw_y, room.rect.width, room.rect.height)
-
-        if draw_rect.right < 0 or draw_rect.left > settings.WINDOW_WIDTH:
-            return
-        if draw_rect.bottom < settings.MAP_HEADER_H or draw_rect.top > settings.WINDOW_HEIGHT:
-            return
-
-        is_player = room.id == self.player_room
-        is_hovered = hasattr(self, 'hovered_room') and self.hovered_room and room.id == self.hovered_room.id
-
-        diff_colors = {
-            1: ((25, 35, 50), settings.CYAN),
-            2: ((35, 30, 20), settings.ORANGE),
-            3: ((45, 20, 20), settings.RED),
-            4: ((50, 15, 50), settings.PURPLE),
-        }
-
-        if room.type == "hub":
-            bg_color = (20, 30, 50)
-            border_color = settings.CYAN
-        elif room.type == "boss":
-            bg_color = (50, 15, 15)
-            border_color = settings.RED
-        elif room.type == "challenge":
-            bg_color = diff_colors.get(room.difficulty, diff_colors[1])[0]
-            border_color = diff_colors.get(room.difficulty, diff_colors[1])[1]
-        elif room.type == "side":
-            bg_color = (30, 40, 20)
-            border_color = settings.GOLD
-        else:
-            bg_color = diff_colors.get(room.difficulty, diff_colors[1])[0]
-            border_color = diff_colors.get(room.difficulty, diff_colors[1])[1]
-
-        if room.state == "completed":
-            bg_color = (15, 45, 15)
-            border_color = settings.GREEN
-        elif room.state == "locked":
-            bg_color = (15, 15, 15)
-            border_color = (40, 40, 40)
-
-        pygame.draw.rect(screen, bg_color, draw_rect, border_radius=10)
-
-        border_width = 3 if is_player else 2
-        if is_player:
-            pulse = int(180 + 75 * math.sin(room.bob_phase * 2))
-            border_color = (pulse, pulse, 255)
-        elif is_hovered:
-            border_color = settings.GOLD
-            border_width = 3
-
-        pygame.draw.rect(screen, border_color, draw_rect, border_width, border_radius=10)
-
-        if room.state == "completed" and not is_player:
-            glow = pygame.Surface((draw_rect.width + 4, draw_rect.height + 4), pygame.SRCALPHA)
-            glow.fill((50, 255, 50, 25))
-            screen.blit(glow, (draw_rect.x - 2, draw_rect.y - 2))
-
-        icon = self._get_room_icon(room)
-        icon_color = settings.WHITE if room.state != "locked" else (60, 60, 60)
-        if room.state == "completed":
-            icon_color = settings.GREEN
-        draw_text(screen, icon, (draw_rect.centerx, draw_rect.centery - 8), icon_color, 20)
-
-        star_color = settings.GOLD if room.state != "locked" else (50, 50, 50)
-        self._draw_stars(screen, draw_rect.centerx, draw_rect.centery + 8, room.difficulty, star_color)
-
-        name_color = settings.LIGHT_GRAY if room.state != "locked" else (50, 50, 50)
-        if room.state == "completed":
-            name_color = settings.GREEN
-        draw_text(screen, t(room.name),
-                 (draw_rect.centerx, draw_rect.bottom - int(10 * settings.UI_SCALE)),
-                 name_color, 8)
 
     def _get_room_icon(self, room):
         if room.state == "completed":
@@ -474,9 +502,327 @@ class WorldMap:
             return "V"
         return "O"
 
+    def draw(self, screen, player=None, mp_info=None):
+        if self._bg_grad:
+            screen.blit(self._bg_grad, (0, 0))
+        else:
+            screen.fill(settings.DARK_BLUE)
+
+        sx = int(self.scroll_x)
+        sy = int(self.scroll_y)
+
+        for p in self._bg_particles:
+            p.draw(screen, sx, sy, settings.MAP_HEADER_H)
+
+        self._draw_grid(screen, sx, sy)
+
+        map_clip = pygame.Rect(0, settings.MAP_HEADER_H,
+                                settings.WINDOW_WIDTH, settings.WINDOW_HEIGHT - settings.MAP_HEADER_H)
+        screen.set_clip(map_clip)
+
+        self._draw_connections(screen, sx, sy)
+        self._draw_flow_particles(screen, sx, sy)
+
+        rooms_in_draw_order = sorted(self.rooms.values(), key=lambda room: (room.screen_y, room.screen_x))
+        for room in rooms_in_draw_order:
+            self._draw_room(screen, room, sx, sy)
+
+        self._draw_avatar(screen, player, sx, sy)
+
+        if mp_info:
+            avatar_size = max(36, int(48 * settings.UI_SCALE))
+            bob_y = int(math.sin(self.anim_timer * 4) * 4)
+            for info in mp_info:
+                self._draw_mp_avatar(screen, info, avatar_size, bob_y, sx, sy)
+
+        screen.set_clip(None)
+
+        self._draw_header(screen)
+        self._draw_bottom_bar(screen)
+
+    def _draw_grid(self, screen, sx, sy):
+        grid_spacing = 60
+        alpha = int(25 + 15 * math.sin(self.anim_timer * 0.5))
+        grid_color = (30, 40, 60, alpha)
+
+        start_x = -(sx % grid_spacing)
+        start_y = settings.MAP_HEADER_H - (sy % grid_spacing)
+
+        for x in range(start_x, settings.WINDOW_WIDTH + grid_spacing, grid_spacing):
+            pygame.draw.line(screen, grid_color[:3], (x, settings.MAP_HEADER_H), (x, settings.WINDOW_HEIGHT), 1)
+        for y in range(start_y, settings.WINDOW_HEIGHT + grid_spacing, grid_spacing):
+            pygame.draw.line(screen, grid_color[:3], (0, y), (settings.WINDOW_WIDTH, y), 1)
+
+    def _draw_connections(self, screen, sx, sy):
+        drawn = set()
+        rooms_in_draw_order = sorted(self.rooms.values(), key=lambda room: (room.screen_y, room.screen_x))
+        for room in rooms_in_draw_order:
+            for conn_id in room.directional_connections.values():
+                if conn_id is None:
+                    continue
+                conn_room = self.rooms.get(conn_id)
+                if conn_room and conn_room.col >= room.col:
+                    pair = tuple(sorted([room.id, conn_room.id]))
+                    if pair in drawn:
+                        continue
+                    drawn.add(pair)
+
+                    start_x = room.rect.centerx - sx
+                    start_y = room.rect.centery - sy + settings.MAP_HEADER_H
+                    end_x = conn_room.rect.centerx - sx
+                    end_y = conn_room.rect.centery - sy + settings.MAP_HEADER_H
+
+                    if room.state == "completed" and conn_room.state == "completed":
+                        color = settings.GREEN
+                    elif room.state != "locked" and conn_room.state != "locked":
+                        color = settings.CYAN
+                    else:
+                        color = (40, 40, 40)
+
+                    glow_surf = pygame.Surface((settings.WINDOW_WIDTH, settings.WINDOW_HEIGHT), pygame.SRCALPHA)
+                    pygame.draw.line(glow_surf, (*color, 40), (start_x, start_y), (end_x, end_y), 8)
+                    screen.blit(glow_surf, (0, 0))
+
+                    if room.state == "locked" or conn_room.state == "locked":
+                        dx = end_x - start_x
+                        dy = end_y - start_y
+                        length = math.sqrt(dx * dx + dy * dy)
+                        if length > 0:
+                            segments = int(length / 10)
+                            for i in range(0, segments, 3):
+                                t1 = i / segments
+                                t2 = min((i + 1.5) / segments, 1)
+                                x1 = start_x + dx * t1
+                                y1 = start_y + dy * t1
+                                x2 = start_x + dx * t2
+                                y2 = start_y + dy * t2
+                                pygame.draw.line(screen, color, (x1, y1), (x2, y2), 2)
+                    else:
+                        pygame.draw.line(screen, color, (start_x, start_y), (end_x, end_y), 2)
+
+    def _draw_avatar(self, screen, player, sx, sy):
+        bob_y = int(math.sin(self.anim_timer * 4) * 4)
+        avatar_draw_y = self.avatar_y - sy + settings.MAP_HEADER_H + bob_y
+        avatar_draw_x = self.avatar_x - sx
+        avatar_size = max(36, int(48 * settings.UI_SCALE))
+
+        for x, y, a in self._avatar_trail:
+            trail_x = x - sx
+            trail_y = y - sy + settings.MAP_HEADER_H + bob_y
+            trail_surf = pygame.Surface((avatar_size, avatar_size), pygame.SRCALPHA)
+            trail_color = (50, 255, 255, int(a * 60))
+            pygame.draw.circle(trail_surf, trail_color, (avatar_size // 2, avatar_size // 2), avatar_size // 2)
+            screen.blit(trail_surf, (int(trail_x) - avatar_size // 2, int(trail_y) - avatar_size // 2))
+
+        glow_surf = pygame.Surface((avatar_size + 16, avatar_size + 16), pygame.SRCALPHA)
+        pulse = int(40 + 30 * math.sin(self.anim_timer * 5))
+        pygame.draw.circle(glow_surf, (50, 255, 255, pulse), (avatar_size // 2 + 8, avatar_size // 2 + 8), avatar_size // 2 + 6)
+        screen.blit(glow_surf, (int(avatar_draw_x) - avatar_size // 2 - 8, int(avatar_draw_y) - avatar_size // 2 - 8))
+
+        if player:
+            sprite = player.get_current_sprite()
+            if sprite:
+                if player.dir_x < 0:
+                    sprite = pygame.transform.flip(sprite, True, False)
+                sprite = pygame.transform.scale(sprite, (avatar_size, avatar_size))
+                screen.blit(sprite, (int(avatar_draw_x) - avatar_size // 2, int(avatar_draw_y) - avatar_size // 2))
+            else:
+                pygame.draw.rect(screen, settings.CYAN,
+                                (int(avatar_draw_x) - avatar_size // 2, int(avatar_draw_y) - avatar_size // 2, avatar_size, avatar_size), border_radius=8)
+                pygame.draw.rect(screen, settings.WHITE,
+                                (int(avatar_draw_x) - avatar_size // 2, int(avatar_draw_y) - avatar_size // 2, avatar_size, avatar_size), 2, border_radius=8)
+        else:
+            pygame.draw.rect(screen, settings.CYAN,
+                            (int(avatar_draw_x) - avatar_size // 2, int(avatar_draw_y) - avatar_size // 2, avatar_size, avatar_size), border_radius=8)
+            pygame.draw.rect(screen, settings.WHITE,
+                            (int(avatar_draw_x) - avatar_size // 2, int(avatar_draw_y) - avatar_size // 2, avatar_size, avatar_size), 2, border_radius=8)
+
+    def _draw_header(self, screen):
+        header_surf = pygame.Surface((settings.WINDOW_WIDTH, settings.MAP_HEADER_H), pygame.SRCALPHA)
+        for y in range(settings.MAP_HEADER_H):
+            ratio = y / settings.MAP_HEADER_H
+            alpha = int(220 + 35 * (1 - ratio))
+            pygame.draw.line(header_surf, (8, 10, 30, alpha), (0, y), (settings.WINDOW_WIDTH, y))
+        screen.blit(header_surf, (0, 0))
+
+        pygame.draw.line(screen, (50, 255, 255, 80), (0, settings.MAP_HEADER_H - 1), (settings.WINDOW_WIDTH, settings.MAP_HEADER_H - 1), 2)
+
+        title_y = int(28 * settings.UI_SCALE)
+        draw_text(screen, t("map_title"),
+                 (settings.WINDOW_WIDTH // 2, title_y),
+                 settings.CYAN, 28)
+
+        gold_str = f"Gold: {self._get_gold()}"
+        gold_x = settings.WINDOW_WIDTH - 110
+        gold_bg = pygame.Surface((100, 26), pygame.SRCALPHA)
+        gold_bg.fill((255, 215, 0, 25))
+        pygame.draw.rect(gold_bg, (255, 215, 0, 80), (0, 0, 100, 26), 1, border_radius=6)
+        screen.blit(gold_bg, (gold_x - 5, title_y - 8))
+        draw_text(screen, gold_str, (gold_x + 45, title_y), settings.GOLD, 16)
+
+        total_rooms = len([r for r in self.rooms.values() if r.type not in ("hub", "victory")])
+        completed_rooms = len([r for r in self.rooms.values() if r.state == "completed" and r.type not in ("hub", "victory")])
+
+        if total_rooms > 0:
+            prog_text = f"{completed_rooms}/{total_rooms}"
+            draw_text(screen, prog_text, (15, title_y), settings.GREEN, 16)
+
+            bar_w = 80
+            bar_h = 6
+            bar_x = 15
+            bar_y = title_y + 16
+            pygame.draw.rect(screen, (30, 30, 30), (bar_x, bar_y, bar_w, bar_h), border_radius=3)
+            if completed_rooms > 0:
+                fill_w = int(bar_w * completed_rooms / total_rooms)
+                pygame.draw.rect(screen, settings.GREEN, (bar_x, bar_y, fill_w, bar_h), border_radius=3)
+
+        draw_text(screen, "[TAB] Player", (15, settings.MAP_HEADER_H - 18), settings.GRAY, 12, center=False)
+        draw_text(screen, "[S] Shop", (100, settings.MAP_HEADER_H - 18), settings.GRAY, 12, center=False)
+        draw_text(screen, "[U] Upgrades", (170, settings.MAP_HEADER_H - 18), settings.GRAY, 12, center=False)
+        draw_text(screen, "[E] Equip", (265, settings.MAP_HEADER_H - 18), settings.GRAY, 12, center=False)
+
+    def _draw_bottom_bar(self, screen):
+        bar_y = settings.WINDOW_HEIGHT - 24
+        bar_surf = pygame.Surface((settings.WINDOW_WIDTH, 24), pygame.SRCALPHA)
+        bar_surf.fill((8, 10, 30, 180))
+        screen.blit(bar_surf, (0, bar_y))
+
+        pygame.draw.line(screen, (50, 255, 255, 40), (0, bar_y), (settings.WINDOW_WIDTH, bar_y), 1)
+
+        diff_labels = {settings.DIFFICULTY_EASY: "EASY", settings.DIFFICULTY_MEDIUM: "MEDIUM", settings.DIFFICULTY_HARD: "HARD"}
+        diff_colors = {settings.DIFFICULTY_EASY: settings.GREEN, settings.DIFFICULTY_MEDIUM: settings.GOLD, settings.DIFFICULTY_HARD: settings.RED}
+        diff_label = diff_labels.get(settings.DIFFICULTY, "MEDIUM")
+        diff_color = diff_colors.get(settings.DIFFICULTY, settings.GOLD)
+
+        draw_text(screen, f"DIFFICULTY: {diff_label}", (settings.WINDOW_WIDTH // 2, bar_y + 12), diff_color, 12)
+
+        draw_text(screen, "ESC Menu", (settings.WINDOW_WIDTH - 55, bar_y + 12), settings.GRAY, 12, center=False)
+
+    def _draw_room(self, screen, room, sx, sy):
+        draw_x = room.rect.x - sx
+        draw_y = room.rect.y - sy + settings.MAP_HEADER_H
+        draw_rect = pygame.Rect(draw_x, draw_y, room.rect.width, room.rect.height)
+
+        if draw_rect.right < -50 or draw_rect.left > settings.WINDOW_WIDTH + 50:
+            return
+        if draw_rect.bottom < settings.MAP_HEADER_H - 50 or draw_rect.top > settings.WINDOW_HEIGHT + 50:
+            return
+
+        is_player = room.id == self.player_room
+        is_hovered = hasattr(self, 'hovered_room') and self.hovered_room and room.id == self.hovered_room.id
+
+        bg_color, border_color = self._get_room_colors(room)
+
+        if room.state == "completed":
+            glow = pygame.Surface((draw_rect.width + 8, draw_rect.height + 8), pygame.SRCALPHA)
+            glow_alpha = int(30 + 15 * math.sin(room.bob_phase))
+            pygame.draw.rect(glow, (50, 255, 50, glow_alpha), (0, 0, draw_rect.width + 8, draw_rect.height + 8), border_radius=12)
+            screen.blit(glow, (draw_rect.x - 4, draw_rect.y - 4))
+
+        if is_player:
+            self._draw_room_pulse(screen, draw_rect, border_color, room.bob_phase)
+
+        if is_hovered:
+            hover_glow = pygame.Surface((draw_rect.width + 12, draw_rect.height + 12), pygame.SRCALPHA)
+            pygame.draw.rect(hover_glow, (255, 215, 0, 40), (0, 0, draw_rect.width + 12, draw_rect.height + 12), border_radius=14)
+            screen.blit(hover_glow, (draw_rect.x - 6, draw_rect.y - 6))
+
+        room_surf = pygame.Surface((draw_rect.width, draw_rect.height), pygame.SRCALPHA)
+
+        for y in range(draw_rect.height):
+            ratio = y / draw_rect.height
+            r = int(bg_color[0] * (1 - ratio * 0.3))
+            g = int(bg_color[1] * (1 - ratio * 0.3))
+            b = int(bg_color[2] * (1 - ratio * 0.3))
+            a = 220
+            pygame.draw.line(room_surf, (r, g, b, a), (0, y), (draw_rect.width, y))
+
+        pygame.draw.rect(room_surf, (255, 255, 255, 8), (1, 1, draw_rect.width - 2, draw_rect.height // 3), border_radius=10)
+
+        room_surf_final = pygame.Surface((draw_rect.width, draw_rect.height), pygame.SRCALPHA)
+        room_surf_final.blit(room_surf, (0, 0))
+
+        screen.blit(room_surf_final, (draw_rect.x, draw_rect.y))
+
+        border_width = 3 if is_player else (3 if is_hovered else 2)
+        pygame.draw.rect(screen, border_color, draw_rect, border_width, border_radius=10)
+
+        if is_player:
+            pulse_alpha = int(100 + 80 * math.sin(room.bob_phase * 2))
+            pygame.draw.rect(screen, (*border_color, pulse_alpha), draw_rect, 1, border_radius=10)
+
+        self._draw_room_icon(screen, room, draw_rect)
+
+        star_color = settings.GOLD if room.state != "locked" else (50, 50, 50)
+        star_y = draw_rect.centery + 14
+        self._draw_stars(screen, draw_rect.centerx, star_y, room.difficulty, star_color)
+
+        name_color = settings.LIGHT_GRAY if room.state != "locked" else (50, 50, 50)
+        if room.state == "completed":
+            name_color = settings.GREEN
+        draw_text(screen, t(room.name),
+                 (draw_rect.centerx, draw_rect.bottom - int(10 * settings.UI_SCALE)),
+                 name_color, 9)
+
+    def _get_room_colors(self, room):
+        diff_colors = {
+            1: ((25, 35, 50), settings.CYAN),
+            2: ((35, 30, 20), settings.ORANGE),
+            3: ((45, 20, 20), settings.RED),
+            4: ((50, 15, 50), settings.PURPLE),
+        }
+
+        if room.type == "hub":
+            return (10, 25, 45), settings.CYAN
+        elif room.type == "boss":
+            return (40, 10, 10), settings.RED
+        elif room.type == "challenge":
+            return diff_colors.get(room.difficulty, diff_colors[1])[0], diff_colors.get(room.difficulty, diff_colors[1])[1]
+        elif room.type == "side":
+            return (25, 30, 10), settings.GOLD
+        elif room.type == "victory":
+            return (20, 15, 40), settings.PURPLE
+        else:
+            return diff_colors.get(room.difficulty, diff_colors[1])[0], diff_colors.get(room.difficulty, diff_colors[1])[1]
+
+    def _draw_room_icon(self, screen, room, draw_rect):
+        cx = draw_rect.centerx
+        cy = draw_rect.centery - 6
+        icon_size = 14
+
+        if room.state == "completed":
+            _draw_checkmark(screen, cx, cy, icon_size * 1.5, settings.GREEN, 3)
+        elif room.state == "locked":
+            _draw_lock_icon(screen, cx, cy, icon_size, (60, 60, 60), 2)
+        elif room.type == "hub":
+            _draw_hexagon(screen, cx, cy, icon_size, settings.CYAN, 2)
+        elif room.type == "boss":
+            _draw_pentagon(screen, cx, cy, icon_size, settings.RED, 2)
+        elif room.type == "challenge":
+            _draw_triangle(screen, cx, cy, icon_size, settings.ORANGE, 2)
+        elif room.type == "side":
+            _draw_diamond(screen, cx, cy, icon_size, settings.GOLD, 2)
+        elif room.type == "victory":
+            _draw_victory_crown(screen, cx, cy, icon_size, settings.PURPLE, 2)
+        else:
+            _draw_circle_icon(screen, cx, cy, icon_size, settings.WHITE, 2)
+
+    def _draw_room_pulse(self, screen, draw_rect, color, phase):
+        pulse_scale = 1 + 0.04 * math.sin(phase * 2)
+        w = int(draw_rect.width * pulse_scale)
+        h = int(draw_rect.height * pulse_scale)
+        ox = (draw_rect.width - w) // 2
+        oy = (draw_rect.height - h) // 2
+
+        for i in range(3, 0, -1):
+            alpha = int(20 * i)
+            glow = pygame.Surface((w + i * 8, h + i * 8), pygame.SRCALPHA)
+            pygame.draw.rect(glow, (*color, alpha), (0, 0, w + i * 8, h + i * 8), border_radius=10 + i * 2)
+            screen.blit(glow, (draw_rect.x + ox - i * 4, draw_rect.y + oy - i * 4))
+
     def _draw_stars(self, screen, cx, cy, count, color):
-        star_size = 4
-        spacing = 10
+        star_size = 5
+        spacing = 12
         total_width = count * spacing
         start_x = cx - total_width // 2 + spacing // 2
         for i in range(count):
@@ -489,6 +835,9 @@ class WorldMap:
                 py = cy + r * math.sin(angle)
                 points.append((px, py))
             if len(points) >= 3:
+                glow = pygame.Surface((star_size * 3, star_size * 3), pygame.SRCALPHA)
+                pygame.draw.circle(glow, (*color, 40), (star_size * 1.5, star_size * 1.5), star_size * 1.5)
+                screen.blit(glow, (x - star_size * 1.5, cy - star_size * 1.5))
                 pygame.draw.polygon(screen, color, points)
 
     def _draw_mp_avatar(self, screen, info, avatar_size, bob_y, sx, sy):
@@ -497,6 +846,10 @@ class WorldMap:
         label = info.get("label", "P2")
         color = info.get("color", settings.GOLD)
         remote_player = info.get("player")
+
+        glow_surf = pygame.Surface((avatar_size + 12, avatar_size + 12), pygame.SRCALPHA)
+        pygame.draw.circle(glow_surf, (*color, 50), (avatar_size // 2 + 6, avatar_size // 2 + 6), avatar_size // 2 + 4)
+        screen.blit(glow_surf, (int(ax) - avatar_size // 2 - 6, int(ay) - avatar_size // 2 - 6))
 
         if remote_player is not None:
             sprite = remote_player.get_current_sprite()
@@ -507,15 +860,15 @@ class WorldMap:
                 screen.blit(sprite, (int(ax) - avatar_size // 2, int(ay) - avatar_size // 2))
             else:
                 pygame.draw.rect(screen, color,
-                                 (int(ax) - avatar_size // 2, int(ay) - avatar_size // 2, avatar_size, avatar_size))
+                                 (int(ax) - avatar_size // 2, int(ay) - avatar_size // 2, avatar_size, avatar_size), border_radius=8)
                 pygame.draw.rect(screen, settings.WHITE,
-                                 (int(ax) - avatar_size // 2, int(ay) - avatar_size // 2, avatar_size, avatar_size), 1)
+                                 (int(ax) - avatar_size // 2, int(ay) - avatar_size // 2, avatar_size, avatar_size), 2, border_radius=8)
 
-        font = pygame.font.Font(None, 20)
+        font = pygame.font.Font(None, 18)
         tag = font.render(label, True, settings.BLACK)
-        badge_w = tag.get_width() + 8
-        badge_h = tag.get_height() + 4
+        badge_w = tag.get_width() + 10
+        badge_h = tag.get_height() + 6
         badge_x = int(ax) - badge_w // 2
-        badge_y = int(ay) - avatar_size // 2 - badge_h - 3
-        pygame.draw.rect(screen, color, (badge_x, badge_y, badge_w, badge_h), border_radius=4)
-        screen.blit(tag, (badge_x + 4, badge_y + 2))
+        badge_y = int(ay) - avatar_size // 2 - badge_h - 4
+        pygame.draw.rect(screen, color, (badge_x, badge_y, badge_w, badge_h), border_radius=5)
+        screen.blit(tag, (badge_x + 5, badge_y + 3))

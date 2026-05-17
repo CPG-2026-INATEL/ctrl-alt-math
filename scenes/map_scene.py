@@ -31,6 +31,8 @@ class MapScene(Scene):
         self._drag_moved = False
         self._hovered_room = None
         self._mouse_pos = (0, 0)
+        self._detail_panel_room = None
+        self._detail_panel_alpha = 0.0
 
     def enter(self, prev_scene=None):
         self.room = None
@@ -41,6 +43,8 @@ class MapScene(Scene):
         self._dragging = False
         self._drag_moved = False
         self._hovered_room = None
+        self._detail_panel_room = None
+        self._detail_panel_alpha = 0.0
         self._speak_room()
 
         if self.game.mp_is_multiplayer:
@@ -254,6 +258,14 @@ class MapScene(Scene):
         self.game.world_map.update(dt, self.game.player)
         self.game.floating_text.update(dt)
 
+        if self._hovered_room and self._hovered_room.state != "locked":
+            self._detail_panel_room = self._hovered_room
+            self._detail_panel_alpha = min(1.0, self._detail_panel_alpha + dt * 6)
+        else:
+            self._detail_panel_alpha = max(0.0, self._detail_panel_alpha - dt * 6)
+            if self._detail_panel_alpha <= 0:
+                self._detail_panel_room = None
+
         if not self.game.mp_is_multiplayer:
             return
 
@@ -344,7 +356,15 @@ class MapScene(Scene):
         bar_surf = pygame.Surface((settings.WINDOW_WIDTH, 28), pygame.SRCALPHA)
         bar_surf.fill((0, 0, 0, 130))
         screen.blit(bar_surf, (0, bar_y - 4))
-        draw_text(screen, msg, (cx, bar_y + 8), color, 16)
+
+        dot_x = cx - 60
+        dot_y = bar_y + 8
+        dot_color = color
+        pulse = int(150 + 105 * math.sin(self.game.world_map.anim_timer * 4))
+        pygame.draw.circle(screen, (*dot_color, pulse), (dot_x, dot_y), 5)
+        pygame.draw.circle(screen, dot_color, (dot_x, dot_y), 3)
+
+        draw_text(screen, msg, (cx + 10, bar_y + 8), color, 16)
 
     def _draw_hover_popup(self, screen):
         room = self._hovered_room
@@ -352,21 +372,20 @@ class MapScene(Scene):
             return
 
         mx, my = self._mouse_pos
-        popup_w = 230
-        popup_h = 110
+        popup_w = 220
+        popup_h = 100
         popup_x = mx + 18
         popup_y = my - 15
 
-        if popup_x + popup_w > settings.WINDOW_WIDTH:
+        if popup_x + popup_w > settings.WINDOW_WIDTH - 200:
             popup_x = mx - popup_w - 18
         if popup_y + popup_h > settings.WINDOW_HEIGHT:
             popup_y = settings.WINDOW_HEIGHT - popup_h - 5
-        if popup_y < 5:
-            popup_y = 5
+        if popup_y < settings.MAP_HEADER_H + 5:
+            popup_y = settings.MAP_HEADER_H + 5
 
-        # Glass background
         bg = pygame.Surface((popup_w, popup_h), pygame.SRCALPHA)
-        bg.fill((10, 12, 28, 230))
+        bg.fill((10, 12, 28, 220))
         screen.blit(bg, (popup_x, popup_y))
 
         type_labels = {"hub": "HUB", "normal": "ROOM", "challenge": "CHALLENGE",
@@ -384,71 +403,194 @@ class MapScene(Scene):
         elif room.type == "victory":
             type_color = settings.PURPLE
 
-        # Neon border color matches room type
         pygame.draw.rect(screen, type_color, (popup_x, popup_y, popup_w, popup_h), 2, border_radius=6)
-        # Accent top strip
-        pygame.draw.rect(screen, type_color, (popup_x, popup_y, popup_w, 4), border_radius=6)
+        pygame.draw.rect(screen, type_color, (popup_x, popup_y, popup_w, 3), border_radius=6)
 
-        # Room name
-        title_font = pygame.font.Font(None, 22)
+        title_font = pygame.font.Font(None, 20)
         title = title_font.render(t(room.name), True, settings.WHITE)
-        screen.blit(title, (popup_x + 10, popup_y + 10))
+        screen.blit(title, (popup_x + 10, popup_y + 8))
 
-        # Type badge
-        badge_font = pygame.font.Font(None, 14)
+        badge_font = pygame.font.Font(None, 13)
         badge_txt = badge_font.render(type_label, True, type_color)
-        screen.blit(badge_txt, (popup_x + 10, popup_y + 32))
+        screen.blit(badge_txt, (popup_x + 10, popup_y + 28))
 
-        # Separator
         pygame.draw.line(screen, (40, 40, 60),
-                         (popup_x + 8, popup_y + 46),
-                         (popup_x + popup_w - 8, popup_y + 46), 1)
+                         (popup_x + 8, popup_y + 42),
+                         (popup_x + popup_w - 8, popup_y + 42), 1)
 
-        # Difficulty stars
         diff_colors = {1: settings.CYAN, 2: settings.GOLD, 3: settings.ORANGE, 4: settings.RED}
         diff_color = diff_colors.get(room.difficulty, settings.GRAY)
         diff_names = {1: "Easy", 2: "Medium", 3: "Hard", 4: "Extreme"}
         diff_name = diff_names.get(room.difficulty, "???")
 
-        diff_font = pygame.font.Font(None, 16)
+        diff_font = pygame.font.Font(None, 14)
         diff_txt = diff_font.render(f"Difficulty: {diff_name}", True, diff_color)
-        screen.blit(diff_txt, (popup_x + 10, popup_y + 53))
+        screen.blit(diff_txt, (popup_x + 10, popup_y + 48))
 
-        # Draw small stars
-        star_y = popup_y + 54
-        star_x = popup_x + popup_w - 15 - room.difficulty * 14
+        star_y = popup_y + 48
+        star_x = popup_x + popup_w - 15 - room.difficulty * 13
         for i in range(room.difficulty):
             pts = []
             for ai in range(10):
                 ang = math.radians(ai * 36 - 90)
-                r = 5 if ai % 2 == 0 else 2
-                pts.append((star_x + i * 14 + r * math.cos(ang),
+                r = 4 if ai % 2 == 0 else 2
+                pts.append((star_x + i * 13 + r * math.cos(ang),
                              star_y + r * math.sin(ang)))
             pygame.draw.polygon(screen, diff_color, pts)
 
-        # Gold reward
-        gold_font = pygame.font.Font(None, 16)
+        gold_font = pygame.font.Font(None, 14)
         gold_txt = gold_font.render(f"+{room.gold_reward} gold", True, settings.GOLD)
-        screen.blit(gold_txt, (popup_x + 10, popup_y + 73))
+        screen.blit(gold_txt, (popup_x + 10, popup_y + 66))
 
-        # State indicator
         state_labels = {"available": "ENTER →", "completed": "REVISIT", "locked": "LOCKED"}
         state_colors = {"available": settings.GREEN, "completed": settings.CYAN, "locked": settings.GRAY}
         state_lbl = state_labels.get(room.state, room.state)
         state_col = state_colors.get(room.state, settings.GRAY)
         state_txt = gold_font.render(state_lbl, True, state_col)
-        screen.blit(state_txt, (popup_x + popup_w - state_txt.get_width() - 10, popup_y + 73))
+        screen.blit(state_txt, (popup_x + popup_w - state_txt.get_width() - 10, popup_y + 66))
 
-        # Narrative hint at bottom
-        narr_font = pygame.font.Font(None, 13)
-        narr_text = t(room.narrative)[:45] + "…" if len(t(room.narrative)) > 45 else t(room.narrative)
+        narr_font = pygame.font.Font(None, 12)
+        narr_text = t(room.narrative)[:40] + "…" if len(t(room.narrative)) > 40 else t(room.narrative)
         narr_surf = narr_font.render(narr_text, True, (130, 130, 150))
-        screen.blit(narr_surf, (popup_x + 10, popup_y + 92))
+        screen.blit(narr_surf, (popup_x + 10, popup_y + 84))
+
+    def _draw_detail_panel(self, screen):
+        room = self._detail_panel_room
+        if room is None or self._detail_panel_alpha <= 0:
+            return
+
+        panel_w = 190
+        panel_h = 260
+        panel_x = settings.WINDOW_WIDTH - panel_w - 8
+        panel_y = settings.MAP_HEADER_H + 8
+
+        alpha = int(self._detail_panel_alpha * 230)
+
+        panel_surf = pygame.Surface((panel_w, panel_h), pygame.SRCALPHA)
+        panel_surf.fill((8, 10, 28, alpha))
+        screen.blit(panel_surf, (panel_x, panel_y))
+
+        type_labels = {"hub": "HUB", "normal": "NORMAL", "challenge": "CHALLENGE",
+                       "side": "SIDE QUEST", "boss": "BOSS", "victory": "VICTORY"}
+        type_label = type_labels.get(room.type, "NORMAL")
+        type_color = settings.GRAY
+        if room.type == "hub":
+            type_color = settings.CYAN
+        elif room.type == "side":
+            type_color = settings.GOLD
+        elif room.type == "challenge":
+            type_color = settings.ORANGE
+        elif room.type == "boss":
+            type_color = settings.RED
+        elif room.type == "victory":
+            type_color = settings.PURPLE
+
+        pygame.draw.rect(screen, (*type_color, alpha), (panel_x, panel_y, panel_w, panel_h), 2, border_radius=8)
+        pygame.draw.rect(screen, (*type_color, alpha), (panel_x, panel_y, panel_w, 3), border_radius=8)
+
+        y = panel_y + 10
+
+        title_font = pygame.font.Font(None, 18)
+        title = title_font.render(t(room.name), True, settings.WHITE)
+        title.set_alpha(alpha)
+        screen.blit(title, (panel_x + 10, y))
+        y += 22
+
+        badge_font = pygame.font.Font(None, 13)
+        type_badge = badge_font.render(type_label, True, type_color)
+        type_badge.set_alpha(alpha)
+        screen.blit(type_badge, (panel_x + 10, y))
+        y += 20
+
+        pygame.draw.line(screen, (40, 40, 60, alpha // 2),
+                         (panel_x + 8, y), (panel_x + panel_w - 8, y), 1)
+        y += 10
+
+        diff_colors = {1: settings.CYAN, 2: settings.GOLD, 3: settings.ORANGE, 4: settings.RED}
+        diff_color = diff_colors.get(room.difficulty, settings.GRAY)
+        diff_names = {1: "Easy", 2: "Medium", 3: "Hard", 4: "Extreme"}
+        diff_name = diff_names.get(room.difficulty, "???")
+
+        diff_font = pygame.font.Font(None, 14)
+        diff_txt = diff_font.render(f"Difficulty: {diff_name}", True, diff_color)
+        diff_txt.set_alpha(alpha)
+        screen.blit(diff_txt, (panel_x + 10, y))
+        y += 18
+
+        star_cx = panel_x + panel_w // 2
+        star_spacing = 14
+        star_start = star_cx - room.difficulty * star_spacing // 2
+        for i in range(room.difficulty):
+            pts = []
+            for ai in range(10):
+                ang = math.radians(ai * 36 - 90)
+                r = 5 if ai % 2 == 0 else 2
+                pts.append((star_start + i * star_spacing + r * math.cos(ang),
+                             y + r * math.sin(ang)))
+            pygame.draw.polygon(screen, diff_color, pts)
+        y += 16
+
+        gold_font = pygame.font.Font(None, 14)
+        gold_txt = gold_font.render(f"+{room.gold_reward} gold", True, settings.GOLD)
+        gold_txt.set_alpha(alpha)
+        screen.blit(gold_txt, (panel_x + 10, y))
+        y += 20
+
+        if room.enemies:
+            enemy_font = pygame.font.Font(None, 13)
+            enemy_label = enemy_font.render("Enemies:", True, settings.LIGHT_GRAY)
+            enemy_label.set_alpha(alpha)
+            screen.blit(enemy_label, (panel_x + 10, y))
+            y += 16
+
+            enemy_type_names = {
+                "censor": "Censor",
+                "strawman": "Strawman",
+                "bayesian": "Bayesian",
+                "ortogonal": "Ortogonal",
+                "atirador": "Atirador",
+                "granadeiro": "Granadeiro",
+                "boss": "BOSS",
+            }
+            enemy_colors_map = {
+                "censor": settings.RED,
+                "strawman": settings.ORANGE,
+                "bayesian": settings.PURPLE,
+                "ortogonal": settings.CYAN,
+                "atirador": settings.YELLOW,
+                "granadeiro": settings.ORANGE,
+                "boss": settings.RED,
+            }
+            for e_type, count in room.enemies:
+                e_name = enemy_type_names.get(e_type, e_type)
+                e_color = enemy_colors_map.get(e_type, settings.GRAY)
+                if e_type == "boss":
+                    e_text = f"  {e_name} x{count}"
+                else:
+                    e_text = f"  {e_name} x{count}"
+                e_surf = enemy_font.render(e_text, True, e_color)
+                e_surf.set_alpha(alpha)
+                screen.blit(e_surf, (panel_x + 10, y))
+                y += 15
+
+        y = panel_y + panel_h - 35
+
+        state_labels = {"available": "ENTER →", "completed": "REVISIT", "locked": "LOCKED"}
+        state_colors = {"available": settings.GREEN, "completed": settings.CYAN, "locked": settings.GRAY}
+        state_lbl = state_labels.get(room.state, room.state)
+        state_col = state_colors.get(room.state, settings.GRAY)
+
+        state_font = pygame.font.Font(None, 16)
+        state_surf = state_font.render(state_lbl, True, state_col)
+        state_surf.set_alpha(alpha)
+        state_x = panel_x + (panel_w - state_surf.get_width()) // 2
+        screen.blit(state_surf, (state_x, y))
 
     def draw(self, screen):
         mp_info = self._build_mp_info()
         self.game.world_map.hovered_room = self._hovered_room
         self.game.world_map.draw(screen, self.game.player, mp_info=mp_info)
         self._draw_hover_popup(screen)
+        self._draw_detail_panel(screen)
         self._draw_vote_ui(screen)
         self.game.floating_text.draw(screen)
