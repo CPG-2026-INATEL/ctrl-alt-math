@@ -21,6 +21,7 @@ class Room:
         self.gold_reward = data.get("gold_reward", 20)
         self.is_start = data.get("is_start", False)
         self.is_final = data.get("is_final", False)
+        self.objective = data.get("objective", "kill_all")
         self.arena_cols = data.get("arena_cols", settings.GRID_COLS)
         self.arena_rows = data.get("arena_rows", settings.GRID_ROWS)
         self.jitter_x = data.get("jitter_x", 0)
@@ -367,10 +368,6 @@ class WorldMap:
         draw_text(screen, t("map_title"),
                  (settings.WINDOW_WIDTH // 2, title_y),
                  settings.CYAN, 32)
-        gold_str = f"Gold: {self._get_gold()}"
-        draw_text(screen, gold_str,
-                 (settings.WINDOW_WIDTH - 100, title_y),
-                 settings.GOLD, 18)
 
         draw_text(screen, "[TAB] Player", (15, 12), settings.GRAY, 13, center=False)
         draw_text(screen, "[S] Shop",    (15, 33), settings.GRAY, 13, center=False)
@@ -413,6 +410,9 @@ class WorldMap:
         elif room.type == "side":
             bg_color = (30, 40, 20)
             border_color = settings.GOLD
+        elif room.objective == "capture_flag":
+            bg_color = (30, 35, 20)
+            border_color = (0, 220, 0)
         else:
             bg_color = diff_colors.get(room.difficulty, diff_colors[1])[0]
             border_color = diff_colors.get(room.difficulty, diff_colors[1])[1]
@@ -467,11 +467,13 @@ class WorldMap:
         if room.type == "boss":
             return "B"
         if room.type == "challenge":
-            return "!"
+            return "C"
         if room.type == "side":
             return "$"
         if room.type == "victory":
             return "V"
+        if room.objective == "capture_flag":
+            return "F"
         return "O"
 
     def _draw_stars(self, screen, cx, cy, count, color):

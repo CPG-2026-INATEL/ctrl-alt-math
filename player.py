@@ -31,6 +31,7 @@ class Player:
         self.inventory = []
         self.equipment = {"weapon": "basic_sword", "shield": "wooden_shield"}
         self.buffs = []
+        self.has_flag = False
 
         self.dir_x = 0
         self.dir_y = -1
