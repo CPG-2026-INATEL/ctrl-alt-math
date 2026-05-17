@@ -256,6 +256,9 @@ class GameplayScene(Scene):
         self.mp_local_move_target = None
         self.mp_pending_remote_turn = None
 
+        if self.game.mp_is_multiplayer and self.game.mp_client:
+            self._send_mp_command("request_sync")
+
         if prev_scene and hasattr(prev_scene, "room"):
             room = prev_scene.room
             self.game.current_room = room
@@ -1377,8 +1380,27 @@ class GameplayScene(Scene):
 
     def update(self, dt):
         if self.game.mp_is_multiplayer and self.game.mp_client:
+            msgs = self.game.mp_client.poll()
+            for msg in msgs:
+                if msg.get("type") == "gp_state":
+                    self.mp_cached_state = dict(msg)
+                    self._apply_mp_state(msg)
+                elif msg.get("type") == "gp_state_diff":
+                    if self.mp_cached_state is not None:
+                        merged = dict(self.mp_cached_state)
+                        merged.update(msg)
+                        merged["type"] = "gp_state"
+                        self.mp_cached_state = merged
+                        self._apply_mp_state(merged)
+                elif msg.get("type") == "scene_switch":
+                    self._restore_primary_player()
+                    self.game.scene_manager.switch(msg.get("scene", "map"))
+                    return
             if not self._is_client_control_turn() and self.state not in ("WAVE_INTRO", "NO_COMBAT"):
                 return
+
+        if self.game.mp_is_multiplayer and self.game.mp_host:
+            self._process_pending_remote_turn()
 
         self.cursor_timer += dt
 
@@ -1605,12 +1627,12 @@ class GameplayScene(Scene):
                 self.mp_sync_timer = 0
                 self.mp_full_sync_counter += 1
                 current_state = self._serialize_mp_state()
-                if self.mp_full_sync_counter >= self.mp_full_sync_interval:
+                if self.mp_last_state is None or self.mp_full_sync_counter >= self.mp_full_sync_interval:
                     self.mp_full_sync_counter = 0
                     self.mp_last_state = current_state
                     self.game.mp_host.broadcast(current_state)
                 else:
-                    diff, is_full = self._compute_state_diff(current_state, self.mp_last_state)
+                    diff, _ = self._compute_state_diff(current_state, self.mp_last_state)
                     if diff:
                         diff["type"] = "gp_state_diff"
                         self.game.mp_host.broadcast(diff)
@@ -1622,24 +1644,6 @@ class GameplayScene(Scene):
                 if msg.get("type") == "gp_cmd":
                     self._apply_remote_gameplay_command(msg)
             self._process_pending_remote_turn()
-
-        if self.game.mp_is_multiplayer and self.game.mp_client:
-            msgs = self.game.mp_client.poll()
-            for msg in msgs:
-                if msg.get("type") == "gp_state":
-                    self.mp_cached_state = dict(msg)
-                    self._apply_mp_state(msg)
-                elif msg.get("type") == "gp_state_diff":
-                    if self.mp_cached_state is not None:
-                        merged = dict(self.mp_cached_state)
-                        merged.update(msg)
-                        merged["type"] = "gp_state"
-                        self.mp_cached_state = merged
-                        self._apply_mp_state(merged)
-                elif msg.get("type") == "scene_switch":
-                    self._restore_primary_player()
-                    self.game.scene_manager.switch(msg.get("scene", "map"))
-                    return
 
     def _resolve_enemy_turn(self, dt):
         if self.enemy_resolve_idx >= len(self.enemy_actions):
@@ -2245,9 +2249,12 @@ class GameplayScene(Scene):
 
     def _apply_remote_gameplay_command(self, msg):
         cmd = msg.get("cmd")
-        if cmd not in ("begin_room", "leave_no_combat") and not self._is_remote_turn():
+        if cmd not in ("begin_room", "leave_no_combat", "request_sync") and not self._is_remote_turn():
             return
 
+        if cmd == "request_sync":
+            self.mp_full_sync_counter = self.mp_full_sync_interval - 1
+            return
         if cmd == "begin_room" and self.state == "WAVE_INTRO":
             self._begin_room()
         elif cmd == "leave_no_combat" and self.state == "NO_COMBAT":

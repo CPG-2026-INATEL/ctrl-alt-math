@@ -32,7 +32,6 @@ class MapScene(Scene):
         self._hovered_room = None
         self._mouse_pos = (0, 0)
         self._host_enter_pending = False
-        self._host_enter_timer = 0.0
 
     def enter(self, prev_scene=None):
         self.room = None
@@ -44,7 +43,6 @@ class MapScene(Scene):
         self._drag_moved = False
         self._hovered_room = None
         self._host_enter_pending = False
-        self._host_enter_timer = 0.0
         self._speak_room()
 
         if self.game.mp_is_multiplayer:
@@ -105,7 +103,13 @@ class MapScene(Scene):
                     if room and self.game.scene_manager.current is self:
                         self.room = room
                         self.game.sfx.play("menu_confirm")
+                        self._net_send({"type": "map_enter_confirm"})
                         self.game.scene_manager.switch("gameplay")
+            elif mtype == "map_enter_confirm":
+                if self.game.mp_host and self._host_enter_pending:
+                    self._host_enter_pending = False
+                    self.game.sfx.play("menu_confirm")
+                    self.game.scene_manager.switch("gameplay")
 
     def _check_votes(self):
         if self._local_voted_room and self._remote_voted_room and self._local_voted_room == self._remote_voted_room:
@@ -116,11 +120,6 @@ class MapScene(Scene):
                     self.game.sfx.play("menu_confirm")
                     self._net_send({"type": "map_enter_room", "room": [room.col, room.row]})
                     self._host_enter_pending = True
-                elif self.game.mp_client:
-                    self.room = room
-                    self.game.sfx.play("menu_confirm")
-                    self._net_send({"type": "map_enter_room", "room": [room.col, room.row]})
-                    self.game.scene_manager.switch("gameplay")
                 elif not self.game.mp_is_multiplayer:
                     self.room = room
                     self.game.sfx.play("menu_confirm")
@@ -272,13 +271,6 @@ class MapScene(Scene):
             self._broadcast_position()
 
         self._poll_network()
-
-        if self._host_enter_pending:
-            self._host_enter_timer += dt
-            if self._host_enter_timer >= 3.0:
-                self._host_enter_pending = False
-                self.game.sfx.play("menu_confirm")
-                self.game.scene_manager.switch("gameplay")
 
         self._update_vote_status()
 
