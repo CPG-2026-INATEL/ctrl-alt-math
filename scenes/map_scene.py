@@ -80,8 +80,6 @@ class MapScene(Scene):
         elif self.game.mp_client:
             msgs = self.game.mp_client.poll()
 
-        is_host = self.game.mp_host is not None
-        role = "HOST" if is_host else "CLIENT"
         for msg in msgs:
             mtype = msg.get("type")
             if mtype == "map_position":
@@ -90,7 +88,6 @@ class MapScene(Scene):
                     self._remote_room = pos
             elif mtype == "map_vote":
                 pos = msg.get("room")
-                print(f"[{role}] Received map_vote: room={pos!r}")
                 if pos:
                     self._remote_voted_room = pos
                     self._check_votes()
@@ -99,31 +96,21 @@ class MapScene(Scene):
                 self._vote_status = ""
             elif mtype == "map_enter_room":
                 room_id = msg.get("room")
-                print(f"[{role}] Received map_enter_room: room_id={room_id!r}")
                 if room_id:
                     room = self.game.world_map.rooms.get(room_id)
-                    print(f"[{role}]   room lookup result: {room}, current is self: {self.game.scene_manager.current is self}")
                     if room and self.game.scene_manager.current is self:
                         self.room = room
                         self.game.sfx.play("menu_confirm")
                         self.game.scene_manager.switch("gameplay")
-            else:
-                if mtype != "map_position":
-                    print(f"[{role}] Received unknown map msg: {mtype!r} full={msg}")
 
     def _check_votes(self):
-        is_host = self.game.mp_host is not None
-        role = "HOST" if is_host else "CLIENT"
-        print(f"[{role}] _check_votes: local={self._local_voted_room!r} remote={self._remote_voted_room!r} match={self._local_voted_room == self._remote_voted_room}")
         if self._local_voted_room and self._remote_voted_room and self._local_voted_room == self._remote_voted_room:
             room = self.game.world_map.rooms.get(self._local_voted_room)
-            print(f"[{role}]   room={room}, state={room.state if room else 'N/A'}")
             if room and room.state in ("available", "completed"):
                 self.room = room
                 self.game.sfx.play("menu_confirm")
                 if self.game.mp_host:
                     self._net_send({"type": "map_enter_room", "room": room.id})
-                print(f"[{role}]   >>> SWITCHING TO GAMEPLAY <<<")
                 self.game.scene_manager.switch("gameplay")
 
     def _cast_vote(self, room_id):

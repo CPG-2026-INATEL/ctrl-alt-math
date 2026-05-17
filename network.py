@@ -105,12 +105,13 @@ class NetworkHost:
             return
         if mtype == "relay":
             payload = msg.get("payload", {})
-            if msg.get("compressed"):
+            if msg.get("compressed") or isinstance(payload, str):
                 try:
                     raw = base64.b64decode(payload)
                     payload = json.loads(gzip.decompress(raw))
                 except Exception:
-                    return
+                    if not isinstance(payload, dict):
+                        return
             payload["_from"] = msg.get("from_player", 2)
             with self.lock:
                 self.inbox.append(payload)
@@ -236,12 +237,13 @@ class NetworkClient:
             return
         if mtype == "relay":
             payload = msg.get("payload", {})
-            if msg.get("compressed"):
+            if msg.get("compressed") or isinstance(payload, str):
                 try:
                     raw = base64.b64decode(payload)
                     payload = json.loads(gzip.decompress(raw))
                 except Exception:
-                    return
+                    if not isinstance(payload, dict):
+                        return
             payload["_from"] = msg.get("from_player", 1)
             with self.lock:
                 self.inbox.append(payload)
