@@ -205,6 +205,11 @@ STRINGS = {
         LANG_EN: "Lifesteal zone attack.\nRecovers 30% of damage\ndealt as HP. Key 3.",
         LANG_PT: "Ataque em zona de dreno.\nRecupera 30% do dano\ncausado como HP. Tecla 3."
     },
+    "enemy_decoy": {LANG_EN: "Decoy Clone", LANG_PT: "Clone Chamariz"},
+    "lore_decoy": {
+        LANG_EN: "A mathematical fractal projection of the rebel. It mimics your appearance to draw enemy fire away from the real target.",
+        LANG_PT: "Uma projeção fractal matemática do rebelde. Imita sua aparência para desviar o fogo inimigo do alvo real."
+    },
     "skill_fractal_name": {LANG_EN: "Fractal", LANG_PT: "Fractal"},
     "skill_fractal_desc": {
         LANG_EN: "Summon a decoy clone.\nEnemies may target it\ninstead of you. Key 4.",

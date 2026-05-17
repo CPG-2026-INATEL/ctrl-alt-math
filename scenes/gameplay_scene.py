@@ -1247,7 +1247,16 @@ class GameplayScene(Scene):
             clone.is_ally = True
             clone.decoy_lifetime = level * 2 + 2
             clone.robot_type = "Clone"
-            clone.size = settings.ENEMY_SIZE * 0.8
+            clone.size = settings.ENEMY_SIZE
+            player = self.game.player
+            skin_name = player.skin_names[player.skin_index]
+            clone.spritesheet = player.spritesheets[skin_name]
+            clone.sprite_size = player.sprite_size
+            clone.display_size = int(clone.size * 2.5)
+            clone.anim_map = {"idle": 0, "walk": 1, "fire": 3, "melee": 3, "destroyed": 5}
+            clone.anim_frames = {"idle": 2, "walk": 2, "fire": 2, "melee": 2, "destroyed": 5}
+            clone.info_title = "enemy_decoy"
+            clone.lore = "lore_decoy"
             self.game.enemies.append(clone)
             self.game.floating_text.add_info(clone.x, clone.y - 20, "CLONE", (100, 255, 180))
             self.game.particles.emit_burst(clone.x, clone.y, (100, 255, 180), 20, 100, 0.5)
@@ -3085,8 +3094,11 @@ class GameplayScene(Scene):
                     "atirador": "AIM",
                     "granadeiro": "3x3",
                 }
-                symbol = type_symbols.get(enemy.type, "?")
-                label = font.render(symbol, True, settings.YELLOW)
+                if getattr(enemy, 'is_decoy', False):
+                    label = font.render("DECOY", True, settings.GREEN)
+                else:
+                    symbol = type_symbols.get(enemy.type, "?")
+                    label = font.render(symbol, True, settings.YELLOW)
                 screen.blit(label, (int(ex) - label.get_width() // 2,
                                      int(ey) - enemy.size - 18))
 
