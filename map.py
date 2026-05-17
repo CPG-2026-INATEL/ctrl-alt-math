@@ -264,7 +264,6 @@ class WorldMap:
 
         self._bg_particles = []
         self._flow_particles = []
-        self._avatar_trail = []
         self._bg_grad = None
         self._grid_surf = None
         self._header_surf = None
@@ -380,7 +379,6 @@ class WorldMap:
         self.anim_timer = 0
         self._init_bg_particles()
         self._flow_particles = []
-        self._avatar_trail = []
         self._star_surf_cache = {}
         self._build_grid_surface()
         self._build_header_surface()
@@ -445,7 +443,6 @@ class WorldMap:
                     player.current_anim = "walk"
                     if abs(dx) > 1:
                         player.dir_x = 1 if dx > 0 else -1
-                self._avatar_trail.append((self.avatar_x, self.avatar_y, 1.0))
         else:
             self.avatar_x = target_x
             self.avatar_y = target_y
@@ -457,8 +454,6 @@ class WorldMap:
 
         for p in self._bg_particles:
             p.update(dt)
-
-        self._avatar_trail = [(x, y, a - dt * 2) for x, y, a in self._avatar_trail if a > 0]
 
         self._update_flow_particles(dt)
 
@@ -683,17 +678,6 @@ class WorldMap:
         avatar_draw_y = self.avatar_y - sy + settings.MAP_HEADER_H + bob_y
         avatar_draw_x = self.avatar_x - sx
         avatar_size = max(36, int(48 * settings.UI_SCALE))
-
-        for x, y, a in self._avatar_trail:
-            trail_x = x - sx
-            trail_y = y - sy + settings.MAP_HEADER_H + bob_y
-            trail_alpha = max(0, min(255, int(a * 60)))
-            pygame.draw.circle(screen, (50, 255, 255, trail_alpha),
-                               (int(trail_x), int(trail_y)), avatar_size // 2)
-
-        pulse = int(40 + 30 * math.sin(self.anim_timer * 5))
-        pygame.draw.circle(screen, (50, 255, 255, pulse),
-                           (int(avatar_draw_x), int(avatar_draw_y)), avatar_size // 2 + 6)
 
         if player:
             sprite = player.get_current_sprite()
