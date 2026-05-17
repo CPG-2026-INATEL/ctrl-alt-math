@@ -94,12 +94,14 @@ class NetworkHost:
             return
         if mtype == "peer_joined":
             peer_ip = msg.get("peer_ip", "unknown")
+            peer_index = msg.get("player_index", 2)
             with self.lock:
-                self.connected_clients = [(2, peer_ip)]
+                self.connected_clients.append((peer_index, peer_ip))
             return
         if mtype == "peer_left":
+            leaving_index = msg.get("player_index")
             with self.lock:
-                self.connected_clients = []
+                self.connected_clients = [(idx, ip) for idx, ip in self.connected_clients if idx != leaving_index]
             return
         if mtype == "relay":
             payload = msg.get("payload", {})
@@ -228,8 +230,8 @@ class NetworkClient:
     def _handle_server_msg(self, msg):
         mtype = msg.get("type")
         if mtype == "room_joined":
-            self.my_id = 2
-            self.player_index = 2
+            self.my_id = msg.get("player_index", 2)
+            self.player_index = msg.get("player_index", 2)
             self.room_code = msg.get("room", self.room_code)
             return
         if mtype == "relay":

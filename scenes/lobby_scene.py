@@ -132,7 +132,7 @@ class LobbyScene(Scene):
             self.status = t("lobby_room_code", code=self.client.room_code)
             self.status_color = settings.GREEN
             self.mode = "connected"
-            self.player_index = 2
+            self.player_index = self.client.player_index
         except (ConnectionError, OSError, RuntimeError) as e:
             self.status = f"Error: {e}"
             self.status_color = settings.RED

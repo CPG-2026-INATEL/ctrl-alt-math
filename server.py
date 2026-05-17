@@ -134,11 +134,15 @@ class MatchServer:
                 self._send(client_id, {"type": "error", "message": "Already in a room"})
                 return
             room.append(client_id)
+            player_index = len(room)
             self.client_rooms[client_id] = room_code
             host_id = room[0]
             peer_ip = self.clients[client_id]["addr"][0]
-        self._send(client_id, {"type": "room_joined", "room": room_code, "player_index": 2})
-        self._send(host_id, {"type": "peer_joined", "player_index": 2, "peer_ip": peer_ip})
+        self._send(client_id, {"type": "room_joined", "room": room_code, "player_index": player_index})
+        self._send(host_id, {"type": "peer_joined", "player_index": player_index, "peer_ip": peer_ip})
+        for other_id in room:
+            if other_id != client_id and other_id != host_id:
+                self._send(other_id, {"type": "peer_joined", "player_index": player_index, "peer_ip": peer_ip})
 
     def _relay(self, client_id, payload):
         with self.lock:
@@ -156,9 +160,11 @@ class MatchServer:
             info = self.clients.pop(client_id, None)
             room_code = self.client_rooms.pop(client_id, None)
             peer_ids = []
+            leaving_index = None
             if room_code and room_code in self.rooms:
                 room = self.rooms[room_code]
                 if client_id in room:
+                    leaving_index = room.index(client_id) + 1
                     room.remove(client_id)
                 peer_ids = list(room)
                 if room:
@@ -166,7 +172,7 @@ class MatchServer:
                 else:
                     self.rooms.pop(room_code, None)
         for peer_id in peer_ids:
-            self._send(peer_id, {"type": "peer_left", "player_index": 2})
+            self._send(peer_id, {"type": "peer_left", "player_index": leaving_index})
         if info:
             try:
                 info["conn"].close()

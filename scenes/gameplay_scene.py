@@ -95,7 +95,9 @@ class GameplayScene(Scene):
     def _player_label(self, idx):
         if not self._is_true_coop():
             return "Player"
-        return "HOST" if idx == 0 else "P2"
+        if idx == 0:
+            return "HOST"
+        return f"P{idx + 1}"
 
     def _restore_primary_player(self):
         if self.players:
@@ -118,7 +120,10 @@ class GameplayScene(Scene):
         return self._is_true_coop() and self._current_player_owner() == "client" and bool(self.game.mp_host)
 
     def _is_client_control_turn(self):
-        return self._is_true_coop() and bool(self.game.mp_client) and self.game.mp_player_index == 2 and self.active_player_idx == 1
+        if not self._is_true_coop() or not self.game.mp_client:
+            return False
+        client_player_idx = self.game.mp_player_index - 1
+        return self.active_player_idx == client_player_idx
 
     def _set_active_player(self, idx, reset_ui=True):
         self._refresh_players()
