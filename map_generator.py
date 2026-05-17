@@ -294,33 +294,6 @@ class MapGenerator:
 
             layers[layer_idx] = layer_room_ids
 
-        for layer_idx in range(depth + 1):
-            for room_id in layers[layer_idx]:
-                for conn_id in connections.get(room_id, []):
-                    if conn_id in rooms:
-                        if room_id not in rooms[conn_id].get("back_connections", []):
-                            if "back_connections" not in rooms[conn_id]:
-                                rooms[conn_id]["back_connections"] = []
-                            rooms[conn_id]["back_connections"].append(room_id)
-
-        for room_id, room_data in rooms.items():
-            if "back_connections" in room_data:
-                all_conns = list(set(connections.get(room_id, []) + room_data["back_connections"]))
-                room_data["connections_out"] = connections.get(room_id, [])
-                room_data["connections_in"] = room_data["back_connections"]
-                room_data["all_connections"] = all_conns
-            else:
-                room_data["connections_out"] = connections.get(room_id, [])
-                room_data["connections_in"] = []
-                room_data["all_connections"] = connections.get(room_id, [])
-            if "back_connections" in room_data:
-                del room_data["back_connections"]
-
-        start = rooms[hub_id]
-        for conn_id in start.get("connections_out", []):
-            if conn_id in rooms:
-                rooms[conn_id]["state"] = "available"
-
         for layer_idx, layer in enumerate(layers):
             for i, room_id in enumerate(layer):
                 room_data = rooms[room_id]
@@ -330,6 +303,62 @@ class MapGenerator:
                     room_data["row"] = 0
                 else:
                     room_data["row"] = i - (row_count - 1) // 2
+
+        for room_id, room_data in rooms.items():
+            directional = {"left": None, "up": None, "right": None, "down": None}
+            current_row = room_data.get("row", 0)
+
+            incoming = []
+            for pid, children in connections.items():
+                if room_id in children and pid in rooms:
+                    incoming.append(pid)
+            if incoming:
+                if len(incoming) == 1:
+                    directional["left"] = incoming[0]
+                else:
+                    incoming.sort(key=lambda pid: abs(rooms[pid].get("row", 0) - current_row))
+                    directional["left"] = incoming[0]
+
+            outgoing = connections.get(room_id, [])
+            targets = []
+            for cid in outgoing:
+                if cid in rooms:
+                    targets.append((rooms[cid].get("row", 0), cid))
+
+            if len(targets) == 1:
+                directional["right"] = targets[0][1]
+            elif len(targets) >= 2:
+                targets.sort(key=lambda t: t[0] - current_row)
+                mid = len(targets) // 2
+                if len(targets) >= 3:
+                    directional["up"] = targets[0][1]
+                    directional["right"] = targets[1][1]
+                    directional["down"] = targets[2][1]
+                else:
+                    if targets[0][0] < current_row:
+                        directional["up"] = targets[0][1]
+                    else:
+                        directional["right"] = targets[0][1]
+                    if targets[1][0] > current_row:
+                        directional["down"] = targets[1][1]
+                    else:
+                        directional["right"] = targets[1][1]
+
+            if directional["right"] is None and directional["up"] is not None:
+                directional["right"] = directional["up"]
+                directional["up"] = None
+            if directional["right"] is None and directional["down"] is not None:
+                directional["right"] = directional["down"]
+                directional["down"] = None
+
+            room_data["directional_connections"] = directional
+            room_data["all_connections"] = [v for v in directional.values() if v is not None]
+
+        start = rooms[hub_id]
+        for d in ["up", "right", "down"]:
+            conn_id = start["directional_connections"].get(d)
+            if conn_id and conn_id in rooms:
+                rooms[conn_id]["state"] = "available"
 
         return rooms, connections, layers
 
