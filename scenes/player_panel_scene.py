@@ -242,13 +242,23 @@ class PlayerPanelScene(Scene):
         tab_w = settings.WINDOW_WIDTH // 4
         for i in range(4):
             tab_rect = pygame.Rect(i * tab_w, tab_y, tab_w, tab_h)
-            bg_color = (30, 30, 60) if i == self.active_tab else (15, 15, 35)
-            pygame.draw.rect(screen, bg_color, tab_rect, border_radius=4)
-            border_color = TAB_COLORS[i] if i == self.active_tab else (60, 60, 80)
-            pygame.draw.rect(screen, border_color, tab_rect, 2, border_radius=4)
+            is_active = (i == self.active_tab)
+            bg_color = (35, 40, 70, 230) if is_active else (10, 10, 25, 180)
+            
+            tab_surf = pygame.Surface((tab_w, tab_h), pygame.SRCALPHA)
+            pygame.draw.rect(tab_surf, bg_color, (0, 0, tab_w, tab_h), border_radius=4)
+            screen.blit(tab_surf, tab_rect)
+            
+            border_color = TAB_COLORS[i] if is_active else (50, 50, 70)
+            pygame.draw.rect(screen, border_color, tab_rect, 2 if is_active else 1, border_radius=4)
+            
+            if is_active:
+                # Glowing neon indicator at bottom of active tab
+                pygame.draw.line(screen, TAB_COLORS[i], (i * tab_w + 12, tab_y + tab_h - 3), ((i + 1) * tab_w - 12, tab_y + tab_h - 3), 3)
+
             label_font = pygame.font.Font(None, 16)
             label = label_font.render(TAB_LABELS[i], True,
-                                      TAB_COLORS[i] if i == self.active_tab else (120, 120, 140))
+                                      TAB_COLORS[i] if is_active else (120, 120, 140))
             screen.blit(label, (tab_rect.centerx - label.get_width() // 2,
                                 tab_rect.centery - label.get_height() // 2))
 
@@ -258,21 +268,45 @@ class PlayerPanelScene(Scene):
         panel_y = 50
 
         panel_surf = pygame.Surface((panel_w, panel_h), pygame.SRCALPHA)
-        panel_surf.fill((15, 15, 35, 200))
+        panel_surf.fill((12, 12, 28, 220))
         screen.blit(panel_surf, (0, panel_y))
 
+        # Thin neon border dividing panels
+        pygame.draw.line(screen, (50, 50, 80), (panel_w - 1, panel_y), (panel_w - 1, settings.WINDOW_HEIGHT), 1)
+
         player = self.game.player
-        lx = 20
-        bar_w = panel_w - 40
-        bar_h = 14
-        content_x = lx
-        content_right = panel_w - 20
+        lx = 25
+        bar_w = panel_w - 50
+        bar_h = 16
+        content_right = panel_w - 25
 
         y = panel_y + 20
 
         sprite = player.get_current_sprite()
-        sprite_size = 120
+        sprite_size = 110
         center_x = panel_w // 2
+        cy = y + sprite_size // 2
+
+        # Rotating math scan vector circles around player sprite
+        time_val = pygame.time.get_ticks() / 1000.0
+        
+        # Inner scan ring
+        r1 = sprite_size // 2 + 10
+        pygame.draw.circle(screen, (0, 80, 80, 100), (center_x, cy), r1, 1)
+        for d_idx in range(3):
+            ang = time_val * 1.5 + d_idx * (2 * math.pi / 3)
+            dx = int(center_x + r1 * math.cos(ang))
+            dy = int(cy + r1 * math.sin(ang))
+            pygame.draw.circle(screen, settings.CYAN, (dx, dy), 4)
+
+        # Outer scan ring
+        r2 = sprite_size // 2 + 20
+        pygame.draw.circle(screen, (80, 60, 0, 100), (center_x, cy), r2, 1)
+        for d_idx in range(4):
+            ang = -time_val * 1.0 + d_idx * (math.pi / 2)
+            dx = int(center_x + r2 * math.cos(ang))
+            dy = int(cy + r2 * math.sin(ang))
+            pygame.draw.circle(screen, settings.GOLD, (dx, dy), 3)
 
         if sprite:
             scaled = pygame.transform.scale(sprite, (sprite_size, sprite_size))
@@ -285,41 +319,67 @@ class PlayerPanelScene(Scene):
             pygame.draw.rect(screen, settings.WHITE,
                              (center_x - sprite_size // 2, y,
                               sprite_size, sprite_size), 2, border_radius=8)
-        y += sprite_size + 12
+        y += sprite_size + 16
 
-        draw_text(screen, f"Lv.{player.level}", (center_x, y), settings.GOLD, 20)
-        y += 30
+        # Draw character name card
+        name_card = pygame.Rect(center_x - 60, y, 120, 24)
+        pygame.draw.rect(screen, (30, 40, 60), name_card, border_radius=12)
+        pygame.draw.rect(screen, settings.GOLD, name_card, 1, border_radius=12)
+        draw_text(screen, f"Lv.{player.level}", (center_x, y + 12), settings.GOLD, 16)
+        y += 36
 
-        pygame.draw.line(screen, (50, 50, 70), (lx, y), (content_right, y), 1)
+        pygame.draw.line(screen, (40, 40, 60), (lx, y), (content_right, y), 1)
         y += 12
 
         hp_pct = max(0, player.hp / player.get_max_hp()) if player.get_max_hp() > 0 else 0
         self._draw_bar(screen, lx, y, bar_w, bar_h, hp_pct, settings.RED, (60, 20, 20))
         draw_text(screen, f"HP {player.hp}/{player.get_max_hp()}",
-                 (lx + 4, y + 1), settings.WHITE, 12, center=False)
+                 (lx + 8, y + 2), settings.WHITE, 12, center=False)
         y += bar_h + 8
 
         xp_pct = player.exp / player.next_level_exp if player.next_level_exp > 0 else 0
         self._draw_bar(screen, lx, y, bar_w, bar_h, xp_pct, settings.GOLD, (40, 40, 10))
         draw_text(screen, f"XP {player.exp}/{player.next_level_exp}",
-                 (lx + 4, y + 1), settings.WHITE, 12, center=False)
+                 (lx + 8, y + 2), settings.WHITE, 12, center=False)
         y += bar_h + 16
 
+        # High-tech stat badges
         col_w = (bar_w - 20) // 2
-        draw_text(screen, f"ATK: {player.get_attack_damage()}", (lx, y), settings.RED, 16, center=False)
-        draw_text(screen, f"DEF: {player.get_defense()}", (lx + col_w, y), settings.BLUE, 16, center=False)
-        y += 22
-        draw_text(screen, f"Range: {player.get_move_range()}", (lx, y), settings.CYAN, 16, center=False)
-        draw_text(screen, f"Gold: {player.gold}", (lx + col_w, y), settings.GOLD, 16, center=False)
-        y += 22
+        badge_h = 24
+        
+        # Row 1: Attack & Defense
+        pygame.draw.rect(screen, (35, 15, 15), (lx, y, col_w, badge_h), border_radius=4)
+        pygame.draw.rect(screen, settings.RED, (lx, y, col_w, badge_h), 1, border_radius=4)
+        draw_text(screen, f"ATK: {player.get_attack_damage()}", (lx + 10, y + badge_h // 2), settings.RED, 14, center=False)
+        
+        pygame.draw.rect(screen, (15, 15, 35), (lx + col_w + 10, y, col_w, badge_h), border_radius=4)
+        pygame.draw.rect(screen, settings.BLUE, (lx + col_w + 10, y, col_w, badge_h), 1, border_radius=4)
+        draw_text(screen, f"DEF: {player.get_defense()}", (lx + col_w + 20, y + badge_h // 2), settings.BLUE, 14, center=False)
+        y += badge_h + 8
 
+        # Row 2: Range & Gold
+        pygame.draw.rect(screen, (15, 35, 35), (lx, y, col_w, badge_h), border_radius=4)
+        pygame.draw.rect(screen, settings.CYAN, (lx, y, col_w, badge_h), 1, border_radius=4)
+        draw_text(screen, f"RANGE: {player.get_move_range()}", (lx + 10, y + badge_h // 2), settings.CYAN, 14, center=False)
+        
+        pygame.draw.rect(screen, (35, 35, 15), (lx + col_w + 10, y, col_w, badge_h), border_radius=4)
+        pygame.draw.rect(screen, settings.GOLD, (lx + col_w + 10, y, col_w, badge_h), 1, border_radius=4)
+        draw_text(screen, f"GOLD: {player.gold}", (lx + col_w + 20, y + badge_h // 2), settings.GOLD, 14, center=False)
+        y += badge_h + 8
+
+        # Row 3: SP & Tickets
         sp = self.game.skill_tree.skill_points if self.game.skill_tree else 0
-        draw_text(screen, f"SP: {sp}", (lx, y), settings.CYAN, 16, center=False)
+        pygame.draw.rect(screen, (25, 15, 35), (lx, y, col_w, badge_h), border_radius=4)
+        pygame.draw.rect(screen, settings.PURPLE, (lx, y, col_w, badge_h), 1, border_radius=4)
+        draw_text(screen, f"SP: {sp}", (lx + 10, y + badge_h // 2), settings.PURPLE, 14, center=False)
+        
         tickets = getattr(player, "upgrade_tickets", 0)
-        draw_text(screen, f"Tickets: {tickets}", (lx + col_w, y), settings.GOLD, 16, center=False)
-        y += 24
+        pygame.draw.rect(screen, (35, 25, 15), (lx + col_w + 10, y, col_w, badge_h), border_radius=4)
+        pygame.draw.rect(screen, settings.GOLD, (lx + col_w + 10, y, col_w, badge_h), 1, border_radius=4)
+        draw_text(screen, f"TICKETS: {tickets}", (lx + col_w + 20, y + badge_h // 2), settings.GOLD, 14, center=False)
+        y += badge_h + 16
 
-        pygame.draw.line(screen, (50, 50, 70), (lx, y), (content_right, y), 1)
+        pygame.draw.line(screen, (40, 40, 60), (lx, y), (content_right, y), 1)
 
     def _draw_upgrades(self, screen):
         player = self.game.player
@@ -430,8 +490,19 @@ class PlayerPanelScene(Scene):
                     py = offset_y + int(prereq["y"] * scale)
                     nx = offset_x + int(skill["x"] * scale)
                     ny = offset_y + int(skill["y"] * scale)
-                    line_color = settings.GREEN if skill_tree.get_level(prereq_id) > 0 else (40, 40, 50)
+                    
+                    is_prereq_unlocked = skill_tree.get_level(prereq_id) > 0
+                    line_color = settings.GREEN if is_prereq_unlocked else (40, 40, 50)
                     pygame.draw.line(screen, line_color, (px, py), (nx, ny), 2)
+                    
+                    # Animated energy flow dots along the connection path!
+                    if is_prereq_unlocked:
+                        time_val = pygame.time.get_ticks() / 1000.0
+                        progress = (time_val * 0.8) % 1.0
+                        dot_x = int(px + (nx - px) * progress)
+                        dot_y = int(py + (ny - py) * progress)
+                        pygame.draw.circle(screen, settings.GOLD, (dot_x, dot_y), 4)
+                        pygame.draw.circle(screen, settings.WHITE, (dot_x, dot_y), 2)
 
         if self.hovered_skill:
             skill = skill_tree.skills.get(self.hovered_skill)

@@ -72,54 +72,62 @@ class UI:
 
     def draw_hud(self, screen, player, wave, skill_points, entropy, wave_count, game=None):
         bar_y = settings.WINDOW_HEIGHT - settings.UI_BAR_HEIGHT
-        pygame.draw.rect(screen, settings.DARK_GRAY,
-                         (0, bar_y, settings.WINDOW_WIDTH, settings.UI_BAR_HEIGHT))
-        pygame.draw.line(screen, settings.GRAY, (0, bar_y),
-                         (settings.WINDOW_WIDTH, bar_y), 1)
 
-        hp_pct = player.hp / player.get_max_hp()
-        rigor_pct = player.rigor / player.max_rigor
-        entropy_pct = entropy / settings.MAX_ENTROPY
+        # Glass panel background with neon top border
+        hud_surf = pygame.Surface((settings.WINDOW_WIDTH, settings.UI_BAR_HEIGHT), pygame.SRCALPHA)
+        hud_surf.fill((10, 12, 25, 215))
+        screen.blit(hud_surf, (0, bar_y))
+        pygame.draw.line(screen, (60, 80, 140), (0, bar_y), (settings.WINDOW_WIDTH, bar_y), 2)
 
-        self._draw_bar(screen, settings.UI_PADDING, bar_y + 8, 160, 14,
-                       hp_pct, settings.RED, (60, 20, 20))
-        draw_text(screen, f"{t('hp')}: {player.hp}/{player.get_max_hp()}",
-                  (settings.UI_PADDING + 80, bar_y + 15),
-                  settings.WHITE, 14)
+        hp_pct = max(0.0, player.hp / player.get_max_hp())
+        rigor_pct = max(0.0, player.rigor / player.max_rigor)
+        entropy_pct = max(0.0, min(1.0, entropy / settings.MAX_ENTROPY))
+        exp_pct = max(0.0, player.exp / player.next_level_exp)
 
-        self._draw_bar(screen, settings.UI_PADDING, bar_y + 26, 160, 14,
-                       rigor_pct, settings.BLUE, (20, 20, 60))
-        draw_text(screen, f"{t('rigor')}: {player.rigor:.0f}/{player.max_rigor}",
-                  (settings.UI_PADDING + 80, bar_y + 33),
-                  settings.WHITE, 14)
+        px = settings.UI_PADDING
 
-        # EXP Bar
-        exp_pct = player.exp / player.next_level_exp
-        self._draw_bar(screen, settings.UI_PADDING + 180, bar_y + 8, 120, 14,
-                       exp_pct, settings.GOLD, (40, 40, 10))
-        draw_text(screen, f"LVL {player.level} ({int(exp_pct*100)}%)",
-                  (settings.UI_PADDING + 240, bar_y + 15),
-                  settings.WHITE, 14)
+        # === LEFT CLUSTER: HP + Rigor ===
+        # HP bar
+        draw_text(screen, "HP", (px, bar_y + 10), settings.RED, 11, center=False)
+        self._draw_bar(screen, px + 20, bar_y + 5, 140, 13,
+                       hp_pct, settings.RED, (50, 15, 15))
+        draw_text(screen, f"{player.hp}/{player.get_max_hp()}",
+                  (px + 90, bar_y + 11), settings.WHITE, 12)
 
-        self._draw_bar(screen, settings.UI_PADDING + 180, bar_y + 26, 120, 14,
-                       entropy_pct, settings.COLOR_ENTROPY_BAR, (40, 10, 40))
-        draw_text(screen, f"{t('entropy')}: {entropy:.0f}",
-                  (settings.UI_PADDING + 240, bar_y + 33),
-                  settings.WHITE, 14)
+        # Rigor bar
+        draw_text(screen, "RG", (px, bar_y + 28), settings.BLUE, 11, center=False)
+        self._draw_bar(screen, px + 20, bar_y + 23, 140, 13,
+                       rigor_pct, settings.BLUE, (15, 15, 50))
+        draw_text(screen, f"{player.rigor:.0f}/{player.max_rigor}",
+                  (px + 90, bar_y + 29), settings.WHITE, 12)
 
+        # Rigor warning pulse
+        if player.rigor < player.max_rigor * 0.25:
+            t_val = pygame.time.get_ticks() / 1000.0
+            pulse = int(100 + 155 * abs(math.sin(t_val * 8)))
+            draw_text(screen, "LOW!", (px + 165, bar_y + 28), (pulse, 50, 50), 11, center=False)
+
+        # === SECOND CLUSTER: EXP + Entropy ===
+        px2 = settings.UI_PADDING + 175
+
+        draw_text(screen, "XP", (px2, bar_y + 10), settings.GOLD, 11, center=False)
+        self._draw_bar(screen, px2 + 20, bar_y + 5, 110, 13,
+                       exp_pct, settings.GOLD, (35, 35, 8))
+        draw_text(screen, f"Lv{player.level} {int(exp_pct*100)}%",
+                  (px2 + 75, bar_y + 11), settings.WHITE, 12)
+
+        draw_text(screen, "EN", (px2, bar_y + 28), settings.PURPLE, 11, center=False)
+        self._draw_bar(screen, px2 + 20, bar_y + 23, 110, 13,
+                       entropy_pct, settings.COLOR_ENTROPY_BAR, (35, 8, 35))
+        draw_text(screen, f"{entropy:.0f}",
+                  (px2 + 75, bar_y + 29), settings.WHITE, 12)
+
+        # === CENTER: Wave + SP ===
+        cx = settings.WINDOW_WIDTH // 2
         draw_text(screen, t("wave_count", wave=wave) + f"/{wave_count}",
-                  (settings.WINDOW_WIDTH // 2, bar_y + 15),
-                  settings.LIGHT_GRAY, 18)
-
-        draw_text(screen, f"{t('skill_points')}: {skill_points}",
-                  (settings.WINDOW_WIDTH // 2, bar_y + 38),
-                  settings.GOLD, 16)
-
-        st = game.skill_tree if game else None
-        axioma_bonus = st.get_skill_value("axioma", "damage_bonus", 0) if st else 0
-        draw_text(screen, f"ATK:{player.get_attack_damage()} DEF:{player.get_defense()}",
-                  (settings.WINDOW_WIDTH // 2 + 100, bar_y + 38),
-                  settings.CYAN, 14)
+                  (cx, bar_y + 12), settings.LIGHT_GRAY, 17)
+        draw_text(screen, f"{t('skill_points')}: {skill_points}  ATK:{player.get_attack_damage()} DEF:{player.get_defense()}",
+                  (cx, bar_y + 33), settings.CYAN, 13)
 
         self._draw_skill_cooldowns(screen, bar_y, player, game)
         self._draw_controls(screen, bar_y)
@@ -168,32 +176,53 @@ class UI:
                                      ready)
 
     def _draw_cooldown_icon(self, screen, x, y, key, ready, cooldown, max_cooldown, has_resource):
-        size = 20
+        size = 24
         rect = pygame.Rect(x, y, size, size)
         if ready and has_resource:
-            pygame.draw.rect(screen, (50, 180, 50), rect, border_radius=3)
-            pygame.draw.rect(screen, settings.GREEN, rect, 1, border_radius=3)
+            # Bright green ready frame
+            pygame.draw.rect(screen, (25, 80, 25), rect, border_radius=4)
+            pygame.draw.rect(screen, settings.GREEN, rect, 2, border_radius=4)
+            # Pulsing ready ring
+            t_val = pygame.time.get_ticks() / 1000.0
+            ring_alpha = int(80 + 80 * abs(math.sin(t_val * 6)))
+            ring_surf = pygame.Surface((size + 4, size + 4), pygame.SRCALPHA)
+            pygame.draw.rect(ring_surf, (*settings.GREEN, ring_alpha),
+                             (0, 0, size + 4, size + 4), 1, border_radius=5)
+            screen.blit(ring_surf, (x - 2, y - 2))
         elif not ready:
-            pygame.draw.rect(screen, (80, 80, 80), rect, border_radius=3)
-            pygame.draw.rect(screen, (120, 120, 120), rect, 1, border_radius=3)
-            if max_cooldown > 0:
+            pygame.draw.rect(screen, (35, 35, 35), rect, border_radius=4)
+            pygame.draw.rect(screen, (80, 80, 80), rect, 1, border_radius=4)
+            # Cooldown fill bar
+            if max_cooldown > 0 and cooldown > 0:
                 pct = 1.0 - (cooldown / max_cooldown)
-                pygame.draw.rect(screen, (100, 100, 100),
-                                 (x + 1, y + 1, int((size - 2) * pct), size - 2))
+                pygame.draw.rect(screen, (60, 60, 60),
+                                 (x + 2, y + size - 4, int((size - 4) * pct), 3))
             if cooldown > 0:
-                draw_text(screen, str(int(cooldown)), rect.center, settings.WHITE, 14)
+                draw_text(screen, str(int(cooldown)), rect.center, (200, 200, 200), 13)
         else:
-            pygame.draw.rect(screen, (60, 60, 40), rect, border_radius=3)
-            pygame.draw.rect(screen, (100, 100, 60), rect, 1, border_radius=3)
+            # Has cooldown available but lacking resource (rigor)
+            pygame.draw.rect(screen, (45, 40, 20), rect, border_radius=4)
+            pygame.draw.rect(screen, (120, 100, 40), rect, 1, border_radius=4)
 
         draw_text(screen, key, (x + size // 2, y + size // 2),
-                  settings.WHITE, 12)
+                  settings.WHITE if ready else (160, 160, 160), 13)
 
     def _draw_bar(self, screen, x, y, w, h, pct, fill_color, bg_color):
-        pygame.draw.rect(screen, bg_color, (x, y, w, h))
+        # Background
+        pygame.draw.rect(screen, bg_color, (x, y, w, h), border_radius=3)
+        # Fill
         if pct > 0:
-            pygame.draw.rect(screen, fill_color, (x, y, int(w * pct), h))
-        pygame.draw.rect(screen, settings.LIGHT_GRAY, (x, y, w, h), 1)
+            fill_w = max(1, int(w * pct))
+            pygame.draw.rect(screen, fill_color, (x, y, fill_w, h), border_radius=3)
+            # Bright edge highlight
+            highlight_x = x + fill_w - 3
+            if highlight_x > x:
+                pygame.draw.rect(screen, (min(255, fill_color[0] + 80),
+                                          min(255, fill_color[1] + 80),
+                                          min(255, fill_color[2] + 80)),
+                                 (highlight_x, y + 1, 3, h - 2), border_radius=2)
+        # Border
+        pygame.draw.rect(screen, (80, 80, 100), (x, y, w, h), 1, border_radius=3)
 
     def _draw_controls(self, screen, bar_y):
         controls = [
@@ -290,30 +319,53 @@ class UI:
         H = settings.WINDOW_HEIGHT
         cx = W // 2
 
-        # Animated background particles
-        for i in range(40):
-            x = int(cx + math.sin(time_val * 0.5 + i * 0.8) * W * 0.42)
-            y = int(H * 0.5 + math.cos(time_val * 0.3 + i * 1.2) * H * 0.38)
-            alpha = int(30 + math.sin(time_val + i) * 20)
-            s = pygame.Surface((2, 2))
-            s.set_alpha(alpha)
-            s.fill(settings.WHITE)
-            screen.blit(s, (x, y))
+        # -------------------------------------------------------------
+        # 3D RETRO PERSPECTIVE VECTOR GRID PLANES
+        # -------------------------------------------------------------
+        grid_surf = pygame.Surface((W, H), pygame.SRCALPHA)
+        offset_y_grid = (time_val * 50) % 90
+        
+        # Horizontal lines that expand spacing towards the bottom (perspective)
+        for horizon_idx in range(-4, 16):
+            line_y = int(H * 0.35 + (horizon_idx * 40 + offset_y_grid) * (horizon_idx * 0.12))
+            if 45 <= line_y <= H:
+                alpha_grid = max(0, min(140, int(12 * horizon_idx)))
+                pygame.draw.line(grid_surf, (0, 160, 160, alpha_grid), (0, line_y), (W, line_y), 1)
+                
+        # Vertical lines originating from the center horizon
+        for vx_idx in range(-12, 13):
+            x_start = cx + vx_idx * 16
+            x_end = cx + vx_idx * 140
+            pygame.draw.line(grid_surf, (0, 160, 160, 25), (x_start, int(H * 0.35)), (x_end, H), 1)
+            
+        screen.blit(grid_surf, (0, 0))
 
-        # Floating math symbols near top
-        symbols = ["∫", "Σ", "√", "π", "∞", "dx", "∇", "σ"]
-        for i, sym in enumerate(symbols):
-            x = int(W * 0.06 + i * W * 0.12)
-            y = int(H * 0.06 + math.sin(time_val * 2 + i) * H * 0.015)
-            alpha = int(40 + math.sin(time_val + i * 0.5) * 20)
-            font = pygame.font.Font(None, max(16, int(H * 0.042)))
-            img = font.render(sym, True, settings.CYAN)
-            img.set_alpha(alpha)
-            screen.blit(img, (x, y))
+        # -------------------------------------------------------------
+        # MATRIX-STYLE NEON GREEN MATHEMATICAL OPERATOR STREAM CHANNELS
+        # -------------------------------------------------------------
+        for col_idx in range(8):
+            stream_x = int(W * 0.06 + col_idx * W * 0.12)
+            for row_idx in range(8):
+                stream_y = int((time_val * 90 + col_idx * 160 + row_idx * 80) % (H + 100) - 50)
+                if 0 <= stream_y <= H:
+                    formula_syms = ["Σ", "∫", "λ", "π", "∞", "√", "∂", "∇", "Δ", "θ", "χ", "∈"]
+                    sym = formula_syms[(int(time_val * 3) + col_idx + row_idx) % len(formula_syms)]
+                    # Alpha fades near vertical bounds
+                    alpha_stream = max(0, min(80, int(50 - abs(H // 2 - stream_y) / (H // 2) * 50)))
+                    font_stream = pygame.font.Font(None, 18)
+                    img_stream = font_stream.render(sym, True, settings.GREEN)
+                    img_stream.set_alpha(alpha_stream)
+                    screen.blit(img_stream, (stream_x, stream_y))
 
         # Title block — sits at ~10% from top
         top_y = int(H * 0.10)
         title_size = max(36, int(H * 0.075))
+        
+        # Layered Pulse & Glowing Shadow Title Text
+        glow_offset = int(2 + math.sin(time_val * 8) * 1.5)
+        # Background cyber-shadow
+        draw_text(screen, t("game_title"), (cx + glow_offset, top_y + glow_offset), (0, 100, 100), title_size)
+        # Foreground title
         draw_text(screen, t("game_title"), (cx, top_y), settings.CYAN, title_size)
 
         sub_y = top_y + int(H * 0.06)
@@ -332,9 +384,17 @@ class UI:
         item_gap  = max(32, int(H * 0.055))
         y_start   = int(H * 0.38)
         for i, (text, desc) in enumerate(menu_items):
-            color = settings.WHITE if i == selected_item else settings.GRAY
-            label = f"> {text} <" if i == selected_item else text
-            draw_text(screen, label, (cx, y_start + i * item_gap), color, item_size)
+            is_sel = (i == selected_item)
+            color = settings.WHITE if is_sel else settings.GRAY
+            
+            # Select brackets pulse dynamically
+            if is_sel:
+                pulse_bracket = int(200 + 55 * math.sin(time_val * 12))
+                bracket_color = (pulse_bracket, pulse_bracket, 255)
+                label = f"[ {text} ]"
+                draw_text(screen, label, (cx, y_start + i * item_gap), bracket_color, item_size + 1)
+            else:
+                draw_text(screen, text, (cx, y_start + i * item_gap), color, item_size)
 
         draw_text(screen, t("menu_nav"),
                   (cx, H - int(H * 0.04)),
@@ -382,28 +442,69 @@ class UI:
             y += 22
 
     def draw_pause(self, screen):
-        overlay = pygame.Surface((settings.WINDOW_WIDTH, settings.WINDOW_HEIGHT))
-        overlay.set_alpha(160)
-        overlay.fill(settings.BLACK)
+        # Semi-transparent overlay
+        overlay = pygame.Surface((settings.WINDOW_WIDTH, settings.WINDOW_HEIGHT), pygame.SRCALPHA)
+        overlay.fill((5, 5, 15, 180))
         screen.blit(overlay, (0, 0))
-        draw_text(screen, t("paused"),
-                  (settings.WINDOW_WIDTH // 2, settings.WINDOW_HEIGHT // 2 - 50),
-                  settings.WHITE, 48)
-        draw_text(screen, t("press_esc_resume"),
-                  (settings.WINDOW_WIDTH // 2, settings.WINDOW_HEIGHT // 2),
-                  settings.GRAY, 20)
-        draw_text(screen, t("press_q_quit"),
-                  (settings.WINDOW_WIDTH // 2, settings.WINDOW_HEIGHT // 2 + 30),
-                  settings.RED, 18)
-        draw_text(screen, t("press_q_quit_short"),
-                  (settings.WINDOW_WIDTH // 2, settings.WINDOW_HEIGHT // 2 + 50),
-                  settings.GRAY, 16)
+
+        import math
+        time_val = pygame.time.get_ticks() / 1000.0
+        cx = settings.WINDOW_WIDTH // 2
+        cy = settings.WINDOW_HEIGHT // 2
+
+        # Centered glassmorphic card
+        card_w, card_h = 340, 180
+        card_x = cx - card_w // 2
+        card_y = cy - card_h // 2 - 20
+        card_surf = pygame.Surface((card_w, card_h), pygame.SRCALPHA)
+        card_surf.fill((15, 18, 38, 235))
+        screen.blit(card_surf, (card_x, card_y))
+        pygame.draw.rect(screen, settings.CYAN, (card_x, card_y, card_w, card_h), 2, border_radius=10)
+        # Neon top accent strip
+        pygame.draw.rect(screen, settings.CYAN, (card_x, card_y, card_w, 3), border_radius=10)
+
+        # Pulsing PAUSED title
+        pulse_scale = int(46 + math.sin(time_val * 6) * 2)
+        draw_text(screen, t("paused"), (cx, card_y + 40), settings.CYAN, pulse_scale)
+
+        # Separator
+        pygame.draw.line(screen, (40, 60, 80), (card_x + 20, card_y + 75), (card_x + card_w - 20, card_y + 75), 1)
+
+        # Action hints
+        draw_text(screen, t("press_esc_resume"), (cx, card_y + 100), settings.LIGHT_GRAY, 18)
+        draw_text(screen, t("press_q_quit"), (cx, card_y + 130), settings.RED, 16)
+        draw_text(screen, t("press_q_quit_short"), (cx, card_y + 152), settings.GRAY, 14)
 
     def draw_game_over(self, screen, room_name):
-        screen.fill(settings.DARK_RED)
-        draw_text(screen, t("game_over"),
-                  (settings.WINDOW_WIDTH // 2, 200),
-                  settings.RED, 56)
+        # Premium dark blood-red glitching cyber background
+        screen.fill((16, 4, 4))
+        
+        import math
+        time_val = pygame.time.get_ticks() / 1000.0
+        W = settings.WINDOW_WIDTH
+        H = settings.WINDOW_HEIGHT
+        cx = W // 2
+
+        # Glitching math background error symbols
+        error_symbols = ["NaN", "DIV BY ZERO", "∅", "OVERFLOW", "ERROR", "∞/0", "NULL", "UNDEFINED"]
+        for i in range(12):
+            x = int((W * 0.08 + i * W * 0.14 + math.sin(time_val + i) * 15) % W)
+            y = int((H * 0.15 + i * H * 0.09 + time_val * 40) % H)
+            alpha = int(25 + 15 * math.sin(time_val * 3 + i))
+            font = pygame.font.Font(None, 16)
+            txt = font.render(error_symbols[i % len(error_symbols)], True, settings.RED)
+            txt.set_alpha(alpha)
+            screen.blit(txt, (x, y))
+            
+            # Subtle random horizontal glitch displacement lines
+            if random.random() < 0.03:
+                pygame.draw.line(screen, (150, 20, 20, 40), (0, y), (W, y), random.randint(1, 2))
+
+        # Title shadow glitching
+        glow_offset = int(math.sin(time_val * 15) * 3)
+        draw_text(screen, t("game_over"), (cx + glow_offset, 200), (80, 10, 10), 58)
+        draw_text(screen, t("game_over"), (cx, 200), settings.RED, 56)
+
         if room_name:
             draw_text(screen, t("fell_at", room=t(room_name)),
                       (settings.WINDOW_WIDTH // 2, 270),
@@ -418,41 +519,57 @@ class UI:
         draw_text(screen, t("upgrades_lost"),
                   (settings.WINDOW_WIDTH // 2, 340),
                   settings.ORANGE, 16)
+        
+        # Pulsing return button prompt
+        pulse_val = int(180 + 75 * math.sin(time_val * 8))
         draw_text(screen, t("press_enter_return"),
                   (settings.WINDOW_WIDTH // 2, 380),
-                  settings.WHITE, 18)
+                  (pulse_val, pulse_val, pulse_val), 18)
 
     def draw_victory(self, screen):
-        screen.fill(settings.DARK_BLUE)
+        # Dark golden neon cyber matrix background
+        screen.fill((10, 12, 20))
 
-        for _ in range(100):
-            x = random.randint(0, settings.WINDOW_WIDTH)
-            y = random.randint(0, settings.WINDOW_HEIGHT)
-            alpha = random.randint(30, 80)
+        import math
+        time_val = pygame.time.get_ticks() / 1000.0
+        W = settings.WINDOW_WIDTH
+        H = settings.WINDOW_HEIGHT
+        cx = W // 2
+
+        # 3D gold perspective grid lines scrolling upwards
+        grid_surf = pygame.Surface((W, H), pygame.SRCALPHA)
+        offset_y_grid = (-time_val * 40) % 80
+        for horizon_idx in range(-3, 15):
+            line_y = int(H * 0.35 + (horizon_idx * 40 + offset_y_grid) * (horizon_idx * 0.12))
+            if 0 <= line_y <= H:
+                alpha_grid = max(0, min(120, int(10 * horizon_idx)))
+                pygame.draw.line(grid_surf, (180, 140, 0, alpha_grid), (0, line_y), (W, line_y), 1)
+        for vx_idx in range(-12, 13):
+            x_start = cx + vx_idx * 16
+            x_end = cx + vx_idx * 140
+            pygame.draw.line(grid_surf, (180, 140, 0, 20), (x_start, int(H * 0.35)), (x_end, H), 1)
+        screen.blit(grid_surf, (0, 0))
+
+        # Golden sparkles
+        for _ in range(30):
+            x = random.randint(0, W)
+            y = random.randint(0, H)
+            alpha = random.randint(40, 100)
             s = pygame.Surface((3, 3))
             s.set_alpha(alpha)
-            colors = [settings.GOLD, settings.CYAN, settings.GREEN, settings.PURPLE]
-            s.fill(random.choice(colors))
+            s.fill(random.choice([settings.GOLD, settings.CYAN, settings.GREEN, settings.WHITE]))
             screen.blit(s, (x, y))
 
-        draw_text(screen, t("victory"),
-                  (settings.WINDOW_WIDTH // 2, 150),
-                  settings.GOLD, 60)
-        draw_text(screen, t("defeated_boss"),
-                  (settings.WINDOW_WIDTH // 2, 220),
-                  settings.WHITE, 24)
-        draw_text(screen, t("complexity_survives"),
-                  (settings.WINDOW_WIDTH // 2, 260),
-                  settings.CYAN, 20)
-        draw_text(screen, t("math_never_forgotten"),
-                  (settings.WINDOW_WIDTH // 2, 290),
-                  settings.LIGHT_GRAY, 18)
-        draw_text(screen, t("victory_quote"),
-                  (settings.WINDOW_WIDTH // 2, 350),
-                  settings.GRAY, 16)
-        draw_text(screen, t("press_enter_play_again"),
-                  (settings.WINDOW_WIDTH // 2, 420),
-                  settings.GRAY, 18)
+        # Pulsing title
+        glow_size = int(60 + math.sin(time_val * 5) * 2)
+        draw_text(screen, t("victory"), (cx, 150), settings.GOLD, glow_size)
+        draw_text(screen, t("defeated_boss"), (cx, 220), settings.WHITE, 24)
+        draw_text(screen, t("complexity_survives"), (cx, 260), settings.CYAN, 20)
+        draw_text(screen, t("math_never_forgotten"), (cx, 290), settings.LIGHT_GRAY, 18)
+        draw_text(screen, t("victory_quote"), (cx, 350), settings.GRAY, 16)
+
+        pulse_val = int(160 + 95 * math.sin(time_val * 6))
+        draw_text(screen, t("press_enter_play_again"), (cx, 420), (pulse_val, pulse_val, pulse_val), 18)
 
     def draw_wave_intro(self, screen, wave_data, wave_num):
         overlay = pygame.Surface((settings.WINDOW_WIDTH, settings.WINDOW_HEIGHT))
@@ -857,17 +974,27 @@ class UI:
         star_size = 15
         gap = 5
         for i in range(3):
-            color = settings.GOLD if i < count else (40, 40, 40)
+            is_lit = i < count
+            color = settings.GOLD if is_lit else (40, 40, 50)
             px = x + i * (star_size + gap)
             py = y
-            # Draw a simple star shape (diamond/cross)
+            
+            # Draw standard 4-point retro star polygon
+            half = star_size // 2
             points = [
-                (px + star_size // 2, py),
-                (px + star_size, py + star_size // 2),
-                (px + star_size // 2, py + star_size),
-                (px, py + star_size // 2)
+                (px + half, py),                  # Top
+                (px + half + 2, py + half - 2),    # Inner top-right
+                (px + star_size, py + half),      # Right
+                (px + half + 2, py + half + 2),    # Inner bottom-right
+                (px + half, py + star_size),      # Bottom
+                (px + half - 2, py + half + 2),    # Inner bottom-left
+                (px, py + half),                  # Left
+                (px + half - 2, py + half - 2)     # Inner top-left
             ]
+            
             pygame.draw.polygon(surf, color, points)
-            if i < count:
-                # Add a little glow
+            if is_lit:
+                # Add outer white glowing border
                 pygame.draw.polygon(surf, settings.WHITE, points, 1)
+                # Central sparkling core dot
+                pygame.draw.circle(surf, settings.WHITE, (px + half, py + half), 2)

@@ -1,5 +1,6 @@
 import pygame
 import math
+import random
 
 import settings
 from i18n import t
@@ -27,6 +28,7 @@ class FloatingText:
         self.scale = 0.3 if bounce else 1.0
         self.target_scale = 1.0
         self.hit_ground = False
+        self.vx = random.uniform(-15, 15) if bounce else 0
 
     def update(self, dt):
         self.age += dt
@@ -80,6 +82,9 @@ class FloatingTextSystem:
         if crit:
             self.add(x, y - 15, f"-{amount}", settings.GOLD, 24, 1.2, bounce=True, shadow=True)
             self.add(x + 15, y - 25, t("crit"), settings.GOLD, 14, 0.8, bounce=True, shadow=False)
+            # Spawn a glowing critical formula
+            formulas = ["E=mc\u00b2", "df/dx=\u221e", "a\u00b2+b\u00b2=c\u00b2", "det(A)\u22600", "sin\u00b2\u03b8+cos\u00b2\u03b8=1", "Q.E.D.", "e^(i\u03c0)+1=0"]
+            self.add_formula(x, y - 45, random.choice(formulas), settings.ORANGE)
         else:
             self.add(x, y - 10, f"-{amount}", settings.RED, 18, 0.9, bounce=True, shadow=True)
 
@@ -87,6 +92,9 @@ class FloatingTextSystem:
         if crit:
             self.add(x, y - 15, f"-{amount}", settings.YELLOW, 26, 1.2, bounce=True, shadow=True)
             self.add(x + 15, y - 28, t("crit"), settings.YELLOW, 14, 0.8, bounce=True, shadow=False)
+            # Spawn a glowing critical formula
+            formulas = ["E=mc\u00b2", "df/dx=\u221e", "a\u00b2+b\u00b2=c\u00b2", "det(A)\u22600", "sin\u00b2\u03b8+cos\u00b2\u03b8=1", "Q.E.D.", "e^(i\u03c0)+1=0"]
+            self.add_formula(x, y - 48, random.choice(formulas), settings.YELLOW)
         else:
             self.add(x, y - 10, f"-{amount}", settings.WHITE, 18, 0.9, bounce=True, shadow=True)
 
