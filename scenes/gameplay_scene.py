@@ -2515,15 +2515,66 @@ class GameplayScene(Scene):
         dist = abs(dx) + abs(dy)
         eucl = math.sqrt(dx * dx + dy * dy)
 
-        # Position info box at the top right of the screen
-        info_x = settings.WINDOW_WIDTH - 180
-        if info_x < 0:
-            info_x = 10
+        is_pitagoras = (self.state == "PLAYER_ACTION_SELECT" and self.selected_skill == "pitagoras")
+        is_reflexao = (self.state == "PLAYER_ACTION_SELECT" and self.selected_skill == "reflexao")
 
+        # Glassmorphic Card Settings
+        card_w = 210
+        card_h = 165 if is_pitagoras else (145 if is_reflexao else 135)
+        card_x = settings.WINDOW_WIDTH - card_w - 20
+        if card_x < 0:
+            card_x = 10
+        card_y = settings.ARENA_OFFSET_Y + 5
+
+        # Render glassmorphic card shadow / glow layers
+        for glow_offset in range(3, 0, -1):
+            glow_alpha = 10 - glow_offset * 2
+            glow_surf = pygame.Surface((card_w + glow_offset * 2, card_h + glow_offset * 2), pygame.SRCALPHA)
+            if is_pitagoras:
+                glow_color = (255, 215, 0, glow_alpha)
+            elif is_reflexao:
+                glow_color = (0, 255, 255, glow_alpha)
+            else:
+                glow_color = (80, 100, 220, glow_alpha)
+            pygame.draw.rect(glow_surf, glow_color, (0, 0, glow_surf.get_width(), glow_surf.get_height()), border_radius=10 + glow_offset)
+            screen.blit(glow_surf, (card_x - glow_offset, card_y - glow_offset))
+
+        # Main glass backdrop surface
+        card_surf = pygame.Surface((card_w, card_h), pygame.SRCALPHA)
+        card_surf.fill((8, 10, 22, 220))  # Ultra-dark translucent blue-black
+        
+        if is_pitagoras:
+            border_color = (255, 215, 0, 160)
+        elif is_reflexao:
+            border_color = (0, 255, 255, 160)
+        else:
+            border_color = (80, 100, 220, 160)
+            
+        pygame.draw.rect(card_surf, border_color, (0, 0, card_w, card_h), 1, border_radius=10)
+        screen.blit(card_surf, (card_x, card_y))
+
+        # Header Title
+        title_font = pygame.font.Font(None, 18)
+        if is_pitagoras:
+            title_text = "PYTHAGOREAN SCAN"
+            title_color = settings.YELLOW
+        elif is_reflexao:
+            title_text = "REFLEXAO SCAN"
+            title_color = settings.CYAN
+        else:
+            title_text = "COORDINATE ANALYZER"
+            title_color = settings.CYAN
+
+        title_img = title_font.render(title_text, True, title_color)
+        screen.blit(title_img, (card_x + 12, card_y + 8))
+
+        # Divider line
+        pygame.draw.line(screen, (50, 55, 80), (card_x + 10, card_y + 24), (card_x + card_w - 10, card_y + 24), 1)
+
+        # Standard lines
         font = pygame.font.Font(None, 16)
-        info_y = settings.ARENA_OFFSET_Y + 5
-
-        label_color = settings.CYAN
+        
+        label_color = settings.LIGHT_GRAY
         value_color = settings.WHITE
 
         lines = [
@@ -2534,6 +2585,7 @@ class GameplayScene(Scene):
         if dist > 0:
             lines.append((f"||v|| = {eucl:.2f}", settings.YELLOW))
 
+        # Get tile name
         tile_type = self.grid.tile_types.get((cc, cr), 0)
         tile_name = "LOW"
         if tile_type == -1:
@@ -2542,41 +2594,45 @@ class GameplayScene(Scene):
             tile_name = "HIGH"
         elif tile_type in (27, 11, 25, 24):
             tile_name = "STAIRS"
-        lines.append((f"Tile: {tile_name}", settings.LIGHT_GRAY))
+        lines.append((f"Tile: {tile_name}", settings.GRAY))
 
+        # Reachable check
         reachable = self.grid.get_reachable_cells(
             pc,
             pr,
             self.game.player.move_range,
             extra_blocked=self._other_player_occupied_cells(self.game.player),
         )
-        if (cc, cr) in reachable or (cc, cr) == (pc, pr):
-            can_reach = True
-        else:
-            can_reach = False
+        can_reach = (cc, cr) in reachable or (cc, cr) == (pc, pr)
         lines.append(("Reachable" if can_reach else "Blocked",
                        settings.GREEN if can_reach else settings.RED))
 
+        # Render lines inside card
+        text_y = card_y + 30
         for text, color in lines:
             img = font.render(text, True, color)
-            screen.blit(img, (info_x, info_y))
-            info_y += 16
+            screen.blit(img, (card_x + 12, text_y))
+            text_y += 16
 
-        tilted_font = pygame.font.Font(None, 13)
+        # Draw formulas/debug at the bottom of the card with bigger text
+        formula_font = pygame.font.Font(None, 18)
         if self.state == "PLAYER_INPUT" and self.show_move_range and (cc, cr) in reachable:
-            move_label = tilted_font.render(f"dpos({dx:+d},{dy:+d}) d={dist}", True, settings.BLUE)
-            screen.blit(move_label, (info_x, info_y + 4))
+            move_label = formula_font.render(f"dpos({dx:+d},{dy:+d}) d={dist}", True, settings.BLUE)
+            screen.blit(move_label, (card_x + 12, text_y + 4))
 
         if self.state == "PLAYER_ACTION_SELECT":
             if self.selected_skill == "pitagoras":
-                eucl_dist = math.sqrt(dx * dx + dy * dy)
-                skill_label = tilted_font.render(
-                    f"a^2+b^2=c^2  c={eucl_dist:.1f}", True, settings.YELLOW)
-                screen.blit(skill_label, (info_x, info_y + 4))
+                pygame.draw.line(screen, (70, 70, 40), (card_x + 10, text_y + 2), (card_x + card_w - 10, text_y + 2), 1)
+                text_y += 8
+                formula_label = formula_font.render("a² + b² = c²", True, settings.YELLOW)
+                value_label = formula_font.render(f"c = {eucl:.2f}", True, settings.GOLD)
+                screen.blit(formula_label, (card_x + 12, text_y))
+                screen.blit(value_label, (card_x + 12, text_y + 16))
             elif self.selected_skill == "reflexao":
-                skill_label = tilted_font.render(
-                    "theta_i=theta_r (reflect)", True, settings.CYAN)
-                screen.blit(skill_label, (info_x, info_y + 4))
+                pygame.draw.line(screen, (40, 70, 70), (card_x + 10, text_y + 2), (card_x + card_w - 10, text_y + 2), 1)
+                text_y += 8
+                formula_label = formula_font.render("theta_i = theta_r (reflect)", True, settings.CYAN)
+                screen.blit(formula_label, (card_x + 12, text_y))
 
     def _draw_enemy_info(self, screen):
         font = pygame.font.Font(None, 14)
